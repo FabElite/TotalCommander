@@ -21,15 +21,23 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("BLE Device Manager")
-        self.geometry("500x600")  # Aumentato l'altezza della finestra per includere il log
+        self.geometry("800x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
 
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
         self.executor = ThreadPoolExecutor(max_workers=1)
 
+        # Frame principale
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.pack(fill="both", expand=True)
+
+        # Frame sinistro per ricerca, stato connessione e comandi
+        self.left_frame = ttk.Frame(self.main_frame)
+        self.left_frame.pack(side="left", fill="y", padx=10, pady=10)
+
         # Frame per la ricerca e la connessione
-        self.frame_search = ttk.LabelFrame(self, text="Ricerca Dispositivi BLE")
+        self.frame_search = ttk.LabelFrame(self.left_frame, text="Ricerca Dispositivi BLE")
         self.frame_search.pack(fill="x", padx=10, pady=10)
 
         self.device_list = tk.Listbox(self.frame_search)
@@ -45,7 +53,7 @@ class MainWindow(tk.Tk):
         self.btn_disconnect.pack(side="top", padx=10, pady=10)
 
         # Frame per lo stato della connessione
-        self.frame_status = ttk.LabelFrame(self, text="Stato Connessione")
+        self.frame_status = ttk.LabelFrame(self.left_frame, text="Stato Connessione")
         self.frame_status.pack(fill="x", padx=10, pady=10)
 
         self.connection_status = tk.Label(self.frame_status, text="Non Connesso", fg="red")
@@ -56,10 +64,19 @@ class MainWindow(tk.Tk):
         self.progress.pack(side="left", fill="x", expand=True, padx=10, pady=10)
 
         # Frame per i comandi
-        self.frame_commands = ttk.LabelFrame(self, text="Comandi")
+        self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi")
         self.frame_commands.pack(fill="x", padx=10, pady=10)
 
         self.create_command_controls()
+
+        # Frame destro per la visualizzazione dei dati BLE
+        self.frame_data = ttk.LabelFrame(self.main_frame, text="Dati BLE FTMS")
+        self.frame_data.pack(side="left", fill="y", padx=10, pady=10)
+
+        self.create_data_fields()
+
+        self.btn_toggle_data = ttk.Button(self.frame_data, text="Abilita Dati", command=self.toggle_data)
+        self.btn_toggle_data.pack(side="top", padx=10, pady=10)
 
         # Frame per il log delle attività
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
@@ -93,6 +110,20 @@ class MainWindow(tk.Tk):
 
             btn = ttk.Button(frame, text="Invia", command=command)
             btn.pack(side="left", padx=5)
+
+    def create_data_fields(self):
+        fields = ["power", "cadence", "speed", "resistance", "total_distance", "elapsed_time"]
+        self.data_entries = {}
+        for field in fields:
+            frame = ttk.Frame(self.frame_data)
+            frame.pack(fill="x", padx=5, pady=5)
+
+            lbl = ttk.Label(frame, text=field)
+            lbl.pack(side="left", padx=5)
+
+            entry = ttk.Entry(frame, state='readonly')
+            entry.pack(side="left", padx=5)
+            self.data_entries[field.lower().replace(" ", "_")] = entry
 
     def monitor_connection_status(self):
         """Monitora lo stato della connessione e aggiorna l'etichetta."""
@@ -160,6 +191,24 @@ class MainWindow(tk.Tk):
         simulation = self.simulazione_entry.get()
         logging.getLogger().info(f"Invio comando simulazione: {simulation}%")
         self.worker.run_coroutine(self.ble_manager.set_brake_simulation(grade=int(simulation)))
+
+    def toggle_data(self):
+        if self.btn_toggle_data.cget('text') == 'Abilita Dati':
+            self.btn_toggle_data.config(text='Disabilita Dati')
+            logging.getLogger().info("Dati BLE abilitati")
+            self.worker.run_coroutine(self.ble_manager.enable_indoor_bike_data_notifications(self.update_data_fields))
+        else:
+            self.btn_toggle_data.config(text='Abilita Dati')
+            self.worker.run_coroutine(self.ble_manager.disable_indoor_bike_data_notifications())
+            # Aggiungi qui il codice per disabilitare le notifiche
+
+    def update_data_fields(self, bike_data):
+        for key, value in bike_data.items():
+            if value is not None:
+                self.data_entries[key.replace(" ", "_")].config(state='normal')
+                self.data_entries[key.replace(" ", "_")].delete(0, tk.END)
+                self.data_entries[key.replace(" ", "_")].insert(0, str(value))
+                self.data_entries[key.replace(" ", "_")].config(state='readonly')
 
 if __name__ == "__main__":
     app = MainWindow()
