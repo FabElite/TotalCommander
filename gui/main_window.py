@@ -66,7 +66,7 @@ class MainWindow(tk.Tk):
         self.progress.pack(side="left", fill="x", expand=True, padx=10, pady=10)
 
         # Frame per i comandi
-        self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi")
+        self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi manuali")
         self.frame_commands.pack(fill="x", padx=10, pady=10)
 
         self.create_command_controls()

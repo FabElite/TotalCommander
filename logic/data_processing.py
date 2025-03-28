@@ -1,12 +1,19 @@
 import csv
 from datetime import datetime
 import time
+import os
 
 class DataProcessor:
     def __init__(self):
         self.start_time = time.time()
-        self.csv_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_bike_data_log.csv"
+        self.output_dir = "output"
+        self.create_output_dir()
+        self.csv_filename = os.path.join(self.output_dir, f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_bike_data_log.csv")
         self.initialize_csv()
+
+    def create_output_dir(self):
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
     def initialize_csv(self):
         try:
