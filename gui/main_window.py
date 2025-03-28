@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
 from logic.data_processing import DataProcessor
+from tkinter import filedialog
 
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a Tkinter Text widget."""
@@ -86,6 +87,10 @@ class MainWindow(tk.Tk):
 
         self.log_text = tk.Text(self.frame_log, state='disabled', height=8)
         self.log_text.pack(fill="both", expand=True)
+
+        # Aggiungi un pulsante per caricare i comandi dal CSV
+        self.btn_load_commands = ttk.Button(self.frame_commands, text="Carica Comandi da CSV", command=self.load_commands_from_csv)
+        self.btn_load_commands.pack(side="top", padx=10, pady=10)
 
         # Avvia il monitoraggio dello stato della connessione
         self.monitor_connection_status()
@@ -214,6 +219,11 @@ class MainWindow(tk.Tk):
 
         # Salva i dati usando DataProcessor
         self.data_processor.handle_bike_data(bike_data)
+
+    def load_commands_from_csv(self):
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if file_path:
+            commands = self.data_processor.read_brake_commands_from_csv(file_path)
 
 if __name__ == "__main__":
     app = MainWindow()

@@ -39,3 +39,27 @@ class DataProcessor:
         with open(self.csv_filename, mode='a', newline='') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerow(row)
+
+    @staticmethod
+    def read_brake_commands_from_csv(file_path):
+        brake_commands = []
+        try:
+            with open(file_path, mode='r') as file:
+                reader = csv.reader(file, delimiter=';')
+                next(reader)  # Salta la prima riga (intestazione)
+                for row in reader:
+                    if row[1]:  # Se c'è un valore nella seconda colonna
+                        command_type = 1
+                        value = int(row[1])
+                    elif row[2]:  # Se c'è un valore nella terza colonna
+                        command_type = 2
+                        value = int(row[2])
+                    elif row[3]:  # Se c'è un valore nella quarta colonna
+                        command_type = 3
+                        value = int(row[3])
+                    wait_time = int(row[0])
+                    brake_commands.append((command_type, value, wait_time))
+                    print (brake_commands)
+        except Exception as e:
+            print (e)
+        return brake_commands
