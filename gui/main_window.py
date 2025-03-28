@@ -3,6 +3,7 @@ from tkinter import ttk
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
+from logic.data_processing import DataProcessor
 
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a Tkinter Text widget."""
@@ -26,6 +27,7 @@ class MainWindow(tk.Tk):
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
+        self.data_processor = DataProcessor()
         self.executor = ThreadPoolExecutor(max_workers=1)
 
         # Frame principale
@@ -209,6 +211,9 @@ class MainWindow(tk.Tk):
                 self.data_entries[key.replace(" ", "_")].delete(0, tk.END)
                 self.data_entries[key.replace(" ", "_")].insert(0, str(value))
                 self.data_entries[key.replace(" ", "_")].config(state='readonly')
+
+        # Salva i dati usando DataProcessor
+        self.data_processor.handle_bike_data(bike_data)
 
 if __name__ == "__main__":
     app = MainWindow()
