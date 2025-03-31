@@ -5,6 +5,7 @@ import logging
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
+import csv
 
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a Tkinter Text widget."""
@@ -23,8 +24,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("BLE Device Manager")
-        self.geometry("800x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
-
+        self.geometry("1000x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
@@ -42,55 +42,75 @@ class MainWindow(tk.Tk):
         # Frame per la ricerca e la connessione
         self.frame_search = ttk.LabelFrame(self.left_frame, text="Ricerca Dispositivi BLE")
         self.frame_search.pack(fill="x", padx=10, pady=10)
-
         self.device_list = tk.Listbox(self.frame_search)
         self.device_list.pack(side="left", fill="x", expand=True, padx=10, pady=10)
-
         self.btn_search = ttk.Button(self.frame_search, text="Cerca Dispositivi", command=self.search_devices)
         self.btn_search.pack(side="top", padx=10, pady=10)
-
         self.btn_connect = ttk.Button(self.frame_search, text="Connetti", command=self.connect_device)
         self.btn_connect.pack(side="top", padx=10, pady=10)
-
         self.btn_disconnect = ttk.Button(self.frame_search, text="Disconnetti", command=self.disconnect_device)
         self.btn_disconnect.pack(side="top", padx=10, pady=10)
 
         # Frame per lo stato della connessione
         self.frame_status = ttk.LabelFrame(self.left_frame, text="Stato Connessione")
         self.frame_status.pack(fill="x", padx=10, pady=10)
-
         self.connection_status = tk.Label(self.frame_status, text="Non Connesso", fg="red")
         self.connection_status.pack(side="left", padx=10, pady=10)
-
-        # Barra di avanzamento
         self.progress = ttk.Progressbar(self.frame_status, mode='indeterminate')
         self.progress.pack(side="left", fill="x", expand=True, padx=10, pady=10)
 
         # Frame per i comandi
         self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi manuali")
         self.frame_commands.pack(fill="x", padx=10, pady=10)
-
         self.create_command_controls()
+
+        # Frame comandi automatici
+        self.automatic_commands = ttk.LabelFrame(self.main_frame, text="Comandi da CSV")
+        self.automatic_commands.pack(side="left", fill="y", padx=10, pady=10, expand=False)
+
+        # Aggiungi una barra di scorrimento verticale alla tabella
+        self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
+        self.scrollbar.pack(side="right", fill="y")
+
+        # Aggiungi una tabella per visualizzare i comandi caricati
+        self.commands_table = ttk.Treeview(self.automatic_commands,
+                                           columns=("Tipo Comando", "Valore", "Tempo di Attesa"), show='headings',
+                                           yscrollcommand=self.scrollbar.set)
+        self.commands_table.heading("Tipo Comando", text="Tipo Comando")
+        self.commands_table.heading("Valore", text="Valore")
+        self.commands_table.heading("Tempo di Attesa", text="Tempo di Attesa")
+        self.commands_table.column("Tipo Comando", width=100)
+        self.commands_table.column("Valore", width=100)
+        self.commands_table.column("Tempo di Attesa", width=100)
+        self.commands_table.pack(side="top", fill="both", expand=True, padx=10, pady=10)
+        self.scrollbar.config(command=self.commands_table.yview)
+
+        # Configura i colori alternati delle righe
+        self.commands_table.tag_configure('oddrow', background='lightgrey')
+        self.commands_table.tag_configure('evenrow', background='white')
 
         # Frame destro per la visualizzazione dei dati BLE
         self.frame_data = ttk.LabelFrame(self.main_frame, text="Dati BLE FTMS")
-        self.frame_data.pack(side="left", fill="y", padx=10, pady=10)
-
+        self.frame_data.pack(side="left", fill="y", padx=10, pady=10, expand=True)
         self.create_data_fields()
-
         self.btn_toggle_data = ttk.Button(self.frame_data, text="Abilita Dati", command=self.toggle_data)
         self.btn_toggle_data.pack(side="top", padx=10, pady=10)
 
         # Frame per il log delle attività
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
         self.frame_log.pack(fill="both", expand=True, padx=10, pady=10)
-
         self.log_text = tk.Text(self.frame_log, state='disabled', height=8)
         self.log_text.pack(fill="both", expand=True)
 
         # Aggiungi un pulsante per caricare i comandi dal CSV
-        self.btn_load_commands = ttk.Button(self.frame_commands, text="Carica Comandi da CSV", command=self.load_commands_from_csv)
-        self.btn_load_commands.pack(side="top", padx=10, pady=10)
+        self.btn_load_commands = ttk.Button(self.frame_commands, text="Carica Comandi da CSV",
+                                            command=self.load_commands_from_csv)
+        self.btn_load_commands.pack(side="left", padx=10, pady=10)
+
+        # Aggiungi un pulsante per lanciare comandi automatici
+        self.btn_auto_commands = ttk.Button(self.frame_commands, text="Lancia Comandi Automatici",
+                                            command=self.launch_auto_commands)
+        self.btn_auto_commands.pack(side="left", padx=10, pady=10)
 
         # Avvia il monitoraggio dello stato della connessione
         self.monitor_connection_status()
@@ -101,20 +121,16 @@ class MainWindow(tk.Tk):
         for i, (label, command) in enumerate(commands):
             frame = ttk.Frame(self.frame_commands)
             frame.pack(fill="x", padx=5, pady=5)
-
             lbl = ttk.Label(frame, text=label)
             lbl.pack(side="left", padx=5)
-
             entry = ttk.Entry(frame)
             entry.pack(side="left", padx=5)
-            # Usa nomi di attributi specifici
             if "Livello" in label:
                 self.livello_entry = entry
             elif "Potenza" in label:
                 self.potenza_entry = entry
             elif "Simulazione" in label:
                 self.simulazione_entry = entry
-
             btn = ttk.Button(frame, text="Invia", command=command)
             btn.pack(side="left", padx=5)
 
@@ -124,10 +140,8 @@ class MainWindow(tk.Tk):
         for field in fields:
             frame = ttk.Frame(self.frame_data)
             frame.pack(fill="x", padx=5, pady=5)
-
             lbl = ttk.Label(frame, text=field)
             lbl.pack(side="left", padx=5)
-
             entry = ttk.Entry(frame, state='readonly')
             entry.pack(side="left", padx=5)
             self.data_entries[field.lower().replace(" ", "_")] = entry
@@ -175,27 +189,30 @@ class MainWindow(tk.Tk):
             self.connection_status.config(text="Non Connesso", fg="red")
         self.progress.stop()
 
-    def send_level_command(self):
-        self.executor.submit(self._send_level_command)
+    def send_level_command(self, level=None):
+        if level is None:
+            level = self.livello_entry.get()
+        self.executor.submit(self._send_level_command, level)
 
-    def _send_level_command(self):
-        level = self.livello_entry.get()
+    def _send_level_command(self, level):
         logging.getLogger().info(f"Invio comando livello: {level}/200")
         self.worker.run_coroutine(self.ble_manager.set_brake_percentage(int(level)))
 
-    def send_power_command(self):
-        self.executor.submit(self._send_power_command)
+    def send_power_command(self, power=None):
+        if power is None:
+            power = self.potenza_entry.get()
+        self.executor.submit(self._send_power_command, power)
 
-    def _send_power_command(self):
-        power = self.potenza_entry.get()
+    def _send_power_command(self, power):
         logging.getLogger().info(f"Invio comando potenza: {power}W")
         self.worker.run_coroutine(self.ble_manager.set_brake_power(int(power)))
 
-    def send_simulation_command(self):
-        self.executor.submit(self._send_simulation_command)
+    def send_simulation_command(self, simulation=None):
+        if simulation is None:
+            simulation = self.simulazione_entry.get()
+        self.executor.submit(self._send_simulation_command, simulation)
 
-    def _send_simulation_command(self):
-        simulation = self.simulazione_entry.get()
+    def _send_simulation_command(self, simulation):
         logging.getLogger().info(f"Invio comando simulazione: {simulation}%")
         self.worker.run_coroutine(self.ble_manager.set_brake_simulation(grade=int(simulation)))
 
@@ -207,7 +224,6 @@ class MainWindow(tk.Tk):
         else:
             self.btn_toggle_data.config(text='Abilita Dati')
             self.worker.run_coroutine(self.ble_manager.disable_indoor_bike_data_notifications())
-            # Aggiungi qui il codice per disabilitare le notifiche
 
     def update_data_fields(self, bike_data):
         for key, value in bike_data.items():
@@ -216,14 +232,58 @@ class MainWindow(tk.Tk):
                 self.data_entries[key.replace(" ", "_")].delete(0, tk.END)
                 self.data_entries[key.replace(" ", "_")].insert(0, str(value))
                 self.data_entries[key.replace(" ", "_")].config(state='readonly')
-
-        # Salva i dati usando DataProcessor
         self.data_processor.handle_bike_data(bike_data)
 
     def load_commands_from_csv(self):
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
             commands = self.data_processor.read_brake_commands_from_csv(file_path)
+            for i, command in enumerate(commands):
+                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                self.commands_table.insert("", "end", values=command, tags=(tag,))
+
+    def launch_auto_commands(self):
+        # Controlla se la tabella "Comandi da CSV" non è vuota
+        if not self.commands_table.get_children():
+            logging.getLogger().info("La tabella dei comandi è vuota.")
+            return
+
+        # Ottieni tutti i comandi dalla tabella
+        commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
+        command_items = self.commands_table.get_children()
+
+        # Funzione ricorsiva per inviare i comandi uno alla volta
+        def send_next_command(index):
+            if index < len(commands):
+                command_type, value, wait_time = commands[index]
+                wait_time = int(wait_time)  # Converti wait_time in intero
+
+                # Rimuovi il colore speciale dalla riga precedente
+                if index > 0:
+                    self.commands_table.item(command_items[index - 1],
+                                             tags=('evenrow' if (index - 1) % 2 == 0 else 'oddrow',))
+
+                # Applica il colore speciale alla riga corrente
+                self.commands_table.item(command_items[index], tags=('currentrow',))
+
+                # Invia il comando appropriato in base al tipo di comando
+                if command_type == "potenza":
+                    self.send_power_command(value)
+                elif command_type == "livelli":
+                    self.send_level_command(value)
+                elif command_type == "simulazione":
+                    self.send_simulation_command(value)
+
+                # Attendi il tempo specificato prima di inviare il prossimo comando
+                self.after(wait_time * 1000, lambda: send_next_command(index + 1))
+
+        # Configura i colori delle righe
+        self.commands_table.tag_configure('oddrow', background='lightgrey')
+        self.commands_table.tag_configure('evenrow', background='white')
+        self.commands_table.tag_configure('currentrow', background='yellow')
+
+        # Inizia l'invio dei comandi dal primo comando
+        send_next_command(0)
 
 if __name__ == "__main__":
     app = MainWindow()

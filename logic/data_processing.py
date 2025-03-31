@@ -49,17 +49,17 @@ class DataProcessor:
                 next(reader)  # Salta la prima riga (intestazione)
                 for row in reader:
                     if row[1]:  # Se c'è un valore nella seconda colonna
-                        command_type = 1
+                        command_type = "livelli"
                         value = int(row[1])
                     elif row[2]:  # Se c'è un valore nella terza colonna
-                        command_type = 2
+                        command_type = "potenza"
                         value = int(row[2])
                     elif row[3]:  # Se c'è un valore nella quarta colonna
-                        command_type = 3
+                        command_type = "simulazione"
                         value = int(row[3])
                     wait_time = int(row[0])
                     brake_commands.append((command_type, value, wait_time))
-                    print (brake_commands)
+                    print(brake_commands)
         except Exception as e:
-            print (e)
+            print(e)
         return brake_commands
