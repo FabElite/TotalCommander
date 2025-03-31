@@ -6,9 +6,12 @@ from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
 import csv
+import functools
+
 
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a Tkinter Text widget."""
+
     def __init__(self, text_widget):
         super().__init__()
         self.text_widget = text_widget
@@ -20,16 +23,18 @@ class TextHandler(logging.Handler):
         self.text_widget.config(state='disabled')
         self.text_widget.yview(tk.END)
 
+
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("BLE Device Manager")
+        self.title("Total Commander")
         self.geometry("1000x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
         self.data_processor = DataProcessor()
         self.executor = ThreadPoolExecutor(max_workers=1)
+        self.auto_commands_running = False  # Stato dei comandi automatici
 
         # Frame principale
         self.main_frame = ttk.Frame(self)
@@ -59,14 +64,18 @@ class MainWindow(tk.Tk):
         self.progress = ttk.Progressbar(self.frame_status, mode='indeterminate')
         self.progress.pack(side="left", fill="x", expand=True, padx=10, pady=10)
 
-        # Frame per i comandi
+        # Frame per i comandi manuali
         self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi manuali")
         self.frame_commands.pack(fill="x", padx=10, pady=10)
         self.create_command_controls()
 
-        # Frame comandi automatici
-        self.automatic_commands = ttk.LabelFrame(self.main_frame, text="Comandi da CSV")
-        self.automatic_commands.pack(side="left", fill="y", padx=10, pady=10, expand=False)
+        # Frame contenitore per la seconda colonna
+        self.middle_frame = ttk.Frame(self.main_frame)
+        self.middle_frame.pack(side="left", fill="y", padx=10, pady=10)
+
+        # Frame comandi da CSV
+        self.automatic_commands = ttk.LabelFrame(self.middle_frame, text="Comandi da CSV")
+        self.automatic_commands.pack(side="top", fill="y", padx=10, pady=10, expand=False)
 
         # Aggiungi una barra di scorrimento verticale alla tabella
         self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
@@ -74,20 +83,44 @@ class MainWindow(tk.Tk):
 
         # Aggiungi una tabella per visualizzare i comandi caricati
         self.commands_table = ttk.Treeview(self.automatic_commands,
-                                           columns=("Tipo Comando", "Valore", "Tempo di Attesa"), show='headings',
+                                           columns=("Comando", "Valore", "Tempo [s]"), show='headings',
                                            yscrollcommand=self.scrollbar.set)
-        self.commands_table.heading("Tipo Comando", text="Tipo Comando")
+        self.commands_table.heading("Comando", text="Comando")
         self.commands_table.heading("Valore", text="Valore")
-        self.commands_table.heading("Tempo di Attesa", text="Tempo di Attesa")
-        self.commands_table.column("Tipo Comando", width=100)
+        self.commands_table.heading("Tempo [s]", text="Tempo [s]")
+        self.commands_table.column("Comando", width=100)
         self.commands_table.column("Valore", width=100)
-        self.commands_table.column("Tempo di Attesa", width=100)
+        self.commands_table.column("Tempo [s]", width=100)
         self.commands_table.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         self.scrollbar.config(command=self.commands_table.yview)
 
         # Configura i colori alternati delle righe
         self.commands_table.tag_configure('oddrow', background='lightgrey')
         self.commands_table.tag_configure('evenrow', background='white')
+        self.commands_table.tag_configure('currentrow', background='yellow')
+
+        # Frame per i comandi automatici
+        self.frame_auto_commands = ttk.LabelFrame(self.middle_frame, text="Comandi automatici")
+        self.frame_auto_commands.pack(side="top", fill="x", padx=10, pady=10)
+
+        # Pulsante per caricare i comandi dal CSV
+        self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
+                                            command=self.load_commands_from_csv)
+        self.btn_load_commands.pack(side="top", padx=10, pady=5)
+
+        # Pulsante per lanciare comandi automatici
+        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Lancia Comandi Automatici",
+                                            command=self.launch_auto_commands)
+        self.btn_auto_commands.pack(side="top", padx=10, pady=5)
+
+        # Pulsante per fermare comandi automatici
+        self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Ferma Comandi Automatici",
+                                                 command=self.stop_auto_commands)
+        self.btn_stop_auto_commands.pack(side="top", padx=10, pady=5)
+
+        # LED di stato per comandi automatici
+        self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
+        self.led_status.pack(side="top", padx=10, pady=5)
 
         # Frame destro per la visualizzazione dei dati BLE
         self.frame_data = ttk.LabelFrame(self.main_frame, text="Dati BLE FTMS")
@@ -101,16 +134,6 @@ class MainWindow(tk.Tk):
         self.frame_log.pack(fill="both", expand=True, padx=10, pady=10)
         self.log_text = tk.Text(self.frame_log, state='disabled', height=8)
         self.log_text.pack(fill="both", expand=True)
-
-        # Aggiungi un pulsante per caricare i comandi dal CSV
-        self.btn_load_commands = ttk.Button(self.frame_commands, text="Carica Comandi da CSV",
-                                            command=self.load_commands_from_csv)
-        self.btn_load_commands.pack(side="left", padx=10, pady=10)
-
-        # Aggiungi un pulsante per lanciare comandi automatici
-        self.btn_auto_commands = ttk.Button(self.frame_commands, text="Lancia Comandi Automatici",
-                                            command=self.launch_auto_commands)
-        self.btn_auto_commands.pack(side="left", padx=10, pady=10)
 
         # Avvia il monitoraggio dello stato della connessione
         self.monitor_connection_status()
@@ -235,8 +258,18 @@ class MainWindow(tk.Tk):
         self.data_processor.handle_bike_data(bike_data)
 
     def load_commands_from_csv(self):
+        # Controlla se ci sono comandi automatici in corso
+        if self.auto_commands_running:
+            logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
+            return
+
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
+            # Elimina i valori precedenti dalla tabella
+            for item in self.commands_table.get_children():
+                self.commands_table.delete(item)
+
+            # Carica i nuovi comandi dal file CSV
             commands = self.data_processor.read_brake_commands_from_csv(file_path)
             for i, command in enumerate(commands):
                 tag = 'evenrow' if i % 2 == 0 else 'oddrow'
@@ -252,9 +285,13 @@ class MainWindow(tk.Tk):
         commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
         command_items = self.commands_table.get_children()
 
+        # Resetta i colori delle righe
+        for index, item in enumerate(command_items):
+            self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
+
         # Funzione ricorsiva per inviare i comandi uno alla volta
         def send_next_command(index):
-            if index < len(commands):
+            if index < len(commands) and self.auto_commands_running:
                 command_type, value, wait_time = commands[index]
                 wait_time = int(wait_time)  # Converti wait_time in intero
 
@@ -275,7 +312,12 @@ class MainWindow(tk.Tk):
                     self.send_simulation_command(value)
 
                 # Attendi il tempo specificato prima di inviare il prossimo comando
-                self.after(wait_time * 1000, lambda: send_next_command(index + 1))
+                self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
+            else:
+                # Comandi automatici completati
+                self.auto_commands_running = False
+                self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
+                logging.getLogger().info("Comandi automatici completati")
 
         # Configura i colori delle righe
         self.commands_table.tag_configure('oddrow', background='lightgrey')
@@ -283,7 +325,27 @@ class MainWindow(tk.Tk):
         self.commands_table.tag_configure('currentrow', background='yellow')
 
         # Inizia l'invio dei comandi dal primo comando
+        self.auto_commands_running = True
+        self.led_status.config(text="Comandi Automatici: ON", fg="green")
         send_next_command(0)
+
+    def stop_auto_commands(self):
+        if self.auto_commands_running:
+            self.auto_commands_running = False
+            self.led_status.config(text="Comandi Automatici: OFF", fg="red")
+            if hasattr(self, 'auto_command_id'):
+                self.after_cancel(self.auto_command_id)  # Ferma l'invio dei comandi automatici
+                logging.getLogger().info("Comandi automatici interrotti")
+
+                # Rimuovi il colore speciale dalla riga corrente
+                for item in self.commands_table.get_children():
+                    if 'currentrow' in self.commands_table.item(item, 'tags'):
+                        index = self.commands_table.index(item)
+                        self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
+                        break
+        else:
+            logging.getLogger().info("Non ci sono comandi automatici attivi")
+
 
 if __name__ == "__main__":
     app = MainWindow()

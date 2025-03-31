@@ -59,7 +59,6 @@ class DataProcessor:
                         value = int(row[3])
                     wait_time = int(row[0])
                     brake_commands.append((command_type, value, wait_time))
-                    print(brake_commands)
         except Exception as e:
             print(e)
         return brake_commands
