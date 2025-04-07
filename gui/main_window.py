@@ -263,7 +263,13 @@ class MainWindow(tk.Tk):
                 self.data_entries[key.replace(" ", "_")].delete(0, tk.END)
                 self.data_entries[key.replace(" ", "_")].insert(0, str(value))
                 self.data_entries[key.replace(" ", "_")].config(state='readonly')
-        self.data_processor.handle_bike_data(bike_data)
+
+        # Aggiungi la lettura dei dati del Lorenz
+        lorenz_data = self.lorenz_reader.get_data()
+        combined_data = {**bike_data, **lorenz_data}
+
+        # Passa i dati combinati al data processor
+        self.data_processor.handle_bike_data(combined_data)
 
     def load_commands_from_csv(self):
         # Controlla se ci sono comandi automatici in corso

@@ -19,7 +19,7 @@ class DataProcessor:
         try:
             with open(self.csv_filename, mode='x', newline='') as file:
                 writer = csv.writer(file, delimiter=';')
-                writer.writerow(["timestamp", "ms", "speed", "cadence", "power", "total_distance", "resistance", "elapsed_time"])
+                writer.writerow(["timestamp", "ms", "speed", "cadence", "power", "total_distance", "resistance", "elapsed_time", "offset", "speed_avg", "torque_lorenz", "power_lorenz"])
         except FileExistsError:
             pass
 
@@ -34,7 +34,11 @@ class DataProcessor:
             data.get("power", ""),
             data.get("total_distance", ""),
             data.get("resistance", ""),
-            data.get("elapsed_time", "")
+            data.get("elapsed_time", ""),
+            data.get("offset", ""),
+            data.get("speed_avg", ""),
+            data.get("torque_lorenz", ""),
+            data.get("power_lorenz", "")
         ]
         with open(self.csv_filename, mode='a', newline='') as file:
             writer = csv.writer(file, delimiter=';')
