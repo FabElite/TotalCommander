@@ -3,15 +3,15 @@ from tkinter import ttk
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
+from shared_lib.LorenzLib import LorenzReader
+from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
 import csv
 import functools
 
-
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a Tkinter Text widget."""
-
     def __init__(self, text_widget):
         super().__init__()
         self.text_widget = text_widget
@@ -23,19 +23,17 @@ class TextHandler(logging.Handler):
         self.text_widget.config(state='disabled')
         self.text_widget.yview(tk.END)
 
-
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander")
-        self.geometry("1000x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
+        self.geometry("1200x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
         self.data_processor = DataProcessor()
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.auto_commands_running = False  # Stato dei comandi automatici
-
         # Frame principale
         self.main_frame = ttk.Frame(self)
         self.main_frame.pack(fill="both", expand=True)
@@ -129,6 +127,11 @@ class MainWindow(tk.Tk):
         self.btn_toggle_data = ttk.Button(self.frame_data, text="Abilita Dati", command=self.toggle_data)
         self.btn_toggle_data.pack(side="top", padx=10, pady=10)
 
+        # Frame per la gestione del Lorenz
+        self.frame_lorenz = ttk.LabelFrame(self.main_frame, text="Gestione Lorenz")
+        self.frame_lorenz.pack(side="left", fill="y", padx=10, pady=10, expand=True)
+        self.create_lorenz_controls()
+
         # Frame per il log delle attività
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
         self.frame_log.pack(fill="both", expand=True, padx=10, pady=10)
@@ -137,6 +140,10 @@ class MainWindow(tk.Tk):
 
         # Avvia il monitoraggio dello stato della connessione
         self.monitor_connection_status()
+
+        # Sovrascrivi il protocollo di chiusura della finestra
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
 
     def create_command_controls(self):
         commands = [("Livello [/200]", self.send_level_command), ("Potenza [W]", self.send_power_command),
@@ -262,13 +269,11 @@ class MainWindow(tk.Tk):
         if self.auto_commands_running:
             logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
             return
-
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
             # Elimina i valori precedenti dalla tabella
             for item in self.commands_table.get_children():
                 self.commands_table.delete(item)
-
             # Carica i nuovi comandi dal file CSV
             commands = self.data_processor.read_brake_commands_from_csv(file_path)
             for i, command in enumerate(commands):
@@ -280,29 +285,23 @@ class MainWindow(tk.Tk):
         if not self.commands_table.get_children():
             logging.getLogger().info("La tabella dei comandi è vuota.")
             return
-
         # Ottieni tutti i comandi dalla tabella
         commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
         command_items = self.commands_table.get_children()
-
         # Resetta i colori delle righe
         for index, item in enumerate(command_items):
             self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
-
         # Funzione ricorsiva per inviare i comandi uno alla volta
         def send_next_command(index):
             if index < len(commands) and self.auto_commands_running:
                 command_type, value, wait_time = commands[index]
                 wait_time = int(wait_time)  # Converti wait_time in intero
-
                 # Rimuovi il colore speciale dalla riga precedente
                 if index > 0:
                     self.commands_table.item(command_items[index - 1],
                                              tags=('evenrow' if (index - 1) % 2 == 0 else 'oddrow',))
-
                 # Applica il colore speciale alla riga corrente
                 self.commands_table.item(command_items[index], tags=('currentrow',))
-
                 # Invia il comando appropriato in base al tipo di comando
                 if command_type == "potenza":
                     self.send_power_command(value)
@@ -310,7 +309,6 @@ class MainWindow(tk.Tk):
                     self.send_level_command(value)
                 elif command_type == "simulazione":
                     self.send_simulation_command(value)
-
                 # Attendi il tempo specificato prima di inviare il prossimo comando
                 self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
             else:
@@ -318,12 +316,10 @@ class MainWindow(tk.Tk):
                 self.auto_commands_running = False
                 self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
                 logging.getLogger().info("Comandi automatici completati")
-
-        # Configura i colori delle righe
-        self.commands_table.tag_configure('oddrow', background='lightgrey')
-        self.commands_table.tag_configure('evenrow', background='white')
-        self.commands_table.tag_configure('currentrow', background='yellow')
-
+                # Configura i colori delle righe
+                self.commands_table.tag_configure('oddrow', background='lightgrey')
+                self.commands_table.tag_configure('evenrow', background='white')
+                self.commands_table.tag_configure('currentrow', background='yellow')
         # Inizia l'invio dei comandi dal primo comando
         self.auto_commands_running = True
         self.led_status.config(text="Comandi Automatici: ON", fg="green")
@@ -335,16 +331,93 @@ class MainWindow(tk.Tk):
             self.led_status.config(text="Comandi Automatici: OFF", fg="red")
             if hasattr(self, 'auto_command_id'):
                 self.after_cancel(self.auto_command_id)  # Ferma l'invio dei comandi automatici
-                logging.getLogger().info("Comandi automatici interrotti")
-
-                # Rimuovi il colore speciale dalla riga corrente
-                for item in self.commands_table.get_children():
-                    if 'currentrow' in self.commands_table.item(item, 'tags'):
-                        index = self.commands_table.index(item)
-                        self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
-                        break
+            logging.getLogger().info("Comandi automatici interrotti")
+            # Rimuovi il colore speciale dalla riga corrente
+            for item in self.commands_table.get_children():
+                if 'currentrow' in self.commands_table.item(item, 'tags'):
+                    index = self.commands_table.index(item)
+                    self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
+                    break
         else:
             logging.getLogger().info("Non ci sono comandi automatici attivi")
+
+    def create_lorenz_controls(self):
+        self.lorenz_reader = LorenzReader()
+        self.lorenz_controls = ttk.Frame(self.frame_lorenz)
+        self.lorenz_controls.pack(fill="x", padx=5, pady=5)
+        self.lorenz_status = tk.Label(self.lorenz_controls, text="Lorenz: Non Connesso", fg="red")
+        self.lorenz_status.pack(side="top", padx=5, pady=5)
+        self.btn_connect_lorenz = ttk.Button(self.lorenz_controls, text="Connetti Lorenz", command=self.connect_lorenz)
+        self.btn_connect_lorenz.pack(side="top", padx=5, pady=5)
+        self.btn_disconnect_lorenz = ttk.Button(self.lorenz_controls, text="Disconnetti Lorenz",
+                                                command=self.disconnect_lorenz)
+        self.btn_disconnect_lorenz.pack(side="top", padx=5, pady=5)
+        self.btn_read_offset = ttk.Button(self.lorenz_controls, text="Leggi Offset", command=self.read_lorenz_offset)
+        self.btn_read_offset.pack(side="top", padx=5, pady=5)
+
+        # Campi di visualizzazione per i dati Lorenz
+        self.offset_label = self.create_data_field(self.lorenz_controls, "Offset")
+        self.speed_avg_label = self.create_data_field(self.lorenz_controls, "Speed Avg")
+        self.torque_lorenz_label = self.create_data_field(self.lorenz_controls, "Torque Lorenz")
+        self.power_lorenz_label = self.create_data_field(self.lorenz_controls, "Power Lorenz")
+
+    def create_data_field(self, parent, label_text):
+        frame = ttk.Frame(parent)
+        frame.pack(fill="x", padx=5, pady=5)
+        lbl = ttk.Label(frame, text=label_text)
+        lbl.pack(side="left", padx=5)
+        entry = ttk.Entry(frame, state='readonly')
+        entry.pack(side="left", padx=5)
+        return entry
+
+    def update_lorenz_data(self, offset, speed_avg, torque_lorenz, power_lorenz):
+        self.offset_label.config(state='normal')
+        self.offset_label.delete(0, tk.END)
+        self.offset_label.insert(0, f"{offset:.2f}")
+        self.offset_label.config(state='readonly')
+
+        self.speed_avg_label.config(state='normal')
+        self.speed_avg_label.delete(0, tk.END)
+        self.speed_avg_label.insert(0, f"{speed_avg:.2f}")
+        self.speed_avg_label.config(state='readonly')
+
+        self.torque_lorenz_label.config(state='normal')
+        self.torque_lorenz_label.delete(0, tk.END)
+        self.torque_lorenz_label.insert(0, f"{torque_lorenz:.2f}")
+        self.torque_lorenz_label.config(state='readonly')
+
+        self.power_lorenz_label.config(state='normal')
+        self.power_lorenz_label.delete(0, tk.END)
+        self.power_lorenz_label.insert(0, f"{power_lorenz:.2f}")
+        self.power_lorenz_label.config(state='readonly')
+
+    def connect_lorenz(self):
+        porta_com_lorenz = trova_porta_usb_serial("Lorenz USB sensor interface Port")
+        if porta_com_lorenz:
+            if self.lorenz_reader.open_connection(int(porta_com_lorenz.split("COM")[-1])):
+                self.lorenz_reader.set_data_callback(self.update_lorenz_data)
+                self.lorenz_status.config(text="Lorenz: Connesso", fg="green")
+                logging.getLogger().info("Lorenz Connesso")
+            else:
+                self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
+                logging.getLogger().info("Lorenz non connesso")
+        else:
+            self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
+            logging.getLogger().info("Lorenz non connesso")
+
+    def disconnect_lorenz(self):
+        if self.lorenz_reader.close_connection():
+            self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
+
+    def read_lorenz_offset(self):
+        self.lorenz_reader.read_offset()
+        logging.getLogger().info(f"Offset letto: {self.lorenz_reader.offset}")
+
+
+    def on_closing(self):
+        if self.lorenz_reader.connected:
+            self.lorenz_reader.close_connection()
+        self.destroy()
 
 
 if __name__ == "__main__":
