@@ -26,6 +26,7 @@ class TextHandler(logging.Handler):
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.lorenz_update_id = None  # Variabile per gestire l'aggiornamento periodico
         self.title("Total Commander")
         self.geometry("1200x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
         self.worker = AsyncioWorker()
@@ -370,34 +371,38 @@ class MainWindow(tk.Tk):
         entry.pack(side="left", padx=5)
         return entry
 
-    def update_lorenz_data(self, offset, speed_avg, torque_lorenz, power_lorenz):
+    def update_lorenz_data(self):
+        offset = self.lorenz_reader.get_offset()
+        data = self.lorenz_reader.get_data()
+
         self.offset_label.config(state='normal')
         self.offset_label.delete(0, tk.END)
-        self.offset_label.insert(0, f"{offset:.2f}")
+        self.offset_label.insert(0, f"{offset:.2f}" if offset is not None else "N/A")
         self.offset_label.config(state='readonly')
 
         self.speed_avg_label.config(state='normal')
         self.speed_avg_label.delete(0, tk.END)
-        self.speed_avg_label.insert(0, f"{speed_avg:.2f}")
+        self.speed_avg_label.insert(0, f"{data['speed_avg']:.2f}" if data['speed_avg'] is not None else "N/A")
         self.speed_avg_label.config(state='readonly')
 
         self.torque_lorenz_label.config(state='normal')
         self.torque_lorenz_label.delete(0, tk.END)
-        self.torque_lorenz_label.insert(0, f"{torque_lorenz:.2f}")
+        self.torque_lorenz_label.insert(0,
+                                        f"{data['torque_lorenz']:.2f}" if data['torque_lorenz'] is not None else "N/A")
         self.torque_lorenz_label.config(state='readonly')
 
         self.power_lorenz_label.config(state='normal')
         self.power_lorenz_label.delete(0, tk.END)
-        self.power_lorenz_label.insert(0, f"{power_lorenz:.2f}")
+        self.power_lorenz_label.insert(0, f"{data['power_lorenz']:.2f}" if data['power_lorenz'] is not None else "N/A")
         self.power_lorenz_label.config(state='readonly')
 
     def connect_lorenz(self):
         porta_com_lorenz = trova_porta_usb_serial("Lorenz USB sensor interface Port")
         if porta_com_lorenz:
             if self.lorenz_reader.open_connection(int(porta_com_lorenz.split("COM")[-1])):
-                self.lorenz_reader.set_data_callback(self.update_lorenz_data)
                 self.lorenz_status.config(text="Lorenz: Connesso", fg="green")
                 logging.getLogger().info("Lorenz Connesso")
+                self.start_lorenz_update()  # Avvia l'aggiornamento periodico
             else:
                 self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
                 logging.getLogger().info("Lorenz non connesso")
@@ -405,9 +410,20 @@ class MainWindow(tk.Tk):
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
             logging.getLogger().info("Lorenz non connesso")
 
+    def start_lorenz_update(self):
+        self.update_lorenz_data()
+        self.lorenz_update_id = self.after(500, self.start_lorenz_update)  # Richiama ogni 500 ms (2 volte al secondo)
+
+    def stop_lorenz_update(self):
+        if self.lorenz_update_id is not None:
+            self.after_cancel(self.lorenz_update_id)
+            self.lorenz_update_id = None
+
     def disconnect_lorenz(self):
         if self.lorenz_reader.close_connection():
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
+            self.stop_lorenz_update()  # Ferma l'aggiornamento periodico
+
 
     def read_lorenz_offset(self):
         self.lorenz_reader.read_offset()
