@@ -5,10 +5,9 @@ import logging
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
+from shared_lib.modbus_utils import ModbusBancoCollaudo
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
-import csv
-import functools
 
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a Tkinter Text widget."""
@@ -28,7 +27,7 @@ class MainWindow(tk.Tk):
         super().__init__()
         self.lorenz_update_id = None  # Variabile per gestire l'aggiornamento periodico
         self.title("Total Commander")
-        self.geometry("1200x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
+        self.geometry("1350x700")  # Aumentato la larghezza della finestra per includere il nuovo blocco
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
@@ -82,14 +81,16 @@ class MainWindow(tk.Tk):
 
         # Aggiungi una tabella per visualizzare i comandi caricati
         self.commands_table = ttk.Treeview(self.automatic_commands,
-                                           columns=("Comando", "Valore", "Tempo [s]"), show='headings',
+                                           columns=("Comando", "Valore", "Tempo [s]", "Vel Banco [km/h]"), show='headings',
                                            yscrollcommand=self.scrollbar.set)
         self.commands_table.heading("Comando", text="Comando")
         self.commands_table.heading("Valore", text="Valore")
         self.commands_table.heading("Tempo [s]", text="Tempo [s]")
+        self.commands_table.heading("Vel Banco [km/h]", text="Vel Banco [km/h]")
         self.commands_table.column("Comando", width=100)
         self.commands_table.column("Valore", width=100)
         self.commands_table.column("Tempo [s]", width=100)
+        self.commands_table.column("Vel Banco [km/h]", width=100)
         self.commands_table.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         self.scrollbar.config(command=self.commands_table.yview)
 
@@ -282,7 +283,7 @@ class MainWindow(tk.Tk):
             for item in self.commands_table.get_children():
                 self.commands_table.delete(item)
             # Carica i nuovi comandi dal file CSV
-            commands = self.data_processor.read_brake_commands_from_csv(file_path)
+            commands = DataProcessor.read_brake_commands_from_csv(file_path)
             for i, command in enumerate(commands):
                 tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                 self.commands_table.insert("", "end", values=command, tags=(tag,))
