@@ -374,7 +374,7 @@ class MainWindow(tk.Tk):
                     self.send_simulation_command(value)
 
                 if self.modbus.is_connesso() and speed_banco is not None:
-                    self.modbus.set_motor_speed(speed_banco)
+                    self.setspeed_modbus(speed_banco)
 
                 # Attendi il tempo specificato prima di inviare il prossimo comando
                 self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
@@ -459,7 +459,7 @@ class MainWindow(tk.Tk):
 
         # Pulsante Zero Speed
         self.btn_zero_speed = ttk.Button(self.banco_controls, text="ZERO SPEED",
-                                         command=lambda: self.clicked_button_setspeed_modbus(0))
+                                         command=lambda: self.setspeed_modbus(0))
         self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=5, pady=10, sticky="ew")
 
     def create_labeled_entry(self, parent, label_text, row):
@@ -480,7 +480,6 @@ class MainWindow(tk.Tk):
             self.torque_lorenz_label: data.get("torque_lorenz"),
             self.power_lorenz_label: data.get("power_lorenz"),
         }
-
         for entry, val in values.items():
             entry.config(state='normal')
             entry.delete(0, tk.END)
@@ -525,13 +524,16 @@ class MainWindow(tk.Tk):
         else:
             self.modbus.disconnetti()
 
-    def clicked_button_setspeed_modbus(self, speed=None):
+    def clicked_button_setspeed_modbus(self):
+        self.setspeed_modbus(int(self.speed_banco_entry.get()) * 10)
+
+    def setspeed_modbus(self, speed):
         try:
             if speed is None:
-                speed_int = int(self.speed_banco_entry.get()) * 10
-            else:
-                speed_int = speed
-            self.modbus.set_motor_speed(speed_int)
+                raise ValueError("La velocità non può essere None")
+            if speed > 80:
+                raise ValueError("La velocità richiesta è superiore a 80km/h. Comando rifiutato.")
+            self.modbus.set_motor_speed(speed)
         except Exception as e:
             # Cattura altre eccezioni non previste
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
