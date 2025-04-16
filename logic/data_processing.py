@@ -61,8 +61,11 @@ class DataProcessor:
                     elif row[3]:  # Se c'è un valore nella quarta colonna
                         command_type = "simulazione"
                         value = int(row[3])
-                    if row[4]:  # Se c'è un valore nella quarta colonna
-                        speed_banco = int(row[4])
+
+                    speed_banco = None
+                    if len(row) >= 5: # Assicurati che la riga abbia almeno 5 colonne
+                        speed_banco = int(row[4]) if row[4] else None
+
                     wait_time = int(row[0])
                     brake_commands.append((command_type, value, wait_time, speed_banco))
         except Exception as e:
