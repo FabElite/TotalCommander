@@ -373,8 +373,11 @@ class MainWindow(tk.Tk):
                 elif command_type == "simulazione":
                     self.send_simulation_command(value)
 
-                if self.modbus.is_connesso() and speed_banco is not None:
-                    self.setspeed_modbus(speed_banco)
+                if speed_banco is not None and speed_banco != "None":
+                    self.setspeed_modbus(float(speed_banco))
+                else:
+                    # Gestisci il caso in cui speed_banco sia None o "None"
+                    print("speed_banco is None or 'None'")
 
                 # Attendi il tempo specificato prima di inviare il prossimo comando
                 self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
@@ -525,15 +528,15 @@ class MainWindow(tk.Tk):
             self.modbus.disconnetti()
 
     def clicked_button_setspeed_modbus(self):
-        self.setspeed_modbus(int(self.speed_banco_entry.get()) * 10)
+        self.setspeed_modbus(int(self.speed_banco_entry.get()))
 
-    def setspeed_modbus(self, speed):
+    def setspeed_modbus(self, speedkmh):
         try:
-            if speed is None:
+            if speedkmh is None:
                 raise ValueError("La velocità non può essere None")
-            if speed > 80:
+            if speedkmh > 80:
                 raise ValueError("La velocità richiesta è superiore a 80km/h. Comando rifiutato.")
-            self.modbus.set_motor_speed(speed)
+            self.modbus.set_motor_speed(speedkmh*10)
         except Exception as e:
             # Cattura altre eccezioni non previste
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
