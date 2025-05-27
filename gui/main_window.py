@@ -172,7 +172,7 @@ class MainWindow(tk.Tk):
 
 
         # Avvia il monitoraggio dello stato della connessione
-        self.monitor_connection_status()
+        self.periodic_connection_check()
 
         # Sovrascrivi il protocollo di chiusura della finestra
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -222,21 +222,59 @@ class MainWindow(tk.Tk):
         self.btn_toggle_data = ttk.Button(self.data_controls, text="Abilita Dati", command=self.toggle_data)
         self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
 
-    def monitor_connection_status(self):
-        """Monitora lo stato della connessione e aggiorna l'etichetta."""
-        if self.ble_manager.get_connection_status():
+    def periodic_connection_check(self):
+        """
+        Funzione sincrona chiamata periodicamente da Tkinter.
+        Avvia i controlli di stato per BLE (asincrono) e Modbus (sincrono).
+        """
+        # Avvia il controllo asincrono per lo stato BLE
+        # Assumiamo che self.worker.run_coroutine() esegua la coroutine
+        # nel loop asyncio del worker senza bloccare il thread principale.
+        self.worker.run_coroutine(self._async_check_ble_status())
+
+        # Controlla e aggiorna lo stato Modbus (sincrono)
+        self._check_and_update_modbus_status()
+
+        # Schedula il prossimo controllo
+        self.after(1000, self.periodic_connection_check)
+
+    async def _async_check_ble_status(self):
+        """
+        Corotuine asincrona per controllare lo stato della connessione BLE.
+        Schedula l'aggiornamento dell'UI nel thread principale di Tkinter.
+        """
+        try:
+            is_connected = self.ble_manager.get_connection_status()
+            # Schedula l'aggiornamento dell'UI nel thread principale di Tkinter
+            self.after(0, self._update_ble_status_ui, is_connected, False)
+        except Exception as e:
+            logging.getLogger().error(f"Errore durante il controllo dello stato BLE: {e}")
+            # Opzionale: aggiorna l'UI per mostrare uno stato di errore
+            self.after(0, self._update_ble_status_ui, None, True)  # Passa un flag di errore
+
+    def _update_ble_status_ui(self, is_connected, error=False):
+        """
+        Aggiorna l'etichetta dello stato della connessione BLE nell'UI.
+        Questa funzione viene eseguita nel thread principale di Tkinter.
+        """
+        if error:
+            self.connection_status.config(text="Errore BLE", fg="orange")
+        elif is_connected:
             self.connection_status.config(text="Connesso", fg="green")
         else:
             self.connection_status.config(text="Non Connesso", fg="red")
 
+    def _check_and_update_modbus_status(self):
+        """
+        Controlla e aggiorna lo stato della connessione Modbus nell'UI.
+        Questa funzione è sincrona e viene chiamata dal thread principale di Tkinter.
+        """
         if self.modbus.is_connesso():
             self.btn_connect_banco.config(text="Disconnetti")
             self.banco_status.config(text="Connesso", fg="green")
         else:
             self.btn_connect_banco.config(text="Connetti")
             self.banco_status.config(text="Non Connesso", fg="red")
-
-        self.after(1000, self.monitor_connection_status)  # Controlla lo stato ogni secondo
 
     def search_devices(self):
         logging.getLogger().info("Richiesta ricerca dispositivi")
