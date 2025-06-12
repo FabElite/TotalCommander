@@ -511,12 +511,11 @@ class MainWindow(tk.Tk):
         return entry
 
     def update_lorenz_data(self):
-        offset = self.lorenz_reader.get_offset()
         data = self.lorenz_reader.get_data()
 
         # Dizionario campo-nome_entry per renderlo più gestibile
         values = {
-            self.offset_label: offset,
+            self.offset_label: data.get("offset_lorenz"),
             self.speed_avg_label: data.get("speed_avg"),
             self.torque_lorenz_label: data.get("torque_lorenz"),
             self.power_lorenz_label: data.get("power_lorenz"),
@@ -528,18 +527,48 @@ class MainWindow(tk.Tk):
             entry.config(state='readonly')
 
     def connect_lorenz(self):
-        porta_com_lorenz = trova_porta_usb_serial("Lorenz USB sensor interface Port")
-        if porta_com_lorenz:
-            if self.lorenz_reader.open_connection(int(porta_com_lorenz.split("COM")[-1])):
-                self.lorenz_status.config(text="Lorenz: Connesso", fg="green")
-                logging.getLogger().info("Lorenz Connesso")
-                self.start_lorenz_update()  # Avvia l'aggiornamento periodico
+        """
+        Questa funzione viene chiamata dal pulsante "Connetti Lorenz".
+        Avvia la connessione in un thread separato per non bloccare la GUI.
+        """
+        logging.getLogger().info("Richiesta connessione a Lorenz...")
+        # Aggiungi un feedback visivo se lo desideri, es. progress bar o disabilitare il pulsante
+        self.executor.submit(self._connect_lorenz_worker)
+
+    def _connect_lorenz_worker(self):
+        """
+        Esegue le operazioni bloccanti di ricerca e connessione al Lorenz.
+        Questa funzione viene eseguita in un thread del ThreadPoolExecutor.
+        """
+        try:
+            porta_com_lorenz = trova_porta_usb_serial("Lorenz USB sensor interface Port")
+            if porta_com_lorenz:
+                if self.lorenz_reader.open_connection(int(porta_com_lorenz.split("COM")[-1])):
+                    # Se la connessione ha successo, schedula l'aggiornamento della GUI
+                    # nel thread principale usando self.after
+                    self.after(0, self._update_lorenz_ui, True)
+                else:
+                    # Connessione fallita
+                    self.after(0, self._update_lorenz_ui, False)
             else:
-                self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
-                logging.getLogger().info("Lorenz non connesso")
+                # Porta non trovata
+                self.after(0, self._update_lorenz_ui, False)
+        except Exception as e:
+            logging.getLogger().error(f"Errore durante la connessione a Lorenz: {e}")
+            self.after(0, self._update_lorenz_ui, False)
+
+    def _update_lorenz_ui(self, is_connected):
+        """
+        Aggiorna la GUI dello stato del Lorenz.
+        Questa funzione viene eseguita nel thread principale di Tkinter.
+        """
+        if is_connected:
+            self.lorenz_status.config(text="Lorenz: Connesso", fg="green")
+            logging.getLogger().info("Lorenz Connesso")
+            self.start_lorenz_update()  # Avvia l'aggiornamento periodico
         else:
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
-            logging.getLogger().info("Lorenz non connesso")
+            logging.getLogger().warning("Lorenz non connesso o connessione fallita.")
 
     def start_lorenz_update(self):
         self.update_lorenz_data()
