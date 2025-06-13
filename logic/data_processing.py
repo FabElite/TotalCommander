@@ -35,7 +35,7 @@ class DataProcessor:
             data.get("total_distance", ""),
             data.get("resistance", ""),
             data.get("elapsed_time", ""),
-            data.get("offset", ""),
+            data.get("offset_lorenz", ""),
             data.get("speed_avg", ""),
             data.get("torque_lorenz", ""),
             data.get("power_lorenz", "")
