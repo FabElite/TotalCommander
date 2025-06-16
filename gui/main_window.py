@@ -490,7 +490,7 @@ class MainWindow(tk.Tk):
 
         # Pulsante Connetti e stato connessione
         self.btn_connect_banco = ttk.Button(self.banco_controls, text="Connetti",
-                                            command=self.clicked_button_connection_modbus)
+                                            command=self.toggle_modbus_connection) # MODIFICATO
         self.btn_connect_banco.grid(row=1, column=0, padx=5, pady=5)
         self.banco_status = tk.Label(self.banco_controls, text="Non Connesso", fg="red")
         self.banco_status.grid(row=1, column=1, padx=5, pady=5)
@@ -592,29 +592,77 @@ class MainWindow(tk.Tk):
         self.lorenz_reader.read_offset()
         logging.getLogger().info(f"Offset letto: {self.lorenz_reader.offset}")
 
-    def clicked_button_connection_modbus(self):
-        if not self.modbus.is_connesso():
-            self.modbus.connetti(self.entry_ip.get(), 502)
-        else:
-            self.modbus.disconnetti()
+    def toggle_modbus_connection(self):
+        """
+        Avvia la connessione/disconnessione Modbus in un thread separato.
+        """
+        logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
+        # Aggiungi un feedback visivo se vuoi, es. disabilitare il pulsante
+        self.btn_connect_banco.config(state='disabled')
+        self.executor.submit(self._toggle_modbus_worker)
+
+    def _toggle_modbus_worker(self):
+        """
+        Esegue le operazioni bloccanti di connessione/disconnessione Modbus.
+        Questa funzione viene eseguita in un thread del ThreadPoolExecutor.
+        """
+        try:
+            if not self.modbus.is_connesso():
+                ip_address = self.entry_ip.get()
+                self.modbus.connetti(ip_address, 502)
+            else:
+                self.modbus.disconnetti()
+        except Exception as e:
+            logging.getLogger().error(f"Errore durante l'operazione Modbus: {e}")
+        finally:
+            # Schedula l'aggiornamento della UI nel thread principale,
+            # indipendentemente dall'esito, e riabilita il pulsante.
+            self.after(0, self._check_and_update_modbus_status)
+            self.after(0, lambda: self.btn_connect_banco.config(state='normal'))
 
     def clicked_button_setspeed_modbus(self):
-        self.setspeed_modbus(int(self.speed_banco_entry.get()))
+        """
+        Metodo chiamato dal click del pulsante per impostare la velocità.
+        """
+        try:
+            speed_value = float(self.speed_banco_entry.get())
+            self.setspeed_modbus(speed_value)
+        except (ValueError, TypeError):
+            logging.getLogger().error(f"Valore velocità non valido: {self.speed_banco_entry.get()}")
 
     def setspeed_modbus(self, speedkmh):
+        """
+        Sottomette l'impostazione della velocità a un thread separato.
+        Questo metodo ora non è più bloccante.
+        """
+        logging.getLogger().info(f"Invio comando velocità banco: {speedkmh} km/h")
+        self.executor.submit(self._setspeed_modbus_worker, speedkmh)
+
+    def _setspeed_modbus_worker(self, speedkmh):
+        """
+        Esegue l'operazione bloccante di impostazione velocità Modbus.
+        Questa funzione viene eseguita in un thread del ThreadPoolExecutor.
+        """
         try:
             if speedkmh is None:
                 raise ValueError("La velocità non può essere None")
             if speedkmh > 80:
                 raise ValueError("La velocità richiesta è superiore a 80km/h. Comando rifiutato.")
-            self.modbus.set_motor_speed(speedkmh*10)
+
+            # Questa è la chiamata bloccante
+            self.modbus.set_motor_speed(speedkmh * 10)
+            logging.getLogger().info(f"Comando velocità {speedkmh} km/h inviato con successo.")
+
         except Exception as e:
-            # Cattura altre eccezioni non previste
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
 
     def on_closing(self):
+        #if self.ble_manager.get_connection_status():
+        #    self.disconnect_device()
         if self.lorenz_reader.connected:
             self.lorenz_reader.close_connection()
+        if self.modbus.is_connesso():
+            self.modbus.disconnetti()
         self.destroy()
 
 if __name__ == "__main__":
