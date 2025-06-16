@@ -344,11 +344,15 @@ class MainWindow(tk.Tk):
 
     def toggle_data(self):
         if self.btn_toggle_data.cget('text') == 'Abilita Dati':
-            self.btn_toggle_data.config(text='Disabilita Dati')
-            logging.getLogger().info("Dati BLE abilitati")
-            self.worker.run_coroutine(self.ble_manager.enable_indoor_bike_data_notifications(self.update_data_fields))
+            if self.ble_manager.get_connection_status():
+                self.btn_toggle_data.config(text='Disabilita Dati')
+                logging.getLogger().info("Abilitate notifiche FTMS")
+                self.worker.run_coroutine(self.ble_manager.enable_indoor_bike_data_notifications(self.update_data_fields))
+            else:
+                logging.getLogger().info("Nessun dispositivo connesso, abilitazione FTMS non possibile")
         else:
             self.btn_toggle_data.config(text='Abilita Dati')
+            logging.getLogger().info("Disabilitate notifiche FTMS")
             self.worker.run_coroutine(self.ble_manager.disable_indoor_bike_data_notifications())
 
     def update_data_fields(self, bike_data):
