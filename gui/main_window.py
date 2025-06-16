@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import json  # <<< AGGIUNTO >>>
+import os    # <<< AGGIUNTO >>>
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
@@ -9,18 +11,6 @@ from shared_lib.modbus_utils import ModbusBancoCollaudo
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
 
-class TextHandler(logging.Handler):
-    """Custom logging handler that sends log messages to a Tkinter Text widget."""
-    def __init__(self, text_widget):
-        super().__init__()
-        self.text_widget = text_widget
-
-    def emit(self, record):
-        msg = self.format(record)
-        self.text_widget.config(state='normal')
-        self.text_widget.insert(tk.END, msg + '\n')
-        self.text_widget.config(state='disabled')
-        self.text_widget.yview(tk.END)
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -35,6 +25,11 @@ class MainWindow(tk.Tk):
         self.modbus = ModbusBancoCollaudo()
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.auto_commands_running = False  # Stato dei comandi automatici
+
+        # <<< MODIFICATO >>>: Istanzia il reader e carica le impostazioni all'avvio
+        self.lorenz_reader = LorenzReader()
+        self.settings_file = "settings.json"
+        self.load_settings()
 
         # Frame principale
         self.main_frame = ttk.Frame(self)
@@ -453,11 +448,11 @@ class MainWindow(tk.Tk):
         else:
             logging.getLogger().info("Non ci sono comandi automatici attivi")
 
+    # <<< MODIFICATO >>>: Rimossa l'istanziazione di LorenzReader da qui
     def create_lorenz_controls(self):
         self.frame_lorenz = ttk.LabelFrame(self.right_frame, text="Gestione Lorenz")
         self.frame_lorenz.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        self.lorenz_reader = LorenzReader()
         self.lorenz_controls = ttk.Frame(self.frame_lorenz)
         self.lorenz_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 
@@ -476,6 +471,26 @@ class MainWindow(tk.Tk):
         self.speed_avg_label = self.create_labeled_entry(self.lorenz_controls, "Speed Avg", 4)
         self.torque_lorenz_label = self.create_labeled_entry(self.lorenz_controls, "Torque Lorenz", 5)
         self.power_lorenz_label = self.create_labeled_entry(self.lorenz_controls, "Power Lorenz", 6)
+
+        # <<< AGGIUNTO >>>: Nuovi controlli per media e inversione velocità
+        # Media Campioni
+        lbl_avg = ttk.Label(self.lorenz_controls, text="Media Campioni")
+        lbl_avg.grid(row=7, column=0, sticky="e", padx=5, pady=2)
+        self.avg_entry = ttk.Entry(self.lorenz_controls, width=15, justify='right')
+        self.avg_entry.grid(row=7, column=1, padx=5, pady=2)
+        self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
+        self.avg_entry.bind("<Return>", self.update_lorenz_avg)
+        self.avg_entry.bind("<FocusOut>", self.update_lorenz_avg)
+
+        # Inverti Velocità
+        self.invert_speed_var = tk.BooleanVar(value=self.lorenz_reader.invert_speed)
+        chk_invert_speed = ttk.Checkbutton(
+            self.lorenz_controls,
+            text="Inverti Segno Velocità",
+            variable=self.invert_speed_var,
+            command=self.toggle_invert_speed
+        )
+        chk_invert_speed.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
     def create_banco_controls(self):
         self.banco_controls = ttk.LabelFrame(self.right_frame, text="Gestione Banco")
@@ -656,6 +671,68 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
 
+    # <<< AGGIUNTO >>>: Metodi per la gestione delle impostazioni e dei nuovi widget
+    def load_settings(self):
+        """Carica le impostazioni da un file JSON."""
+        defaults = {'avg_dim': 20, 'invert_speed': False}
+        try:
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+                    # Assicura che le chiavi necessarie esistano, altrimenti usa i default
+                    self.lorenz_reader.avg_dim = int(settings.get('avg_dim', defaults['avg_dim']))
+                    self.lorenz_reader.invert_speed = bool(settings.get('invert_speed', defaults['invert_speed']))
+                    logging.getLogger().info(f"Impostazioni caricate da {self.settings_file}")
+            else:
+                # Se il file non esiste, usa i valori di default
+                self.lorenz_reader.avg_dim = defaults['avg_dim']
+                self.lorenz_reader.invert_speed = defaults['invert_speed']
+                logging.getLogger().info("File di impostazioni non trovato, uso i valori di default.")
+                self.save_settings()  # Crea il file con i valori di default
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            logging.getLogger().error(f"Errore nel caricare le impostazioni: {e}. Uso i valori di default.")
+            self.lorenz_reader.avg_dim = defaults['avg_dim']
+            self.lorenz_reader.invert_speed = defaults['invert_speed']
+
+    def save_settings(self):
+        """Salva le impostazioni correnti in un file JSON."""
+        settings = {
+            'avg_dim': self.lorenz_reader.avg_dim,
+            'invert_speed': self.lorenz_reader.invert_speed
+        }
+        try:
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+            logging.getLogger().info(f"Impostazioni salvate in {self.settings_file}")
+        except IOError as e:
+            logging.getLogger().error(f"Errore nel salvare le impostazioni: {e}")
+
+    def update_lorenz_avg(self, event=None):
+        """Aggiorna la dimensione della media del Lorenz e salva le impostazioni."""
+        try:
+            new_avg = int(self.avg_entry.get())
+            if new_avg > 0:
+                if self.lorenz_reader.avg_dim != new_avg:
+                    self.lorenz_reader.avg_dim = new_avg
+                    logging.getLogger().info(f"Dimensione media Lorenz impostata a: {new_avg}")
+                    self.save_settings()
+            else:
+                logging.getLogger().warning("La dimensione della media deve essere un intero positivo.")
+                self.avg_entry.delete(0, tk.END)
+                self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
+        except ValueError:
+            logging.getLogger().error("Valore non valido per la media. Inserire un numero intero.")
+            # Ripristina il valore precedente
+            self.avg_entry.delete(0, tk.END)
+            self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
+
+    def toggle_invert_speed(self):
+        """Inverte il segno della velocità del Lorenz e salva le impostazioni."""
+        is_inverted = self.invert_speed_var.get()
+        self.lorenz_reader.invert_speed = is_inverted
+        logging.getLogger().info(f"Inversione velocità Lorenz: {'Attiva' if is_inverted else 'Disattiva'}")
+        self.save_settings()
+
     def on_closing(self):
         #if self.ble_manager.get_connection_status():
         #    self.disconnect_device()
@@ -666,5 +743,7 @@ class MainWindow(tk.Tk):
         self.destroy()
 
 if __name__ == "__main__":
+    # Setup del logger base se non già configurato
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     app = MainWindow()
     app.mainloop()

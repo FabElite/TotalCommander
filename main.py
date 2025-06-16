@@ -1,6 +1,20 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from gui.main_window import MainWindow, TextHandler
+from gui.main_window import MainWindow
+import tkinter as tk
+
+class TextHandler(logging.Handler):
+    """Custom logging handler that sends log messages to a Tkinter Text widget."""
+    def __init__(self, text_widget):
+        super().__init__()
+        self.text_widget = text_widget
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.text_widget.config(state='normal')
+        self.text_widget.insert(tk.END, msg + '\n')
+        self.text_widget.config(state='disabled')
+        self.text_widget.yview(tk.END)
 
 def setup_logging(text_widget):
     LOG_FILENAME = "app.log"
