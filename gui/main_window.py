@@ -2,8 +2,10 @@ import tkinter as tk
 from tkinter import ttk
 from concurrent.futures import ThreadPoolExecutor
 import logging
-import json  # <<< AGGIUNTO >>>
-import os    # <<< AGGIUNTO >>>
+import json
+import os
+import sys  # <<< NUOVA MODIFICA >>>
+import subprocess  # <<< NUOVA MODIFICA >>>
 from shared_lib.bluetooth_manager import AsyncioWorker, BLEManager
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
@@ -15,21 +17,23 @@ from tkinter import filedialog
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.lorenz_update_id = None  # Variabile per gestire l'aggiornamento periodico
+        self.lorenz_update_id = None
         self.title("Total Commander")
-        self.geometry("1350x760")  # Aumentato la larghezza della finestra per includere il nuovo blocco
+        self.geometry("1350x760")
         self.worker = AsyncioWorker()
         self.worker.start()
         self.ble_manager = BLEManager(self.worker)
         self.data_processor = DataProcessor()
         self.modbus = ModbusBancoCollaudo()
         self.executor = ThreadPoolExecutor(max_workers=1)
-        self.auto_commands_running = False  # Stato dei comandi automatici
+        self.auto_commands_running = False
 
-        # <<< MODIFICATO >>>: Istanzia il reader e carica le impostazioni all'avvio
         self.lorenz_reader = LorenzReader()
         self.settings_file = "settings.json"
         self.load_settings()
+
+        # <<< NUOVA MODIFICA >>>: Creazione del menu a tendina
+        self._create_menu()
 
         # Frame principale
         self.main_frame = ttk.Frame(self)
@@ -43,9 +47,7 @@ class MainWindow(tk.Tk):
         self.frame_search = ttk.LabelFrame(self.left_frame, text="Ricerca Dispositivi BLE")
         self.frame_search.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        # Configura la colonna del left_frame per espandersi
         self.left_frame.grid_columnconfigure(0, weight=1)
-        # Configura la colonna del frame_search per espandersi
         self.frame_search.grid_columnconfigure(0, weight=1)
 
         self.device_list = tk.Listbox(self.frame_search)
@@ -64,7 +66,6 @@ class MainWindow(tk.Tk):
         self.frame_status = ttk.LabelFrame(self.left_frame, text="Stato Connessione")
         self.frame_status.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
 
-        # Configura la colonna del frame_status per espandersi
         self.frame_status.grid_columnconfigure(0, weight=1)
         self.frame_status.grid_columnconfigure(1, weight=1)
 
@@ -91,13 +92,12 @@ class MainWindow(tk.Tk):
         self.automatic_commands.grid_rowconfigure(0, weight=1)
         self.automatic_commands.grid_columnconfigure(0, weight=1)
 
-        # Aggiungi una barra di scorrimento verticale alla tabella
         self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
         self.scrollbar.grid(row=0, column=1, sticky="ns")
 
-        # Aggiungi una tabella per visualizzare i comandi caricati
         self.commands_table = ttk.Treeview(self.automatic_commands,
-                                           columns=("Comando", "Valore", "Tempo [s]", "Vel Banco [km/h]"), show='headings',
+                                           columns=("Comando", "Valore", "Tempo [s]", "Vel Banco [km/h]"),
+                                           show='headings',
                                            yscrollcommand=self.scrollbar.set)
 
         self.commands_table.heading("Comando", text="Comando")
@@ -111,75 +111,74 @@ class MainWindow(tk.Tk):
         self.commands_table.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.scrollbar.config(command=self.commands_table.yview)
 
-        # Configura i colori alternati delle righe
         self.commands_table.tag_configure('oddrow', background='lightgrey')
         self.commands_table.tag_configure('evenrow', background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
 
-
-        # Frame per i comandi automatici
         self.frame_auto_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi automatici")
         self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
 
-        # Configura la colonna del frame_status per espandersi
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
         self.frame_auto_commands.grid_columnconfigure(1, weight=1)
 
-        # LED di stato per comandi automatici
         self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
         self.led_status.grid(row=1, column=0, padx=10, pady=5)
 
-        # Pulsante per caricare i comandi dal CSV
         self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
                                             command=self.load_commands_from_csv)
         self.btn_load_commands.grid(row=0, column=1, padx=10, pady=2)
 
-        # Pulsante per lanciare comandi automatici
         self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Lancia Comandi Automatici",
                                             command=self.launch_auto_commands)
         self.btn_auto_commands.grid(row=1, column=1, padx=10, pady=2)
 
-        # Pulsante per fermare comandi automatici
         self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Ferma Comandi Automatici",
                                                  command=self.stop_auto_commands)
         self.btn_stop_auto_commands.grid(row=2, column=1, padx=10, pady=2)
 
-
-        # Frame destro per la visualizzazione dei dati BLE
         self.frame_data = ttk.LabelFrame(self.main_frame, text="Dati BLE FTMS")
         self.frame_data.grid(row=0, column=2, sticky="nsew", padx=10, pady=5)
         self.create_data_fields()
 
-
         self.right_frame = ttk.Frame(self.main_frame)
         self.right_frame.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
-        # Frame per la gestione del Lorenz
+
         self.create_lorenz_controls()
         self.create_banco_controls()
 
-        # Frame per il log delle attività
+        # <<< NUOVA MODIFICA >>>: Aggiorna il campo offset con il valore caricato all'avvio
+        self.offset_label.config(state='normal')
+        self.offset_label.delete(0, tk.END)
+        self.offset_label.insert(0, f"{self.lorenz_reader.offset:.2f}")
+        self.offset_label.config(state='readonly')
+
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
         self.frame_log.grid(row=1, column=0, columnspan=4, sticky="nsew", padx=10, pady=10)
-        # Configura la colonna del frame_log per espandersi
         self.frame_log.grid_columnconfigure(0, weight=1)
         self.log_text = tk.Text(self.frame_log, state='disabled', height=13)
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-
-        # Avvia il monitoraggio dello stato della connessione
         self.periodic_connection_check()
 
-        # Sovrascrivi il protocollo di chiusura della finestra
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    # <<< NUOVA MODIFICA >>>: Metodo per creare il menu
+    def _create_menu(self):
+        self.menubar = tk.Menu(self)
+        self.config(menu=self.menubar)
+
+        file_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="File", menu=file_menu)
+
+        file_menu.add_command(label="Cartella di lavoro", command=self._open_working_directory)
 
     def create_command_controls(self):
         commands = [("Livello [/200]", self.send_level_command), ("Potenza [W]", self.send_power_command),
                     ("Simulazione [%]", self.send_simulation_command)]
 
-        # Configura le colonne per avere la suddivisione desiderata
-        self.frame_commands.grid_columnconfigure(0, weight=2)  # Colonna delle etichette
-        self.frame_commands.grid_columnconfigure(1, weight=1)  # Colonna delle entry
-        self.frame_commands.grid_columnconfigure(2, weight=1)  # Colonna dei bottoni
+        self.frame_commands.grid_columnconfigure(0, weight=2)
+        self.frame_commands.grid_columnconfigure(1, weight=1)
+        self.frame_commands.grid_columnconfigure(2, weight=1)
 
         for i, (label, command) in enumerate(commands):
             lbl = ttk.Label(self.frame_commands, text=label)
@@ -213,45 +212,23 @@ class MainWindow(tk.Tk):
             entry.grid(row=0, column=1, padx=5)
             self.data_entries[field.lower().replace(" ", "_")] = entry
 
-        # Pulsante per abilitare/disabilitare i dati
         self.btn_toggle_data = ttk.Button(self.data_controls, text="Abilita Dati", command=self.toggle_data)
         self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
 
     def periodic_connection_check(self):
-        """
-        Funzione sincrona chiamata periodicamente da Tkinter.
-        Avvia i controlli di stato per BLE (asincrono) e Modbus (sincrono).
-        """
-        # Avvia il controllo asincrono per lo stato BLE
-        # Assumiamo che self.worker.run_coroutine() esegua la coroutine
-        # nel loop asyncio del worker senza bloccare il thread principale.
         self.worker.run_coroutine(self._async_check_ble_status())
-
-        # Controlla e aggiorna lo stato Modbus (sincrono)
         self._check_and_update_modbus_status()
-
-        # Schedula il prossimo controllo
         self.after(1000, self.periodic_connection_check)
 
     async def _async_check_ble_status(self):
-        """
-        Corotuine asincrona per controllare lo stato della connessione BLE.
-        Schedula l'aggiornamento dell'UI nel thread principale di Tkinter.
-        """
         try:
             is_connected = self.ble_manager.get_connection_status()
-            # Schedula l'aggiornamento dell'UI nel thread principale di Tkinter
             self.after(0, self._update_ble_status_ui, is_connected, False)
         except Exception as e:
             logging.getLogger().error(f"Errore durante il controllo dello stato BLE: {e}")
-            # Opzionale: aggiorna l'UI per mostrare uno stato di errore
-            self.after(0, self._update_ble_status_ui, None, True)  # Passa un flag di errore
+            self.after(0, self._update_ble_status_ui, None, True)
 
     def _update_ble_status_ui(self, is_connected, error=False):
-        """
-        Aggiorna l'etichetta dello stato della connessione BLE nell'UI.
-        Questa funzione viene eseguita nel thread principale di Tkinter.
-        """
         if error:
             self.connection_status.config(text="Errore BLE", fg="orange")
         elif is_connected:
@@ -260,10 +237,6 @@ class MainWindow(tk.Tk):
             self.connection_status.config(text="Non Connesso", fg="red")
 
     def _check_and_update_modbus_status(self):
-        """
-        Controlla e aggiorna lo stato della connessione Modbus nell'UI.
-        Questa funzione è sincrona e viene chiamata dal thread principale di Tkinter.
-        """
         if self.modbus.is_connesso():
             self.btn_connect_banco.config(text="Disconnetti")
             self.banco_status.config(text="Connesso", fg="green")
@@ -280,9 +253,7 @@ class MainWindow(tk.Tk):
         devices = self.worker.run_coroutine(self.ble_manager.scan_devices(timeout=5)).result()
         self.device_list.delete(0, tk.END)
         for address, (name, rssi) in devices.items():
-            # Inserisci il dispositivo nella lista
             self.device_list.insert(tk.END, f"{name} - {address} - RSSI: {rssi}")
-            # Cambia il colore di sfondo se l'RSSI è inferiore a 50
             if rssi > -50:
                 self.device_list.itemconfig(tk.END, {'bg': 'lightcoral'})
             logging.getLogger().info(f"Dispositivo trovato: {name} - {address} - RSSI: {rssi}")
@@ -342,7 +313,8 @@ class MainWindow(tk.Tk):
             if self.ble_manager.get_connection_status():
                 self.btn_toggle_data.config(text='Disabilita Dati')
                 logging.getLogger().info("Abilitate notifiche FTMS")
-                self.worker.run_coroutine(self.ble_manager.enable_indoor_bike_data_notifications(self.update_data_fields))
+                self.worker.run_coroutine(
+                    self.ble_manager.enable_indoor_bike_data_notifications(self.update_data_fields))
             else:
                 logging.getLogger().info("Nessun dispositivo connesso, abilitazione FTMS non possibile")
         else:
@@ -357,52 +329,40 @@ class MainWindow(tk.Tk):
                 self.data_entries[key.replace(" ", "_")].delete(0, tk.END)
                 self.data_entries[key.replace(" ", "_")].insert(0, str(value))
                 self.data_entries[key.replace(" ", "_")].config(state='readonly')
-        # Aggiungi la lettura dei dati del Lorenz
         lorenz_data = self.lorenz_reader.get_data()
         combined_data = {**bike_data, **lorenz_data}
-        # Passa i dati combinati al data processor
         self.data_processor.handle_bike_data(combined_data)
 
     def load_commands_from_csv(self):
-        # Controlla se ci sono comandi automatici in corso
         if self.auto_commands_running:
             logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
             return
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
-            # Elimina i valori precedenti dalla tabella
             for item in self.commands_table.get_children():
                 self.commands_table.delete(item)
-            # Carica i nuovi comandi dal file CSV
             commands = DataProcessor.read_brake_commands_from_csv(file_path)
             for i, command in enumerate(commands):
                 tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                 self.commands_table.insert("", "end", values=command, tags=(tag,))
 
     def launch_auto_commands(self):
-        # Controlla se la tabella "Comandi da CSV" non è vuota
         if not self.commands_table.get_children():
             logging.getLogger().info("La tabella dei comandi è vuota.")
             return
-        # Ottieni tutti i comandi dalla tabella
         commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
         command_items = self.commands_table.get_children()
-        # Resetta i colori delle righe
         for index, item in enumerate(command_items):
             self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
 
-        # Funzione ricorsiva per inviare i comandi uno alla volta
         def send_next_command(index):
             if index < len(commands) and self.auto_commands_running:
                 command_type, value, wait_time, speed_banco = commands[index]
-                wait_time = int(wait_time)  # Converti wait_time in intero
-                # Rimuovi il colore speciale dalla riga precedente
+                wait_time = int(wait_time)
                 if index > 0:
                     self.commands_table.item(command_items[index - 1],
                                              tags=('evenrow' if (index - 1) % 2 == 0 else 'oddrow',))
-                # Applica il colore speciale alla riga corrente
                 self.commands_table.item(command_items[index], tags=('currentrow',))
-                # Invia il comando appropriato in base al tipo di comando
                 if command_type == "potenza":
                     self.send_power_command(value)
                 elif command_type == "livelli":
@@ -413,21 +373,18 @@ class MainWindow(tk.Tk):
                 if speed_banco is not None and speed_banco != "None":
                     self.setspeed_modbus(float(speed_banco))
                 else:
-                    # Gestisci il caso in cui speed_banco sia None o "None"
                     print("speed_banco is None or 'None'")
 
-                # Attendi il tempo specificato prima di inviare il prossimo comando
                 self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
             else:
-                # Comandi automatici completati
                 self.auto_commands_running = False
                 self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
                 logging.getLogger().info("Comandi automatici completati")
-        # Configura i colori delle righe
+                self.setspeed_modbus(0)
+
         self.commands_table.tag_configure('oddrow', background='lightgrey')
         self.commands_table.tag_configure('evenrow', background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
-        # Inizia l'invio dei comandi dal primo comando
         self.auto_commands_running = True
         self.led_status.config(text="Comandi Automatici: ON", fg="green")
         send_next_command(0)
@@ -437,9 +394,8 @@ class MainWindow(tk.Tk):
             self.auto_commands_running = False
             self.led_status.config(text="Comandi Automatici: OFF", fg="red")
             if hasattr(self, 'auto_command_id'):
-                self.after_cancel(self.auto_command_id)  # Ferma l'invio dei comandi automatici
+                self.after_cancel(self.auto_command_id)
             logging.getLogger().info("Comandi automatici interrotti")
-            # Rimuovi il colore speciale dalla riga corrente
             for item in self.commands_table.get_children():
                 if 'currentrow' in self.commands_table.item(item, 'tags'):
                     index = self.commands_table.index(item)
@@ -448,7 +404,6 @@ class MainWindow(tk.Tk):
         else:
             logging.getLogger().info("Non ci sono comandi automatici attivi")
 
-    # <<< MODIFICATO >>>: Rimossa l'istanziazione di LorenzReader da qui
     def create_lorenz_controls(self):
         self.frame_lorenz = ttk.LabelFrame(self.right_frame, text="Gestione Lorenz")
         self.frame_lorenz.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -466,14 +421,11 @@ class MainWindow(tk.Tk):
         self.btn_read_offset = ttk.Button(self.lorenz_controls, text="Leggi Offset", command=self.read_lorenz_offset)
         self.btn_read_offset.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
 
-        # Campi di visualizzazione con etichetta e Entry su due colonne
         self.offset_label = self.create_labeled_entry(self.lorenz_controls, "Offset", 3)
         self.speed_avg_label = self.create_labeled_entry(self.lorenz_controls, "Speed Avg", 4)
         self.torque_lorenz_label = self.create_labeled_entry(self.lorenz_controls, "Torque Lorenz", 5)
         self.power_lorenz_label = self.create_labeled_entry(self.lorenz_controls, "Power Lorenz", 6)
 
-        # <<< AGGIUNTO >>>: Nuovi controlli per media e inversione velocità
-        # Media Campioni
         lbl_avg = ttk.Label(self.lorenz_controls, text="Media Campioni")
         lbl_avg.grid(row=7, column=0, sticky="e", padx=5, pady=2)
         self.avg_entry = ttk.Entry(self.lorenz_controls, width=15, justify='right')
@@ -482,7 +434,6 @@ class MainWindow(tk.Tk):
         self.avg_entry.bind("<Return>", self.update_lorenz_avg)
         self.avg_entry.bind("<FocusOut>", self.update_lorenz_avg)
 
-        # Inverti Velocità
         self.invert_speed_var = tk.BooleanVar(value=self.lorenz_reader.invert_speed)
         chk_invert_speed = ttk.Checkbutton(
             self.lorenz_controls,
@@ -496,28 +447,24 @@ class MainWindow(tk.Tk):
         self.banco_controls = ttk.LabelFrame(self.right_frame, text="Gestione Banco")
         self.banco_controls.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
 
-        # Porta IP
         lbl_ip = ttk.Label(self.banco_controls, text="PORTA IP:")
         lbl_ip.grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.entry_ip = ttk.Entry(self.banco_controls, width=12)
         self.entry_ip.insert(0, "192.168.0.10")
         self.entry_ip.grid(row=0, column=1, padx=5, pady=5)
 
-        # Pulsante Connetti e stato connessione
         self.btn_connect_banco = ttk.Button(self.banco_controls, text="Connetti",
-                                            command=self.toggle_modbus_connection) # MODIFICATO
+                                            command=self.toggle_modbus_connection)
         self.btn_connect_banco.grid(row=1, column=0, padx=5, pady=5)
         self.banco_status = tk.Label(self.banco_controls, text="Non Connesso", fg="red")
         self.banco_status.grid(row=1, column=1, padx=5, pady=5)
 
-        # Pulsante Set Velocità
         self.btn_set_speed = ttk.Button(self.banco_controls, text="Set Velocità [km/h]:",
                                         command=self.clicked_button_setspeed_modbus)
         self.btn_set_speed.grid(row=2, column=0, padx=5, pady=5)
         self.speed_banco_entry = ttk.Entry(self.banco_controls, width=12)
         self.speed_banco_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        # Pulsante Zero Speed
         self.btn_zero_speed = ttk.Button(self.banco_controls, text="ZERO SPEED",
                                          command=lambda: self.setspeed_modbus(0))
         self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=5, pady=10, sticky="ew")
@@ -532,7 +479,6 @@ class MainWindow(tk.Tk):
     def update_lorenz_data(self):
         data = self.lorenz_reader.get_data()
 
-        # Dizionario campo-nome_entry per renderlo più gestibile
         values = {
             self.offset_label: data.get("offset_lorenz"),
             self.speed_avg_label: data.get("speed_avg"),
@@ -546,52 +492,35 @@ class MainWindow(tk.Tk):
             entry.config(state='readonly')
 
     def connect_lorenz(self):
-        """
-        Questa funzione viene chiamata dal pulsante "Connetti Lorenz".
-        Avvia la connessione in un thread separato per non bloccare la GUI.
-        """
         logging.getLogger().info("Richiesta connessione a Lorenz...")
-        # Aggiungi un feedback visivo se lo desideri, es. progress bar o disabilitare il pulsante
         self.executor.submit(self._connect_lorenz_worker)
 
     def _connect_lorenz_worker(self):
-        """
-        Esegue le operazioni bloccanti di ricerca e connessione al Lorenz.
-        Questa funzione viene eseguita in un thread del ThreadPoolExecutor.
-        """
         try:
             porta_com_lorenz = trova_porta_usb_serial("Lorenz USB sensor interface Port")
             if porta_com_lorenz:
                 if self.lorenz_reader.open_connection(int(porta_com_lorenz.split("COM")[-1])):
-                    # Se la connessione ha successo, schedula l'aggiornamento della GUI
-                    # nel thread principale usando self.after
                     self.after(0, self._update_lorenz_ui, True)
                 else:
-                    # Connessione fallita
                     self.after(0, self._update_lorenz_ui, False)
             else:
-                # Porta non trovata
                 self.after(0, self._update_lorenz_ui, False)
         except Exception as e:
             logging.getLogger().error(f"Errore durante la connessione a Lorenz: {e}")
             self.after(0, self._update_lorenz_ui, False)
 
     def _update_lorenz_ui(self, is_connected):
-        """
-        Aggiorna la GUI dello stato del Lorenz.
-        Questa funzione viene eseguita nel thread principale di Tkinter.
-        """
         if is_connected:
             self.lorenz_status.config(text="Lorenz: Connesso", fg="green")
             logging.getLogger().info("Lorenz Connesso")
-            self.start_lorenz_update()  # Avvia l'aggiornamento periodico
+            self.start_lorenz_update()
         else:
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
             logging.getLogger().warning("Lorenz non connesso o connessione fallita.")
 
     def start_lorenz_update(self):
         self.update_lorenz_data()
-        self.lorenz_update_id = self.after(500, self.start_lorenz_update)  # Richiama ogni 500 ms (2 volte al secondo)
+        self.lorenz_update_id = self.after(500, self.start_lorenz_update)
 
     def stop_lorenz_update(self):
         if self.lorenz_update_id is not None:
@@ -601,26 +530,20 @@ class MainWindow(tk.Tk):
     def disconnect_lorenz(self):
         if self.lorenz_reader.close_connection():
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
-            self.stop_lorenz_update()  # Ferma l'aggiornamento periodico
+            self.stop_lorenz_update()
 
+    # <<< NUOVA MODIFICA >>>: Salva le impostazioni dopo aver letto il nuovo offset
     def read_lorenz_offset(self):
         self.lorenz_reader.read_offset()
         logging.getLogger().info(f"Offset letto: {self.lorenz_reader.offset}")
+        self.save_settings()
 
     def toggle_modbus_connection(self):
-        """
-        Avvia la connessione/disconnessione Modbus in un thread separato.
-        """
         logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
-        # Aggiungi un feedback visivo se vuoi, es. disabilitare il pulsante
         self.btn_connect_banco.config(state='disabled')
         self.executor.submit(self._toggle_modbus_worker)
 
     def _toggle_modbus_worker(self):
-        """
-        Esegue le operazioni bloccanti di connessione/disconnessione Modbus.
-        Questa funzione viene eseguita in un thread del ThreadPoolExecutor.
-        """
         try:
             if not self.modbus.is_connesso():
                 ip_address = self.entry_ip.get()
@@ -630,15 +553,10 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore durante l'operazione Modbus: {e}")
         finally:
-            # Schedula l'aggiornamento della UI nel thread principale,
-            # indipendentemente dall'esito, e riabilita il pulsante.
             self.after(0, self._check_and_update_modbus_status)
             self.after(0, lambda: self.btn_connect_banco.config(state='normal'))
 
     def clicked_button_setspeed_modbus(self):
-        """
-        Metodo chiamato dal click del pulsante per impostare la velocità.
-        """
         try:
             speed_value = float(self.speed_banco_entry.get())
             self.setspeed_modbus(speed_value)
@@ -646,59 +564,51 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Valore velocità non valido: {self.speed_banco_entry.get()}")
 
     def setspeed_modbus(self, speedkmh):
-        """
-        Sottomette l'impostazione della velocità a un thread separato.
-        Questo metodo ora non è più bloccante.
-        """
         logging.getLogger().info(f"Invio comando velocità banco: {speedkmh} km/h")
         self.executor.submit(self._setspeed_modbus_worker, speedkmh)
 
     def _setspeed_modbus_worker(self, speedkmh):
-        """
-        Esegue l'operazione bloccante di impostazione velocità Modbus.
-        Questa funzione viene eseguita in un thread del ThreadPoolExecutor.
-        """
         try:
             if speedkmh is None:
                 raise ValueError("La velocità non può essere None")
             if speedkmh > 80:
                 raise ValueError("La velocità richiesta è superiore a 80km/h. Comando rifiutato.")
-
-            # Questa è la chiamata bloccante
             self.modbus.set_motor_speed(speedkmh * 10)
             logging.getLogger().info(f"Comando velocità {speedkmh} km/h inviato con successo.")
-
         except Exception as e:
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
 
-    # <<< AGGIUNTO >>>: Metodi per la gestione delle impostazioni e dei nuovi widget
+    # <<< NUOVA MODIFICA >>>: Aggiornato per caricare anche l'offset
     def load_settings(self):
         """Carica le impostazioni da un file JSON."""
-        defaults = {'avg_dim': 20, 'invert_speed': False}
+        defaults = {'avg_dim': 20, 'invert_speed': False, 'offset': 0.0}
         try:
             if os.path.exists(self.settings_file):
                 with open(self.settings_file, 'r') as f:
                     settings = json.load(f)
-                    # Assicura che le chiavi necessarie esistano, altrimenti usa i default
                     self.lorenz_reader.avg_dim = int(settings.get('avg_dim', defaults['avg_dim']))
                     self.lorenz_reader.invert_speed = bool(settings.get('invert_speed', defaults['invert_speed']))
+                    self.lorenz_reader.offset = float(settings.get('offset', defaults['offset']))
                     logging.getLogger().info(f"Impostazioni caricate da {self.settings_file}")
             else:
-                # Se il file non esiste, usa i valori di default
                 self.lorenz_reader.avg_dim = defaults['avg_dim']
                 self.lorenz_reader.invert_speed = defaults['invert_speed']
+                self.lorenz_reader.offset = defaults['offset']
                 logging.getLogger().info("File di impostazioni non trovato, uso i valori di default.")
-                self.save_settings()  # Crea il file con i valori di default
+                self.save_settings()
         except (json.JSONDecodeError, TypeError, ValueError) as e:
             logging.getLogger().error(f"Errore nel caricare le impostazioni: {e}. Uso i valori di default.")
             self.lorenz_reader.avg_dim = defaults['avg_dim']
             self.lorenz_reader.invert_speed = defaults['invert_speed']
+            self.lorenz_reader.offset = defaults['offset']
 
+    # <<< NUOVA MODIFICA >>>: Aggiornato per salvare anche l'offset
     def save_settings(self):
         """Salva le impostazioni correnti in un file JSON."""
         settings = {
             'avg_dim': self.lorenz_reader.avg_dim,
-            'invert_speed': self.lorenz_reader.invert_speed
+            'invert_speed': self.lorenz_reader.invert_speed,
+            'offset': self.lorenz_reader.offset
         }
         try:
             with open(self.settings_file, 'w') as f:
@@ -708,7 +618,6 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore nel salvare le impostazioni: {e}")
 
     def update_lorenz_avg(self, event=None):
-        """Aggiorna la dimensione della media del Lorenz e salva le impostazioni."""
         try:
             new_avg = int(self.avg_entry.get())
             if new_avg > 0:
@@ -722,28 +631,49 @@ class MainWindow(tk.Tk):
                 self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
         except ValueError:
             logging.getLogger().error("Valore non valido per la media. Inserire un numero intero.")
-            # Ripristina il valore precedente
             self.avg_entry.delete(0, tk.END)
             self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
 
     def toggle_invert_speed(self):
-        """Inverte il segno della velocità del Lorenz e salva le impostazioni."""
         is_inverted = self.invert_speed_var.get()
         self.lorenz_reader.invert_speed = is_inverted
         logging.getLogger().info(f"Inversione velocità Lorenz: {'Attiva' if is_inverted else 'Disattiva'}")
         self.save_settings()
 
+    # <<< NUOVA MODIFICA >>>: Metodi per trovare e aprire la cartella di lavoro
+    def _get_application_path(self):
+        """Restituisce il percorso della cartella dell'eseguibile o dello script."""
+        if getattr(sys, 'frozen', False):
+            # Se l'applicazione è un eseguibile creato da PyInstaller
+            application_path = os.path.dirname(sys.executable)
+        else:
+            # Se è uno script .py
+            application_path = os.path.dirname(os.path.abspath(__file__))
+        return application_path
+
+    def _open_working_directory(self):
+        """Apre la cartella di lavoro nel file explorer del sistema operativo."""
+        path = self._get_application_path()
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.Popen(["open", path])
+            else:  # linux
+                subprocess.Popen(["xdg-open", path])
+            logging.info(f"Apertura cartella di lavoro: {path}")
+        except Exception as e:
+            logging.error(f"Impossibile aprire la cartella di lavoro: {e}")
+
     def on_closing(self):
-        #if self.ble_manager.get_connection_status():
-        #    self.disconnect_device()
         if self.lorenz_reader.connected:
             self.lorenz_reader.close_connection()
         if self.modbus.is_connesso():
             self.modbus.disconnetti()
         self.destroy()
 
+
 if __name__ == "__main__":
-    # Setup del logger base se non già configurato
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     app = MainWindow()
     app.mainloop()
