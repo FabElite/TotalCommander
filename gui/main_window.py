@@ -7,14 +7,13 @@ import os
 import sys
 import subprocess
 import asyncio
-import threading  # <<< nuovo: thread dedicato al loop BLE
+import threading
 from shared_lib.bluetooth_manager import BLEManager
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
-
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -35,6 +34,9 @@ class MainWindow(tk.Tk):
         self.auto_commands_running = False
         self.lorenz_reader = LorenzReader()
         self.settings_file = "settings.json"
+
+        self._shutdown_anim_id = None  # id del timer dell'animazione testuale
+        self._shutdown_pb = None  # riferimento alla progressbar della finestra di shutdown
 
         # --- Loop asyncio dedicato al BLE (persistente) ---
         self._ble_loop = None
@@ -202,25 +204,60 @@ class MainWindow(tk.Tk):
         file_menu.add_command(label="Cartella di lavoro", command=self._open_working_directory)
 
     # ---------- UI controls ----------
-
     def create_command_controls(self):
-        commands = [("Livello [/200]", self.send_level_command),
-                    ("Potenza [W]", self.send_power_command),
-                    ("Simulazione [%]", self.send_simulation_command)]
+        commands = [
+            ("Livello [/200]", self.send_level_command),
+            ("Potenza [W]", self.send_power_command),
+            ("Simulazione [%]", self.send_simulation_command)
+        ]
+
         self.frame_commands.grid_columnconfigure(0, weight=2)
         self.frame_commands.grid_columnconfigure(1, weight=1)
         self.frame_commands.grid_columnconfigure(2, weight=1)
+
         for i, (label, command) in enumerate(commands):
             lbl = ttk.Label(self.frame_commands, text=label)
             lbl.grid(row=i, column=0, padx=5, sticky="ew")
-            entry = ttk.Entry(self.frame_commands)
-            entry.grid(row=i, column=1, padx=5, sticky="ew")
+
             if "Livello" in label:
+                # Spinbox livello: step 1, min 0, max 200 (puoi togliere il max se vuoi libero)
+                entry = ttk.Spinbox(
+                    self.frame_commands,
+                    from_=0,
+                    to=200,
+                    increment=1,
+                    width=12
+                )
+                entry.set(0)
                 self.livello_entry = entry
+
             elif "Potenza" in label:
+                # Spinbox potenza: step 1, min 0, senza limite superiore
+                entry = ttk.Spinbox(
+                    self.frame_commands,
+                    from_=0,
+                    to=5000,  # molto alto, così è praticamente "senza limite"
+                    increment=1,
+                    width=12
+                )
+                entry.set(0)
                 self.potenza_entry = entry
+
             elif "Simulazione" in label:
+                # Spinbox simulazione: step 0.1, senza limiti
+                entry = ttk.Spinbox(
+                    self.frame_commands,
+                    from_=-999999,
+                    to=999999,
+                    increment=0.1,
+                    format="%.1f",
+                    width=12
+                )
+                entry.set(0.0)
                 self.simulazione_entry = entry
+
+            entry.grid(row=i, column=1, padx=5, sticky="ew")
+
             btn = ttk.Button(self.frame_commands, text="Invia", command=command)
             btn.grid(row=i, column=2, padx=5, sticky="ew")
 
@@ -314,11 +351,17 @@ class MainWindow(tk.Tk):
 
     def _connect_device(self, address):
         logging.getLogger().info(f"Tentativo connessione a {address}")
-        fut = asyncio.run_coroutine_threadsafe(self.ble_manager.connect_to_device(address), self._ble_loop)
+        fut = asyncio.run_coroutine_threadsafe(
+            self.ble_manager.connect_to_device(address, connection_timeout=15.0),
+            self._ble_loop
+        )
         try:
+            # result() ora riceverà True o False, ma il log dell'errore
+            # sarà già stato gestito all'interno di connect_to_device
             fut.result()
         except Exception as e:
-            logging.getLogger().error(f"Errore connessione BLE: {e}")
+            # Questo blocco ora gestirà solo errori imprevisti nella comunicazione tra thread
+            logging.getLogger().error(f"Errore imprevisto nella gestione della connessione BLE: {e}")
         finally:
             self.after(0, self.progress.stop)
 
@@ -349,8 +392,13 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._send_level_command, level)
 
     def _send_level_command(self, level):
+        try:
+            level = int(float(level))
+        except ValueError:
+            logging.getLogger().error(f"Valore livello non valido: {level}")
+            return
         logging.getLogger().info(f"Invio comando livello: {level}/200")
-        fut = asyncio.run_coroutine_threadsafe(self.ble_manager.set_brake_percentage(int(level)), self._ble_loop)
+        fut = asyncio.run_coroutine_threadsafe(self.ble_manager.set_brake_percentage(level), self._ble_loop)
         try:
             fut.result()
         except Exception as e:
@@ -362,6 +410,11 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._send_power_command, power)
 
     def _send_power_command(self, power):
+        try:
+            power = int(float(power))
+        except ValueError:
+            logging.getLogger().error(f"Valore potenza non valido: {power}")
+            return
         logging.getLogger().info(f"Invio comando potenza: {power}W")
         fut = asyncio.run_coroutine_threadsafe(self.ble_manager.set_brake_power(int(power)), self._ble_loop)
         try:
@@ -430,9 +483,21 @@ class MainWindow(tk.Tk):
         self.data_processor.handle_bike_data(combined_data)
 
     def _update_data_fields_ui(self, bike_data):
-        for key, value in bike_data.items():
+        # Mappa tra chiavi di bike_data e nomi dei campi UI
+        key_mapping = {
+            'Cad': 'cadence',
+            'ElaTime': 'elapsed_time',
+            'Pwr': 'power',
+            'Res': 'resistance',
+            'Spd': 'speed',
+            'TotDist': 'total_distance'
+        }
+
+        for data_key, value in bike_data.items():
             if value is not None:
-                ui_key = key.replace(" ", "_")
+                ui_key = key_mapping.get(data_key)
+                if ui_key is None:
+                    continue
                 entry = self.data_entries.get(ui_key)
                 if entry is None:
                     continue
@@ -576,8 +641,18 @@ class MainWindow(tk.Tk):
         self.btn_set_speed = ttk.Button(self.banco_controls, text="Set Velocità [km/h]:",
                                         command=self.clicked_button_setspeed_modbus)
         self.btn_set_speed.grid(row=2, column=0, padx=5, pady=5)
-        self.speed_banco_entry = ttk.Entry(self.banco_controls, width=12)
-        self.speed_banco_entry.grid(row=2, column=1, padx=5, pady=5)
+        # Spinbox per la velocità banco con step di 0.1
+        self.speed_banco_spin = ttk.Spinbox(
+            self.banco_controls,
+            from_=0.0,  # valore minimo
+            to=100.0,  # valore massimo (modifica se serve)
+            increment=0.1,  # passo di incremento/decremento
+            format="%.1f",  # sempre con un decimale
+            width=12
+        )
+        self.speed_banco_spin.set(0.0)  # valore iniziale
+        self.speed_banco_spin.grid(row=2, column=1, padx=5, pady=5)
+
         self.btn_zero_speed = ttk.Button(self.banco_controls, text="ZERO SPEED",
                                          command=lambda: self.setspeed_modbus(0))
         self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=5, pady=10, sticky="ew")
@@ -671,10 +746,10 @@ class MainWindow(tk.Tk):
 
     def clicked_button_setspeed_modbus(self):
         try:
-            speed_value = float(self.speed_banco_entry.get())
+            speed_value = float(self.speed_banco_spin.get())
             self.setspeed_modbus(speed_value)
         except (ValueError, TypeError):
-            logging.getLogger().error(f"Valore velocità non valido: {self.speed_banco_entry.get()}")
+            logging.getLogger().error(f"Valore velocità non valido: {self.speed_banco_spin.get()}")
 
     def setspeed_modbus(self, speedkmh):
         logging.getLogger().info(f"Invio comando velocità banco: {speedkmh} km/h")
@@ -686,8 +761,10 @@ class MainWindow(tk.Tk):
                 raise ValueError("La velocità non può essere None")
             if speedkmh > 80:
                 raise ValueError("La velocità richiesta è superiore a 80km/h. Comando rifiutato.")
-            self.modbus.set_motor_speed(speedkmh * 10)
-            logging.getLogger().info(f"Comando velocità {speedkmh} km/h inviato con successo.")
+            if self.modbus.set_motor_speed(speedkmh * 10):
+                logging.getLogger().info(f"Comando velocità {speedkmh} km/h inviato con successo.")
+            else:
+                logging.getLogger().info(f"Il comando di velocità non è andato a buon fine")
         except Exception as e:
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
 
@@ -804,13 +881,68 @@ class MainWindow(tk.Tk):
         # Mostra una finestra di avviso
         shutdown_win = tk.Toplevel(self)
         shutdown_win.title("Chiusura")
-        shutdown_win.geometry("300x100")
-        label = ttk.Label(shutdown_win, text="Chiusura delle connessioni in corso...\nAttendere prego.")
-        label.pack(expand=True, padx=20, pady=20)
+
+        # Dimensioni desiderate
+        w, h = 300, 130
+
+        # Evita flicker: nascondi, calcola posizione, poi mostra
+        shutdown_win.withdraw()
+        self.update_idletasks()
+
+        # Centro rispetto alla finestra principale, con fallback allo schermo
+        pw, ph = self.winfo_width(), self.winfo_height()
+        if pw <= 1 or ph <= 1:
+            sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+            x = (sw - w) // 2
+            y = (sh - h) // 2
+        else:
+            px, py = self.winfo_rootx(), self.winfo_rooty()
+            x = px + (pw - w) // 2
+            y = py + (ph - h) // 2
+
+        shutdown_win.geometry(f"{w}x{h}+{x}+{y}")
+
+        # --- CONTENUTO: testo + progressbar indeterminata + puntini animati ---
+        status_var = tk.StringVar(value="Chiusura delle connessioni in corso...\nAttendere prego.")
+        label = ttk.Label(shutdown_win, textvariable=status_var, anchor="center", justify="center")
+        label.pack(expand=True, padx=20, pady=(16, 6))
+
+        # Progressbar indeterminata
+        pb = ttk.Progressbar(shutdown_win, mode='indeterminate', length=220)
+        pb.pack(padx=20, pady=(0, 14), fill='x')
+        pb.start(12)  # più basso = più veloce; 10-15 è un buon compromesso
+
+        # Piccola animazione dei puntini nel testo
+        dots = ['   ', '.  ', '.. ', '...']
+        idx = 0
+
+        def _animate_text():
+            nonlocal idx
+            # Prima riga animata, seconda riga fissa
+            status_var.set(f"Chiusura delle connessioni in corso{dots[idx]}\nAttendere prego.")
+            idx = (idx + 1) % len(dots)
+            # Salvo l'id per poterla stoppare in _poll_shutdown_done
+            try:
+                self._shutdown_anim_id = shutdown_win.after(350, _animate_text)
+            except Exception:
+                # La finestra potrebbe essere già stata distrutta in fase di shutdown
+                self._shutdown_anim_id = None
+
+        _animate_text()
+
+        # Opzionali ma utili
+        shutdown_win.resizable(False, False)
         shutdown_win.transient(self)
         shutdown_win.grab_set()
-        shutdown_win.update()
+
+        # Mostra e porta in primo piano
+        shutdown_win.deiconify()
+        shutdown_win.lift()
+        shutdown_win.focus_force()
+
+        # Teniamo i riferimenti per pulire a fine shutdown
         self._shutdown_win = shutdown_win
+        self._shutdown_pb = pb
 
         # Avvia la procedura di chiusura nel pool
         self._shutdown_future = self.executor.submit(self._graceful_shutdown)
@@ -832,15 +964,29 @@ class MainWindow(tk.Tk):
                 self.executor.shutdown(wait=True)
 
             logging.getLogger().info("Spegnimento completato.")
-
             # Chiudi la finestrella di shutdown se esiste
             if self._shutdown_win is not None and self._shutdown_win.winfo_exists():
                 try:
+                    # Stop animazione testuale
+                    if hasattr(self, "_shutdown_anim_id") and self._shutdown_anim_id:
+                        try:
+                            self._shutdown_win.after_cancel(self._shutdown_anim_id)
+                        except Exception:
+                            pass
+                        self._shutdown_anim_id = None
+
+                    # Stop progressbar
+                    if hasattr(self, "_shutdown_pb") and self._shutdown_pb is not None:
+                        try:
+                            self._shutdown_pb.stop()
+                        except Exception:
+                            pass
+                        self._shutdown_pb = None
+
                     self._shutdown_win.destroy()
                 except Exception:
                     pass
-                self._shutdown_win = None
-
+            self._shutdown_win = None
             self.destroy()
         else:
             self.after(100, self._poll_shutdown_done)
