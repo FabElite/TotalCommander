@@ -19,9 +19,20 @@ class DataProcessor:
         try:
             with open(self.csv_filename, mode='x', newline='') as file:
                 writer = csv.writer(file, delimiter=';')
-                writer.writerow(["timestamp", "ms", "speed", "cadence", "power", "total_distance", "resistance", "elapsed_time", "offset", "speed_avg", "torque_lorenz", "power_lorenz"])
+                writer.writerow([
+                    "timestamp", "ms", "speed_trainer", "cadence_trainer", "power_trainer",
+                    "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
+                    "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz"
+                ])
         except FileExistsError:
             pass
+
+    @staticmethod
+    def _format_value(value):
+        """Converte numeri in stringhe con virgola come separatore decimale."""
+        if isinstance(value, (float, int)):
+            return str(value).replace('.', ',')
+        return str(value)
 
     def handle_bike_data(self, data):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -29,20 +40,23 @@ class DataProcessor:
         row = [
             timestamp,
             elapsed_deciseconds,
-            data.get("speed", ""),
-            data.get("cadence", ""),
-            data.get("power", ""),
-            data.get("total_distance", ""),
-            data.get("resistance", ""),
-            data.get("elapsed_time", ""),
+            data.get("Spd", ""),
+            data.get("Cad", ""),
+            data.get("Pwr", ""),
+            data.get("TotDist", ""),
+            data.get("Res", ""),
+            data.get("ElaTime", ""),
             data.get("offset_lorenz", ""),
             data.get("speed_avg", ""),
             data.get("torque_lorenz", ""),
             data.get("power_lorenz", "")
         ]
+        # Applica formattazione a tutti i campi
+        formatted_row = [self._format_value(v) for v in row]
+
         with open(self.csv_filename, mode='a', newline='') as file:
             writer = csv.writer(file, delimiter=';')
-            writer.writerow(row)
+            writer.writerow(formatted_row)
 
     @staticmethod
     def read_brake_commands_from_csv(file_path):
@@ -52,18 +66,20 @@ class DataProcessor:
                 reader = csv.reader(file, delimiter=';')
                 next(reader)  # Salta la prima riga (intestazione)
                 for row in reader:
-                    if row[1]:  # Se c'è un valore nella seconda colonna
+                    if row[1]:
                         command_type = "livelli"
                         value = int(row[1])
-                    elif row[2]:  # Se c'è un valore nella terza colonna
+                    elif row[2]:
                         command_type = "potenza"
                         value = int(row[2])
-                    elif row[3]:  # Se c'è un valore nella quarta colonna
+                    elif row[3]:
                         command_type = "simulazione"
                         value = int(row[3])
+                    else:
+                        continue
 
                     speed_banco = None
-                    if len(row) >= 5: # Assicurati che la riga abbia almeno 5 colonne
+                    if len(row) >= 5:
                         speed_banco = int(row[4]) if row[4] else None
 
                     wait_time = int(row[0])
