@@ -28,6 +28,12 @@ class MainWindow(tk.Tk):
         self.title("Total Commander")
         self.geometry("1350x760")
 
+        self.style = ttk.Style(self)
+        # Stile per pulsante "DATI ABILITATI" (testo verde scuro)
+        self.style.configure('Data.Enabled.TButton', foreground='#008000', font=('Helvetica', 10, 'bold'))
+        # Stile per pulsante "DATI DISABILITATI" (testo rosso scuro)
+        self.style.configure('Data.Disabled.TButton', foreground='#CC0000', font=('Helvetica', 10, 'bold'))
+
         self.ble_manager = BLEManager()
         self.data_processor = DataProcessor()
         self.modbus = ModbusBancoCollaudo()
@@ -297,6 +303,14 @@ class MainWindow(tk.Tk):
             entry = ttk.Entry(frame, state='readonly', justify='right')
             entry.grid(row=0, column=1, padx=5)
             self.data_entries[field.lower().replace(" ", "_")] = entry
+
+        self.btn_toggle_data = ttk.Button(
+            self.data_controls,
+            text="Abilita Dati",
+            command=self.toggle_data,
+            style='Data.Disabled.TButton'
+        )
+
         self.btn_toggle_data = ttk.Button(self.data_controls, text="Abilita Dati", command=self.toggle_data)
         self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
 
@@ -462,17 +476,21 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore invio simulazione: {e}")
 
     # ---------- Dati FTMS (UI nel main thread) ----------
-
     def toggle_data(self):
         if self.btn_toggle_data.cget('text') == 'Abilita Dati':
             if self.ble_manager.get_connection_status():
-                self.btn_toggle_data.config(text='Disabilita Dati')
+                # <<< MODIFICA: Cambia stile in VERDE >>>
+                self.btn_toggle_data.config(text='Disabilita Dati', style='Data.Enabled.TButton')
                 logging.getLogger().info("Abilitate notifiche FTMS")
                 self.executor.submit(self._enable_ftms_notifications)
             else:
                 logging.getLogger().info("Nessun dispositivo connesso, abilitazione FTMS non possibile")
         else:
-            self.btn_toggle_data.config(text='Abilita Dati')
+            # <<< MODIFICA: Cambia stile in ROSSO e pulisce i campi >>>
+            self.btn_toggle_data.config(text='Abilita Dati', style='Data.Disabled.TButton')
+            self._clear_data_fields_ui()  # Pulisce i dati visualizzati
+            # <<< FINE MODIFICA >>>
+
             logging.getLogger().info("Disabilitate notifiche FTMS")
             self.executor.submit(self._disable_ftms_notifications)
 
@@ -529,6 +547,13 @@ class MainWindow(tk.Tk):
                 entry.insert(0, str(value))
                 entry.config(state='readonly')
 
+    def _clear_data_fields_ui(self):
+        """Pulisce tutti i campi dati nella UI."""
+        logging.getLogger().debug("Pulizia campi dati UI...")
+        for entry in self.data_entries.values():
+            entry.config(state='normal')
+            entry.delete(0, tk.END)
+            entry.config(state='readonly')
     # ---------- CSV / comandi automatici ----------
 
     def load_commands_from_csv(self):
@@ -585,6 +610,9 @@ class MainWindow(tk.Tk):
                 self.commands_table.tag_configure('oddrow', background='lightgrey')
                 self.commands_table.tag_configure('evenrow', background='white')
                 self.commands_table.tag_configure('currentrow', background='yellow')
+                if self.btn_toggle_data.cget('text') == 'Disabilita Dati':
+                    logging.getLogger().info("Comandi automatici terminati, disabilito le notifiche dati.")
+                    self.toggle_data()
 
         self.auto_commands_running = True
         self.led_status.config(text="Comandi Automatici: ON", fg="green")
