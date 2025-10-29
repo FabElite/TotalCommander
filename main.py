@@ -40,7 +40,7 @@ def setup_initial_logging():
 
     logger.info("Logging iniziale configurato (file e console).")
 
-# NUOVA FUNZIONE PER AGGIUNGERE L'HANDLER DELLA GUI
+
 def add_gui_logging_handler(log_queue): # <-- Accetta la coda
     """Aggiunge l'handler per il widget di testo della GUI al logger esistente."""
     log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s") # Formato più breve per la GUI
