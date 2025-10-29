@@ -47,7 +47,7 @@ class DataProcessor:
             data.get("Res", ""),
             data.get("ElaTime", ""),
             data.get("offset_lorenz", ""),
-            data.get("speed_avg", ""),
+            data.get("speed_avg_lorenz", ""),
             data.get("torque_lorenz", ""),
             data.get("power_lorenz", "")
         ]

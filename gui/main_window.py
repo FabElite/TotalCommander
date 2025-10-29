@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+import queue
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import json
@@ -30,7 +31,7 @@ class MainWindow(tk.Tk):
         self.ble_manager = BLEManager()
         self.data_processor = DataProcessor()
         self.modbus = ModbusBancoCollaudo()
-        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.executor = ThreadPoolExecutor(max_workers=5)
         self.auto_commands_running = False
         self.lorenz_reader = LorenzReader()
         self.settings_file = "settings.json"
@@ -157,8 +158,30 @@ class MainWindow(tk.Tk):
         self.log_text = tk.Text(self.frame_log, state='disabled', height=13)
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
+        self.log_queue = queue.Queue()
+        self._process_log_queue()
+
         self.periodic_connection_check()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def _process_log_queue(self):
+        """
+        Processa i messaggi di log dalla coda in modo thread-safe.
+        """
+        try:
+            # Processa tutti i messaggi attualmente nella coda
+            while True:
+                record = self.log_queue.get_nowait()
+                self.log_text.config(state='normal')
+                self.log_text.insert(tk.END, record + '\n')
+                self.log_text.config(state='disabled')
+                self.log_text.yview(tk.END)
+        except queue.Empty:
+            # La coda è vuota, va bene
+            pass
+        finally:
+            # Richiama questa funzione dopo 100ms
+            self.after(100, self._process_log_queue)
 
     # ---------- Loop asyncio BLE persistente ----------
 
@@ -668,7 +691,7 @@ class MainWindow(tk.Tk):
         data = self.lorenz_reader.get_data()
         values = {
             self.offset_label: data.get("offset_lorenz"),
-            self.speed_avg_label: data.get("speed_avg"),
+            self.speed_avg_label: data.get("speed_avg_lorenz"),
             self.torque_lorenz_label: data.get("torque_lorenz"),
             self.power_lorenz_label: data.get("power_lorenz"),
         }

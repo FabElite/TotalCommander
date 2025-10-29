@@ -3,19 +3,17 @@ from logging.handlers import RotatingFileHandler
 from gui.main_window import MainWindow
 import tkinter as tk
 import sys
+import queue
 
 class TextHandler(logging.Handler):
-    """Custom logging handler that sends log messages to a Tkinter Text widget."""
-    def __init__(self, text_widget):
+    """Custom logging handler that sends log messages to a thread-safe queue."""
+    def __init__(self, log_queue):
         super().__init__()
-        self.text_widget = text_widget
+        self.log_queue = log_queue
 
     def emit(self, record):
         msg = self.format(record)
-        self.text_widget.config(state='normal')
-        self.text_widget.insert(tk.END, msg + '\n')
-        self.text_widget.config(state='disabled')
-        self.text_widget.yview(tk.END)
+        self.log_queue.put(msg)
 
 def setup_initial_logging():
     """Configura il logging per file e console. Da chiamare all'avvio."""
@@ -43,18 +41,19 @@ def setup_initial_logging():
     logger.info("Logging iniziale configurato (file e console).")
 
 # NUOVA FUNZIONE PER AGGIUNGERE L'HANDLER DELLA GUI
-def add_gui_logging_handler(text_widget):
+def add_gui_logging_handler(log_queue): # <-- Accetta la coda
     """Aggiunge l'handler per il widget di testo della GUI al logger esistente."""
     log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s") # Formato più breve per la GUI
-    text_handler = TextHandler(text_widget)
+    text_handler = TextHandler(log_queue)
     text_handler.setFormatter(log_formatter)
     logging.getLogger().addHandler(text_handler)
-    logging.getLogger().info("Handler della GUI aggiunto al logger.")
+    logging.getLogger().info("Handler della GUI (via coda) aggiunto al logger.")
 
 
 if __name__ == "__main__":
     setup_initial_logging()
     logging.info("Avvio del programma...")
     app = MainWindow()
-    add_gui_logging_handler(app.log_text)
+    # Passa la coda dell'app, non il widget
+    add_gui_logging_handler(app.log_queue)
     app.mainloop()
