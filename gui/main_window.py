@@ -9,12 +9,14 @@ import sys
 import subprocess
 import asyncio
 import threading
+from collections import deque  # <-- per smoothing Δ
 from shared_lib.bluetooth_manager import BLEManager
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
+
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -26,13 +28,20 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1350x760")
+        self.geometry("1375x760")
 
         self.style = ttk.Style(self)
-        # Stile per pulsante "DATI ABILITATI" (testo verde scuro)
+
+        # Stile pulsante dati ON/OFF
         self.style.configure('Data.Enabled.TButton', foreground='#008000', font=('Helvetica', 10, 'bold'))
-        # Stile per pulsante "DATI DISABILITATI" (testo rosso scuro)
         self.style.configure('Data.Disabled.TButton', foreground='#CC0000', font=('Helvetica', 10, 'bold'))
+
+        # Stili compatti per la tabella CSV (ulteriore accorciamento)
+        self.style.configure('Compact.Treeview', rowheight=16, font=('Helvetica', 8))
+        self.style.configure('Compact.Treeview.Heading', font=('Helvetica', 8, 'bold'), padding=(3, 1))
+
+        # Font evidenziato per i valori chiave nel pannello di confronto
+        self.value_font = ('Helvetica', 12, 'bold')
 
         self.ble_manager = BLEManager()
         self.data_processor = DataProcessor()
@@ -40,10 +49,17 @@ class MainWindow(tk.Tk):
         self.executor = ThreadPoolExecutor(max_workers=5)
         self.auto_commands_running = False
         self.lorenz_reader = LorenzReader()
+
         self.settings_file = "settings.json"
 
-        self._shutdown_anim_id = None  # id del timer dell'animazione testuale
-        self._shutdown_pb = None  # riferimento alla progressbar della finestra di shutdown
+        # Soglie Δ (defaults) – sovrascritte da settings.json se presenti
+        self.delta_speed_thresholds_kmh = (1.0, 3.0)     # verde <=1.0, arancione <=3.0, rosso >3.0
+        self.delta_power_thresholds_pct = (2.0, 5.0)     # verde <=2%, arancione <=5%, rosso >5%
+        # Finestra smoothing (default) – overridable da settings
+        self.delta_smoothing_window = 5
+
+        self._shutdown_anim_id = None
+        self._shutdown_pb = None
 
         # --- Loop asyncio dedicato al BLE (persistente) ---
         self._ble_loop = None
@@ -51,106 +67,146 @@ class MainWindow(tk.Tk):
         self._ble_loop_ready = threading.Event()
         self._init_ble_loop()
 
+        # Carica impostazioni (incluso soglie delta e smoothing)
         self.load_settings()
-        self._create_menu()
 
         # Frame principale
         self.main_frame = ttk.Frame(self)
         self.main_frame.grid(row=0, column=0, sticky="nsew")
 
+        # Layout radice
+        self.grid_rowconfigure(0, weight=1)   # zona principale
+        self.grid_rowconfigure(1, weight=0)   # log
+        self.grid_columnconfigure(0, weight=1)
+
+        # Layout main_frame (4 colonne principali)
+        self.main_frame.grid_columnconfigure(0, weight=0)  # sinistra
+        self.main_frame.grid_columnconfigure(1, weight=0)  # centro-sinistra
+        self.main_frame.grid_columnconfigure(2, weight=1)  # Dati BLE
+        self.main_frame.grid_columnconfigure(3, weight=1)  # Lorenz + Banco (affiancati)
+        self.main_frame.grid_rowconfigure(0, weight=0)     # confronto
+        self.main_frame.grid_rowconfigure(1, weight=1)     # contenuti
+
         # Frame sinistro per ricerca, stato connessione e comandi
         self.left_frame = ttk.Frame(self.main_frame)
-        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=10)
-
-        # Frame per la ricerca e la connessione
-        self.frame_search = ttk.LabelFrame(self.left_frame, text="Ricerca Dispositivi BLE")
-        self.frame_search.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=5, pady=(8, 8))
         self.left_frame.grid_columnconfigure(0, weight=1)
+
+        # Ricerca/Connessione BLE
+        self.frame_search = ttk.LabelFrame(self.left_frame, text="Ricerca Dispositivi BLE")
+        self.frame_search.grid(row=0, column=0, sticky="nsew", padx=5, pady=(4, 4))
         self.frame_search.grid_columnconfigure(0, weight=1)
 
-        self.device_list = tk.Listbox(self.frame_search)
-        self.device_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
+        self.device_list = tk.Listbox(self.frame_search, height=7)
+        self.device_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=4)
         self.btn_search = ttk.Button(self.frame_search, text="Cerca Dispositivi", command=self.search_devices)
         self.btn_search.grid(row=1, column=0, sticky="ew", padx=10, pady=2)
         self.btn_connect = ttk.Button(self.frame_search, text="Connetti", command=self.connect_device)
         self.btn_connect.grid(row=2, column=0, sticky="ew", padx=10, pady=2)
         self.btn_disconnect = ttk.Button(self.frame_search, text="Disconnetti", command=self.disconnect_device)
-        self.btn_disconnect.grid(row=3, column=0, sticky="ew", padx=10, pady=4)
+        self.btn_disconnect.grid(row=3, column=0, sticky="ew", padx=10, pady=3)
 
-        # Frame per lo stato della connessione
+        # Stato connessione
         self.frame_status = ttk.LabelFrame(self.left_frame, text="Stato Connessione")
-        self.frame_status.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        self.frame_status.grid(row=1, column=0, sticky="ew", padx=5, pady=(2, 4))
         self.frame_status.grid_columnconfigure(0, weight=1)
         self.frame_status.grid_columnconfigure(1, weight=1)
         self.connection_status = tk.Label(self.frame_status, text="Non Connesso", fg="red")
-        self.connection_status.grid(row=0, column=0, padx=5, pady=10)
+        self.connection_status.grid(row=0, column=0, padx=5, pady=6)
         self.progress = ttk.Progressbar(self.frame_status, mode='indeterminate')
-        self.progress.grid(row=0, column=1, columnspan=2, sticky="ew", padx=10, pady=10)
+        self.progress.grid(row=0, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
 
-        # Frame per i comandi manuali
+        # Comandi manuali
         self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi manuali")
-        self.frame_commands.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        self.frame_commands.grid(row=2, column=0, sticky="ew", padx=5, pady=(2, 6))
         self.create_command_controls()
 
-        # Frame contenitore per la seconda colonna
+        # Colonna intermedia (CSV + Auto comandi)
         self.middle_left_frame = ttk.Frame(self.main_frame)
-        self.middle_left_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-
-        # Frame comandi da CSV
-        self.automatic_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi da CSV")
-        self.automatic_commands.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.middle_left_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=5, pady=(4, 6))
         self.middle_left_frame.grid_rowconfigure(0, weight=1)
         self.middle_left_frame.grid_columnconfigure(0, weight=1)
+
+        # Comandi da CSV (stile compatto ulteriore)
+        self.automatic_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi da CSV")
+        self.automatic_commands.grid(row=0, column=0, sticky="nsew", padx=5, pady=(2, 2))
         self.automatic_commands.grid_rowconfigure(0, weight=1)
         self.automatic_commands.grid_columnconfigure(0, weight=1)
-
         self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
         self.scrollbar.grid(row=0, column=1, sticky="ns")
 
         self.commands_table = ttk.Treeview(
             self.automatic_commands,
-            columns=("Comando", "Valore", "Tempo [s]", "Vel Banco [km/h]"),
+            columns=("Comando", "Val", "t[s]", "Vb[km/h]"),
             show='headings',
-            yscrollcommand=self.scrollbar.set
+            yscrollcommand=self.scrollbar.set,
+            style='Compact.Treeview'
         )
         self.commands_table.heading("Comando", text="Comando")
-        self.commands_table.heading("Valore", text="Valore")
-        self.commands_table.heading("Tempo [s]", text="Tempo [s]")
-        self.commands_table.heading("Vel Banco [km/h]", text="Vel Banco [km/h]")
-        self.commands_table.column("Comando", width=100)
-        self.commands_table.column("Valore", width=100)
-        self.commands_table.column("Tempo [s]", width=100)
-        self.commands_table.column("Vel Banco [km/h]", width=100)
-        self.commands_table.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.commands_table.heading("Val", text="Val")
+        self.commands_table.heading("t[s]", text="t[s]")
+        self.commands_table.heading("Vb[km/h]", text="Vb[km/h]")
+        self.commands_table.column("Comando", width=95, anchor='center')
+        self.commands_table.column("Val", width=70, anchor='center')
+        self.commands_table.column("t[s]", width=55, anchor='center')
+        self.commands_table.column("Vb[km/h]", width=85, anchor='center')
+        self.commands_table.grid(row=0, column=0, sticky="nsew", padx=8, pady=4)
         self.scrollbar.config(command=self.commands_table.yview)
         self.commands_table.tag_configure('oddrow', background='lightgrey')
         self.commands_table.tag_configure('evenrow', background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
 
+        # Comandi automatici (paddings ridotti)
         self.frame_auto_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi automatici")
-        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=8, pady=(2, 4))
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
         self.frame_auto_commands.grid_columnconfigure(1, weight=1)
         self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
-        self.led_status.grid(row=1, column=0, padx=10, pady=5)
+        self.led_status.grid(row=1, column=0, padx=8, pady=2)
         self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
                                             command=self.load_commands_from_csv)
-        self.btn_load_commands.grid(row=0, column=1, padx=10, pady=2)
+        self.btn_load_commands.grid(row=0, column=1, padx=8, pady=1, sticky='e')
         self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Lancia Comandi Automatici",
                                             command=self.launch_auto_commands)
-        self.btn_auto_commands.grid(row=1, column=1, padx=10, pady=2)
+        self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='e')
         self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Ferma Comandi Automatici",
                                                  command=self.stop_auto_commands)
-        self.btn_stop_auto_commands.grid(row=2, column=1, padx=10, pady=2)
+        self.btn_stop_auto_commands.grid(row=2, column=1, padx=8, pady=1, sticky='e')
 
+        # =======================
+        # PANNELLO DI CONFRONTO (in alto, largo come BLE + Lorenz + Banco)
+        # =======================
+        # Variabili per memorizzare gli ultimi valori BLE/Lorenz (per Δ)
+        self._last_ble_speed = None
+        self._last_ble_power = None
+        self._last_lrz_speed = None
+        self._last_lrz_power = None
+
+        # Buffer per smoothing Δ
+        win = max(1, int(self.delta_smoothing_window))
+        self._delta_speed_hist = deque(maxlen=win)
+        self._delta_power_hist = deque(maxlen=win)
+
+        self._create_compare_panel()
+        self.compare_frame.grid(row=0, column=2, columnspan=2, sticky="nsew", padx=10, pady=(5, 0))
+
+        # Dati BLE FTMS (riga 1, colonna 2)
         self.frame_data = ttk.LabelFrame(self.main_frame, text="Dati BLE FTMS")
-        self.frame_data.grid(row=0, column=2, sticky="nsew", padx=10, pady=5)
+        self.frame_data.grid(row=1, column=2, sticky="nsew", padx=10, pady=5)
         self.create_data_fields()
 
+        # Lato destro: Lorenz e Banco AFFIANCATI nella stessa riga
         self.right_frame = ttk.Frame(self.main_frame)
-        self.right_frame.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
-        self.create_lorenz_controls()
-        self.create_banco_controls()
+        self.right_frame.grid(row=1, column=3, sticky="nsew", padx=10, pady=10)
+        self.right_frame.grid_columnconfigure(0, weight=1)
+        self.right_frame.grid_columnconfigure(1, weight=1)
+
+        # Crea i due blocchi affiancati
+        self.create_lorenz_controls()       # pos (row=0, col=0)
+        self.create_banco_controls()        # pos (row=0, col=1)
+
+        # Menu base (solo File)
+        self._create_menu()
 
         # Aggiorna offset all'avvio
         self.offset_label.config(state='normal')
@@ -158,24 +214,200 @@ class MainWindow(tk.Tk):
         self.offset_label.insert(0, f"{self.lorenz_reader.offset:.2f}")
         self.offset_label.config(state='readonly')
 
+        # Log
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
-        self.frame_log.grid(row=1, column=0, columnspan=4, sticky="nsew", padx=10, pady=10)
+        self.frame_log.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.frame_log.grid_columnconfigure(0, weight=1)
         self.log_text = tk.Text(self.frame_log, state='disabled', height=13)
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
         self.log_queue = queue.Queue()
         self._process_log_queue()
 
         self.periodic_connection_check()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    def _process_log_queue(self):
-        """
-        Processa i messaggi di log dalla coda in modo thread-safe.
-        """
+    # ------------------------------
+    # Helper per entry readonly
+    # ------------------------------
+    def _set_ro(self, entry, text):
+        entry.config(state='normal')
+        entry.delete(0, tk.END)
+        entry.insert(0, text)
+        entry.config(state='readonly')
+
+    # ------------------------------
+    # Pannello di confronto (BLE | Δ | Lorenz)
+    # ------------------------------
+    def _create_compare_panel(self):
+        # Frame (internamente 3 colonne: BLE | Δ | Lorenz)
+        self.compare_frame = ttk.LabelFrame(self.main_frame, text="Confronto BLE ↔ Lorenz")
+        self.compare_frame.grid_columnconfigure(0, weight=1)  # BLE
+        self.compare_frame.grid_columnconfigure(1, weight=0)  # Δ
+        self.compare_frame.grid_columnconfigure(2, weight=1)  # Lorenz
+
+        # --- Colonna sinistra: BLE FTMS ---
+        left = ttk.Frame(self.compare_frame)
+        left.grid(row=0, column=0, sticky="ew", padx=(10, 5), pady=8)
+        left.grid_columnconfigure(0, weight=0)
+        left.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(left, text="BLE FTMS", anchor="center").grid(
+            row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4)
+        )
+
+        ttk.Label(left, text="Speed [km/h]", width=14, anchor="e").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+        self.cmp_ble_speed = ttk.Entry(left, state='readonly', width=12, justify='right', font=self.value_font)
+        self.cmp_ble_speed.grid(row=1, column=1, padx=0, pady=2, sticky="w")
+
+        ttk.Label(left, text="Power [W]", width=14, anchor="e").grid(row=2, column=0, padx=5, pady=2, sticky="e")
+        self.cmp_ble_power = ttk.Entry(left, state='readonly', width=12, justify='right', font=self.value_font)
+        self.cmp_ble_power.grid(row=2, column=1, padx=0, pady=2, sticky="w")
+
+        # --- Colonna centrale: Δ (velocità in km/h, potenza in %) ---
+        center = ttk.Frame(self.compare_frame)
+        center.grid(row=0, column=1, sticky="ns", padx=5, pady=8)
+
+        # Header dinamico con finestra media
+        self.cmp_delta_header = ttk.Label(
+            center,
+            text=f"Δ (Speed: km/h, Power: %) – media N={self.delta_smoothing_window}",
+            anchor="center"
+        )
+        self.cmp_delta_header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
+
+        # Etichette Δ: due righe (riga 1 = media con colore; riga 2 = istantaneo in grigio)
+        self.cmp_delta_speed = tk.Label(center, text="—", width=16, anchor="center", fg="#666666", justify='center')
+        self.cmp_delta_speed.grid(row=1, column=0, padx=2, pady=2, sticky="ew")
+        self.cmp_delta_power = tk.Label(center, text="—", width=16, anchor="center", fg="#666666", justify='center')
+        self.cmp_delta_power.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
+
+        # --- Colonna destra: LORENZ ---
+        right = ttk.Frame(self.compare_frame)
+        right.grid(row=0, column=2, sticky="ew", padx=(5, 10), pady=8)
+        right.grid_columnconfigure(0, weight=0)
+        right.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(right, text="Gestione Lorenz", anchor="center").grid(
+            row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4)
+        )
+
+        ttk.Label(right, text="Speed [km/h]", width=14, anchor="e").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+        self.cmp_lrz_speed = ttk.Entry(right, state='readonly', width=12, justify='right', font=self.value_font)
+        self.cmp_lrz_speed.grid(row=1, column=1, padx=0, pady=2, sticky="w")
+
+        ttk.Label(right, text="Power [W]", width=14, anchor="e").grid(row=2, column=0, padx=5, pady=2, sticky="e")
+        self.cmp_lrz_power = ttk.Entry(right, state='readonly', width=12, justify='right', font=self.value_font)
+        self.cmp_lrz_power.grid(row=2, column=1, padx=0, pady=2, sticky="w")
+
+    # -------- Colori/soglie e formattazioni Δ --------
+    def _color_for_speed_delta(self, abs_kmh):
+        if abs_kmh is None:
+            return "#666666"
+        a = float(abs_kmh)
+        t1, t2 = self.delta_speed_thresholds_kmh
+        if a <= t1:
+            return "#0A7A0A"  # verde
+        elif a <= t2:
+            return "#C98000"  # arancione
+        else:
+            return "#B00000"  # rosso
+
+    def _color_for_power_delta(self, pct):
+        if pct is None:
+            return "#666666"
+        a = abs(float(pct))
+        t1, t2 = self.delta_power_thresholds_pct
+        if a <= t1:
+            return "#0A7A0A"  # verde
+        elif a <= t2:
+            return "#C98000"  # arancione
+        else:
+            return "#B00000"  # rosso
+
+    def _fmt_speed_delta(self, diff_kmh):
+        if diff_kmh is None:
+            return "—"
+        sign = "+" if diff_kmh >= 0 else "−"
+        return f"{sign}{abs(diff_kmh):.2f} km/h"
+
+    def _fmt_power_delta(self, pct):
+        if pct is None:
+            return "—"
+        sign = "+" if pct >= 0 else "−"
+        return f"{sign}{abs(pct):.1f}%"
+
+    # -------- Calcolo Δ (inst) e smoothing --------
+    def _compute_speed_delta_abs(self, ble_val, lrz_val):
+        """Restituisce (BLE - Lorenz) in km/h; None se non computabile."""
         try:
-            # Processa tutti i messaggi attualmente nella coda
+            if ble_val is None or lrz_val is None:
+                return None
+            return float(ble_val) - float(lrz_val)
+        except Exception:
+            return None
+
+    def _compute_power_delta_pct(self, ble_val, lrz_val):
+        """Restituisce (BLE - Lorenz) / Lorenz * 100; None se non computabile/denominatore 0."""
+        try:
+            if ble_val is None or lrz_val is None:
+                return None
+            lrz = float(lrz_val)
+            if lrz == 0:
+                return None
+            ble = float(ble_val)
+            return (ble - lrz) / lrz * 100.0
+        except Exception:
+            return None
+
+    def _mean_or_none(self, values_deque):
+        vals = [v for v in values_deque if v is not None]
+        return (sum(vals) / len(vals)) if vals else None
+
+    def _update_compare_panel(self):
+        # Δ istantanei
+        d_speed_inst = self._compute_speed_delta_abs(self._last_ble_speed, self._last_lrz_speed)
+        d_power_inst = self._compute_power_delta_pct(self._last_ble_power, self._last_lrz_power)
+
+        # Aggiorna buffer smoothing (solo se disponibili)
+        if d_speed_inst is not None:
+            self._delta_speed_hist.append(d_speed_inst)
+        if d_power_inst is not None:
+            self._delta_power_hist.append(d_power_inst)
+
+        # Δ medi (media mobile sui buffer)
+        d_speed_avg = self._mean_or_none(self._delta_speed_hist)
+        d_power_avg = self._mean_or_none(self._delta_power_hist)
+
+        # Testi (media su 1 riga, instanteo tra parentesi su seconda riga)
+        if d_speed_avg is not None or d_speed_inst is not None:
+            smooth_txt = self._fmt_speed_delta(d_speed_avg if d_speed_avg is not None else d_speed_inst)
+            inst_txt = self._fmt_speed_delta(d_speed_inst)
+            txt = smooth_txt if inst_txt == "—" else f"{smooth_txt}\n({inst_txt})"
+            color = self._color_for_speed_delta(abs(d_speed_avg) if d_speed_avg is not None else None)
+            self.cmp_delta_speed.config(text=txt, fg=color)
+        else:
+            self.cmp_delta_speed.config(text="—", fg="#666666")
+
+        if d_power_avg is not None or d_power_inst is not None:
+            smooth_txt = self._fmt_power_delta(d_power_avg if d_power_avg is not None else d_power_inst)
+            inst_txt = self._fmt_power_delta(d_power_inst)
+            txt = smooth_txt if inst_txt == "—" else f"{smooth_txt}\n({inst_txt})"
+            color = self._color_for_power_delta(d_power_avg)
+            self.cmp_delta_power.config(text=txt, fg=color)
+        else:
+            self.cmp_delta_power.config(text="—", fg="#666666")
+
+        # Aggiorna header con N
+        self.cmp_delta_header.config(
+            text=f"Δ (Speed: km/h, Power: %) – media N={self.delta_smoothing_window}"
+        )
+
+    # ------------------------------
+    # Log queue
+    # ------------------------------
+    def _process_log_queue(self):
+        """Processa i messaggi di log dalla coda in modo thread-safe."""
+        try:
             while True:
                 record = self.log_queue.get_nowait()
                 self.log_text.config(state='normal')
@@ -183,14 +415,13 @@ class MainWindow(tk.Tk):
                 self.log_text.config(state='disabled')
                 self.log_text.yview(tk.END)
         except queue.Empty:
-            # La coda è vuota, va bene
             pass
         finally:
-            # Richiama questa funzione dopo 100ms
             self.after(100, self._process_log_queue)
 
-    # ---------- Loop asyncio BLE persistente ----------
-
+    # ------------------------------
+    # Loop asyncio BLE persistente
+    # ------------------------------
     def _init_ble_loop(self):
         """Crea un thread dedicato con un event loop asyncio persistente per BLE."""
         def _worker():
@@ -200,9 +431,7 @@ class MainWindow(tk.Tk):
             try:
                 self._ble_loop.run_forever()
             finally:
-                # Chiudi il loop sullo stesso thread
                 try:
-                    # Best effort: chiudi eventuali generatori async
                     if hasattr(self._ble_loop, "shutdown_asyncgens"):
                         self._ble_loop.run_until_complete(self._ble_loop.shutdown_asyncgens())
                 except Exception:
@@ -223,23 +452,26 @@ class MainWindow(tk.Tk):
         if self._ble_loop_thread is not None:
             self._ble_loop_thread.join(timeout=join_timeout)
 
-    # ---------- Menu ----------
-
+    # ------------------------------
+    # Menu (solo File)
+    # ------------------------------
     def _create_menu(self):
         self.menubar = tk.Menu(self)
         self.config(menu=self.menubar)
+
         file_menu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Cartella di lavoro", command=self._open_working_directory)
 
-    # ---------- UI controls ----------
+    # ------------------------------
+    # UI controls
+    # ------------------------------
     def create_command_controls(self):
         commands = [
             ("Livello [/200]", self.send_level_command),
             ("Potenza [W]", self.send_power_command),
             ("Simulazione [%]", self.send_simulation_command)
         ]
-
         self.frame_commands.grid_columnconfigure(0, weight=2)
         self.frame_commands.grid_columnconfigure(1, weight=1)
         self.frame_commands.grid_columnconfigure(2, weight=1)
@@ -247,70 +479,37 @@ class MainWindow(tk.Tk):
         for i, (label, command) in enumerate(commands):
             lbl = ttk.Label(self.frame_commands, text=label)
             lbl.grid(row=i, column=0, padx=5, sticky="ew")
-
             if "Livello" in label:
-                # Spinbox livello: step 1, min 0, max 200 (puoi togliere il max se vuoi libero)
-                entry = ttk.Spinbox(
-                    self.frame_commands,
-                    from_=0,
-                    to=200,
-                    increment=1,
-                    width=12
-                )
+                entry = ttk.Spinbox(self.frame_commands, from_=0, to=200, increment=1, width=12)
                 entry.set(0)
                 self.livello_entry = entry
-
             elif "Potenza" in label:
-                # Spinbox potenza: step 1, min 0, senza limite superiore
-                entry = ttk.Spinbox(
-                    self.frame_commands,
-                    from_=0,
-                    to=5000,  # molto alto, così è praticamente "senza limite"
-                    increment=1,
-                    width=12
-                )
+                entry = ttk.Spinbox(self.frame_commands, from_=0, to=5000, increment=1, width=12)
                 entry.set(0)
                 self.potenza_entry = entry
-
             elif "Simulazione" in label:
-                # Spinbox simulazione: step 0.1, senza limiti
-                entry = ttk.Spinbox(
-                    self.frame_commands,
-                    from_=-999999,
-                    to=999999,
-                    increment=0.1,
-                    format="%.1f",
-                    width=12
-                )
+                entry = ttk.Spinbox(self.frame_commands, from_=-999999, to=999999,
+                                    increment=0.1, format="%.1f", width=12)
                 entry.set(0.0)
                 self.simulazione_entry = entry
-
             entry.grid(row=i, column=1, padx=5, sticky="ew")
-
             btn = ttk.Button(self.frame_commands, text="Invia", command=command)
             btn.grid(row=i, column=2, padx=5, sticky="ew")
 
     def create_data_fields(self):
         fields = ["power", "cadence", "speed", "resistance", "total_distance", "elapsed_time"]
         self.data_entries = {}
-
         self.data_controls = ttk.Frame(self.frame_data)
         self.data_controls.grid(row=0, column=0, sticky="ew", padx=0, pady=5)
-
         for i, field in enumerate(fields):
             frame = ttk.Frame(self.data_controls)
-            frame.grid(row=i, column=0, sticky="e", padx=5, pady=3)
-
+            frame.grid(row=i, column=0, sticky="e", padx=5, pady=2)
             lbl = ttk.Label(frame, text=field.capitalize(), width=14, anchor="e")
             lbl.grid(row=0, column=0, padx=5)
-
-            # Ridotto: campo stretto, allineato a destra
             entry = ttk.Entry(frame, state='readonly', justify='right', width=10)
             entry.grid(row=0, column=1, padx=0)
-
             self.data_entries[field.lower().replace(" ", "_")] = entry
 
-        # Pulsante "Abilita Dati" centrato sotto i campi
         self.btn_toggle_data = ttk.Button(
             self.data_controls,
             text="Abilita Dati",
@@ -319,10 +518,11 @@ class MainWindow(tk.Tk):
         )
         self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
 
+    # ------------------------------
+    # Status check periodic
+    # ------------------------------
     def periodic_connection_check(self):
-        # BLE status check in worker, UI update via self.after in _async_check_ble_status
         self.executor.submit(lambda: asyncio.run(self._async_check_ble_status()))
-        # Modbus status from main thread
         self._check_and_update_modbus_status()
         self.periodic_check_id = self.after(1000, self.periodic_connection_check)
 
@@ -350,15 +550,15 @@ class MainWindow(tk.Tk):
             self.btn_connect_banco.config(text="Connetti")
             self.banco_status.config(text="Non Connesso", fg="red")
 
-    # ---------- Ricerca/Connessione BLE (thread-safe UI + loop BLE persistente) ----------
-
+    # ------------------------------
+    # Ricerca/Connessione BLE
+    # ------------------------------
     def search_devices(self):
         logging.getLogger().info("Richiesta ricerca dispositivi")
         self.progress.start()
         self.executor.submit(self._search_devices)
 
     def _search_devices(self):
-        # Esegui la coroutine sul loop BLE persistente
         fut = asyncio.run_coroutine_threadsafe(self.ble_manager.scan_devices(timeout=5), self._ble_loop)
         try:
             devices = fut.result()
@@ -398,11 +598,8 @@ class MainWindow(tk.Tk):
             self._ble_loop
         )
         try:
-            # result() ora riceverà True o False, ma il log dell'errore
-            # sarà già stato gestito all'interno di connect_to_device
             fut.result()
         except Exception as e:
-            # Questo blocco ora gestirà solo errori imprevisti nella comunicazione tra thread
             logging.getLogger().error(f"Errore imprevisto nella gestione della connessione BLE: {e}")
         finally:
             self.after(0, self.progress.stop)
@@ -423,11 +620,12 @@ class MainWindow(tk.Tk):
             def _ui():
                 if ok:
                     self.connection_status.config(text="Non Connesso", fg="red")
-                self.progress.stop()
+                    self.progress.stop()
             self.after(0, _ui)
 
-    # ---------- Invio comandi BLE ----------
-
+    # ------------------------------
+    # Invio comandi BLE
+    # ------------------------------
     def send_level_command(self, level=None):
         if level is None:
             level = self.livello_entry.get()
@@ -480,22 +678,20 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore invio simulazione: {e}")
 
-    # ---------- Dati FTMS (UI nel main thread) ----------
+    # ------------------------------
+    # Dati FTMS (UI)
+    # ------------------------------
     def toggle_data(self):
         if self.btn_toggle_data.cget('text') == 'Abilita Dati':
             if self.ble_manager.get_connection_status():
-                # <<< MODIFICA: Cambia stile in VERDE >>>
                 self.btn_toggle_data.config(text='Disabilita Dati', style='Data.Enabled.TButton')
                 logging.getLogger().info("Abilitate notifiche FTMS")
                 self.executor.submit(self._enable_ftms_notifications)
             else:
                 logging.getLogger().info("Nessun dispositivo connesso, abilitazione FTMS non possibile")
         else:
-            # <<< MODIFICA: Cambia stile in ROSSO e pulisce i campi >>>
             self.btn_toggle_data.config(text='Abilita Dati', style='Data.Disabled.TButton')
-            self._clear_data_fields_ui()  # Pulisce i dati visualizzati
-            # <<< FINE MODIFICA >>>
-
+            self._clear_data_fields_ui()
             logging.getLogger().info("Disabilitate notifiche FTMS")
             self.executor.submit(self._disable_ftms_notifications)
 
@@ -522,8 +718,6 @@ class MainWindow(tk.Tk):
     def update_data_fields(self, bike_data):
         # UI nel main thread
         self.after(0, self._update_data_fields_ui, bike_data)
-
-
         # Elaborazione dati (non UI)
         lorenz_data = self.lorenz_reader.get_data()
         combined_data = {**bike_data, **lorenz_data}
@@ -539,19 +733,33 @@ class MainWindow(tk.Tk):
             'Spd': 'speed',
             'TotDist': 'total_distance'
         }
-
         for data_key, value in bike_data.items():
-            if value is not None:
-                ui_key = key_mapping.get(data_key)
-                if ui_key is None:
-                    continue
-                entry = self.data_entries.get(ui_key)
-                if entry is None:
-                    continue
-                entry.config(state='normal')
-                entry.delete(0, tk.END)
-                entry.insert(0, str(value))
-                entry.config(state='readonly')
+            if value is None:
+                continue
+            ui_key = key_mapping.get(data_key)
+            if ui_key is None:
+                continue
+            entry = self.data_entries.get(ui_key)
+            if entry is None:
+                continue
+            entry.config(state='normal')
+            entry.delete(0, tk.END)
+            entry.insert(0, str(value))
+            entry.config(state='readonly')
+
+            # Aggiorna pannello di confronto per BLE + memorizza ultimi valori
+            try:
+                if ui_key == 'speed' and hasattr(self, 'cmp_ble_speed'):
+                    self._set_ro(self.cmp_ble_speed, str(value))
+                    self._last_ble_speed = float(value)
+                elif ui_key == 'power' and hasattr(self, 'cmp_ble_power'):
+                    self._set_ro(self.cmp_ble_power, str(value))
+                    self._last_ble_power = float(value)
+            except Exception:
+                pass
+
+        # Ricalcola Δ (medie + istantanei)
+        self._update_compare_panel()
 
     def _clear_data_fields_ui(self):
         """Pulisce tutti i campi dati nella UI."""
@@ -560,8 +768,16 @@ class MainWindow(tk.Tk):
             entry.config(state='normal')
             entry.delete(0, tk.END)
             entry.config(state='readonly')
-    # ---------- CSV / comandi automatici ----------
+        # Reset BLE last values + buffer smoothing
+        self._last_ble_speed = None
+        self._last_ble_power = None
+        self._delta_speed_hist.clear()
+        self._delta_power_hist.clear()
+        self._update_compare_panel()
 
+    # ------------------------------
+    # CSV / comandi automatici
+    # ------------------------------
     def load_commands_from_csv(self):
         if self.auto_commands_running:
             logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
@@ -640,10 +856,13 @@ class MainWindow(tk.Tk):
         else:
             logging.getLogger().info("Non ci sono comandi automatici attivi")
 
-    # ---------- Lorenz ----------
+    # ------------------------------
+    # Lorenz (affiancato al Banco)
+    # ------------------------------
     def create_lorenz_controls(self):
         self.frame_lorenz = ttk.LabelFrame(self.right_frame, text="Gestione Lorenz")
-        self.frame_lorenz.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        # Affiancato: colonna 0
+        self.frame_lorenz.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=10)
 
         self.lorenz_controls = ttk.Frame(self.frame_lorenz)
         self.lorenz_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
@@ -656,7 +875,6 @@ class MainWindow(tk.Tk):
         self.btn_disconnect_lorenz = ttk.Button(self.lorenz_controls, text="Disconnetti Lorenz",
                                                 command=self.disconnect_lorenz)
         self.btn_disconnect_lorenz.grid(row=1, column=1, padx=5, pady=5)
-
         self.btn_read_offset = ttk.Button(self.lorenz_controls, text="Leggi Offset", command=self.read_lorenz_offset)
         self.btn_read_offset.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
 
@@ -682,32 +900,39 @@ class MainWindow(tk.Tk):
         )
         chk_invert_speed.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
+    # ------------------------------
+    # Banco (affiancato al Lorenz)
+    # ------------------------------
     def create_banco_controls(self):
         self.banco_controls = ttk.LabelFrame(self.right_frame, text="Gestione Banco")
-        self.banco_controls.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        # Affiancato: colonna 1 (stessa riga del Lorenz)
+        self.banco_controls.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=10)
+
         lbl_ip = ttk.Label(self.banco_controls, text="PORTA IP:")
         lbl_ip.grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.entry_ip = ttk.Entry(self.banco_controls, width=12)
         self.entry_ip.insert(0, "192.168.0.10")
         self.entry_ip.grid(row=0, column=1, padx=5, pady=5)
+
         self.btn_connect_banco = ttk.Button(self.banco_controls, text="Connetti",
                                             command=self.toggle_modbus_connection)
         self.btn_connect_banco.grid(row=1, column=0, padx=5, pady=5)
         self.banco_status = tk.Label(self.banco_controls, text="Non Connesso", fg="red")
         self.banco_status.grid(row=1, column=1, padx=5, pady=5)
+
         self.btn_set_speed = ttk.Button(self.banco_controls, text="Set Velocità [km/h]:",
                                         command=self.clicked_button_setspeed_modbus)
         self.btn_set_speed.grid(row=2, column=0, padx=5, pady=5)
-        # Spinbox per la velocità banco con step di 0.1
+
         self.speed_banco_spin = ttk.Spinbox(
             self.banco_controls,
-            from_=0.0,  # valore minimo
-            to=100.0,  # valore massimo (modifica se serve)
-            increment=0.1,  # passo di incremento/decremento
-            format="%.1f",  # sempre con un decimale
+            from_=0.0,
+            to=100.0,
+            increment=0.1,
+            format="%.1f",
             width=12
         )
-        self.speed_banco_spin.set(0.0)  # valore iniziale
+        self.speed_banco_spin.set(0.0)
         self.speed_banco_spin.grid(row=2, column=1, padx=5, pady=5)
 
         self.btn_zero_speed = ttk.Button(self.banco_controls, text="ZERO SPEED",
@@ -717,7 +942,7 @@ class MainWindow(tk.Tk):
     def create_labeled_entry(self, parent, label_text, row):
         label = ttk.Label(parent, text=label_text)
         label.grid(row=row, column=0, sticky="e", padx=5, pady=2)
-        entry = ttk.Entry(parent, width=15, state='readonly', justify='right')
+        entry = ttk.Entry(parent, width=12, state='readonly', justify='right')
         entry.grid(row=row, column=1, padx=5, pady=2)
         return entry
 
@@ -734,6 +959,22 @@ class MainWindow(tk.Tk):
             entry.delete(0, tk.END)
             entry.insert(0, f"{val:.2f}" if val is not None else "N/A")
             entry.config(state='readonly')
+
+        # Aggiorna pannello di confronto lato Lorenz + memorizza ultimi valori
+        try:
+            v_speed = data.get("speed_avg_lorenz")
+            if v_speed is not None and hasattr(self, 'cmp_lrz_speed'):
+                self._set_ro(self.cmp_lrz_speed, f"{v_speed:.2f}")
+                self._last_lrz_speed = float(v_speed)
+            v_power = data.get("power_lorenz")
+            if v_power is not None and hasattr(self, 'cmp_lrz_power'):
+                self._set_ro(self.cmp_lrz_power, f"{v_power:.2f}")
+                self._last_lrz_power = float(v_power)
+        except Exception:
+            pass
+
+        # Ricalcola Δ (medie + istantanei)
+        self._update_compare_panel()
 
     def connect_lorenz(self):
         logging.getLogger().info("Richiesta connessione a Lorenz...")
@@ -781,8 +1022,9 @@ class MainWindow(tk.Tk):
         logging.getLogger().info(f"Offset letto: {self.lorenz_reader.offset}")
         self.save_settings()
 
-    # ---------- Modbus ----------
-
+    # ------------------------------
+    # Modbus
+    # ------------------------------
     def toggle_modbus_connection(self):
         logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
         self.btn_connect_banco.config(state='disabled')
@@ -825,25 +1067,41 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
 
-    # ---------- Settings ----------
-
+    # ------------------------------
+    # Settings (soglie + smoothing + lorenz)
+    # ------------------------------
     def load_settings(self):
-        """Carica le impostazioni da un file JSON."""
+        """Carica le impostazioni da un file JSON (Lorenz + soglie delta + smoothing finestra)."""
         defaults = {'avg_dim': 20, 'invert_speed': False, 'offset': 0.0}
         try:
             if os.path.exists(self.settings_file):
                 with open(self.settings_file, 'r') as f:
                     settings = json.load(f)
+                # Lorenz
                 self.lorenz_reader.avg_dim = int(settings.get('avg_dim', defaults['avg_dim']))
                 self.lorenz_reader.invert_speed = bool(settings.get('invert_speed', defaults['invert_speed']))
                 self.lorenz_reader.offset = float(settings.get('offset', defaults['offset']))
+                # Soglie delta
+                sp = settings.get('delta_speed_thresholds_kmh', self.delta_speed_thresholds_kmh)
+                pw = settings.get('delta_power_thresholds_pct', self.delta_power_thresholds_pct)
+                if isinstance(sp, (list, tuple)) and len(sp) == 2:
+                    self.delta_speed_thresholds_kmh = (float(sp[0]), float(sp[1]))
+                if isinstance(pw, (list, tuple)) and len(pw) == 2:
+                    self.delta_power_thresholds_pct = (float(pw[0]), float(pw[1]))
+                # Finestra smoothing
+                win = settings.get('delta_smoothing_window', self.delta_smoothing_window)
+                try:
+                    self.delta_smoothing_window = max(1, int(win))
+                except Exception:
+                    self.delta_smoothing_window = 5
                 logging.getLogger().info(f"Impostazioni caricate da {self.settings_file}")
             else:
+                # default + salva
                 self.lorenz_reader.avg_dim = defaults['avg_dim']
                 self.lorenz_reader.invert_speed = defaults['invert_speed']
                 self.lorenz_reader.offset = defaults['offset']
-                logging.getLogger().info("File di impostazioni non trovato, uso i valori di default.")
                 self.save_settings()
+                logging.getLogger().info("File di impostazioni non trovato, uso i valori di default.")
         except (json.JSONDecodeError, TypeError, ValueError) as e:
             logging.getLogger().error(f"Errore nel caricare le impostazioni: {e}. Uso i valori di default.")
             self.lorenz_reader.avg_dim = defaults['avg_dim']
@@ -851,11 +1109,14 @@ class MainWindow(tk.Tk):
             self.lorenz_reader.offset = defaults['offset']
 
     def save_settings(self):
-        """Salva le impostazioni correnti in un file JSON."""
+        """Salva le impostazioni correnti in un file JSON (Lorenz + soglie delta + smoothing)."""
         settings = {
             'avg_dim': self.lorenz_reader.avg_dim,
             'invert_speed': self.lorenz_reader.invert_speed,
-            'offset': self.lorenz_reader.offset
+            'offset': self.lorenz_reader.offset,
+            'delta_speed_thresholds_kmh': list(self.delta_speed_thresholds_kmh),
+            'delta_power_thresholds_pct': list(self.delta_power_thresholds_pct),
+            'delta_smoothing_window': int(self.delta_smoothing_window),
         }
         try:
             with open(self.settings_file, 'w') as f:
@@ -887,8 +1148,9 @@ class MainWindow(tk.Tk):
         logging.getLogger().info(f"Inversione velocità Lorenz: {'Attiva' if is_inverted else 'Disattiva'}")
         self.save_settings()
 
-    # ---------- Utility ----------
-
+    # ------------------------------
+    # Utility
+    # ------------------------------
     def _get_application_path(self):
         """Restituisce il percorso della cartella dell'eseguibile o dello script."""
         if getattr(sys, 'frozen', False):
@@ -911,12 +1173,14 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.error(f"Impossibile aprire la cartella di lavoro: {e}")
 
-    # ---------- Chiusura pulita (no deadlock, no "loop is closed") ----------
+    # ------------------------------
+    # Chiusura pulita
+    # ------------------------------
     def on_closing(self):
         """
         Gestisce l'evento di chiusura della finestra in modo non bloccante e senza deadlock.
         """
-        # 1. FERMA TUTTI I TASK PERIODICI
+        # Ferma task periodici
         if self.periodic_check_id:
             self.after_cancel(self.periodic_check_id)
             self.periodic_check_id = None
@@ -935,18 +1199,14 @@ class MainWindow(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", lambda: None)
         self.title("Total Commander - Chiusura in corso...")
 
-        # Mostra una finestra di avviso
+        # Finestra di spegnimento
         shutdown_win = tk.Toplevel(self)
         shutdown_win.title("Chiusura")
 
-        # Dimensioni desiderate
         w, h = 300, 130
-
-        # Evita flicker: nascondi, calcola posizione, poi mostra
         shutdown_win.withdraw()
         self.update_idletasks()
 
-        # Centro rispetto alla finestra principale, con fallback allo schermo
         pw, ph = self.winfo_width(), self.winfo_height()
         if pw <= 1 or ph <= 1:
             sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
@@ -956,58 +1216,45 @@ class MainWindow(tk.Tk):
             px, py = self.winfo_rootx(), self.winfo_rooty()
             x = px + (pw - w) // 2
             y = py + (ph - h) // 2
-
         shutdown_win.geometry(f"{w}x{h}+{x}+{y}")
 
-        # --- CONTENUTO: testo + progressbar indeterminata + puntini animati ---
         status_var = tk.StringVar(value="Chiusura delle connessioni in corso...\nAttendere prego.")
         label = ttk.Label(shutdown_win, textvariable=status_var, anchor="center", justify="center")
         label.pack(expand=True, padx=20, pady=(16, 6))
 
-        # Progressbar indeterminata
         pb = ttk.Progressbar(shutdown_win, mode='indeterminate', length=220)
         pb.pack(padx=20, pady=(0, 14), fill='x')
-        pb.start(12)  # più basso = più veloce; 10-15 è un buon compromesso
+        pb.start(12)
 
-        # Piccola animazione dei puntini nel testo
-        dots = ['   ', '.  ', '.. ', '...']
+        dots = [' ', '. ', '.. ', '...']
         idx = 0
 
         def _animate_text():
             nonlocal idx
-            # Prima riga animata, seconda riga fissa
             status_var.set(f"Chiusura delle connessioni in corso{dots[idx]}\nAttendere prego.")
             idx = (idx + 1) % len(dots)
-            # Salvo l'id per poterla stoppare in _poll_shutdown_done
             try:
                 self._shutdown_anim_id = shutdown_win.after(350, _animate_text)
             except Exception:
-                # La finestra potrebbe essere già stata distrutta in fase di shutdown
                 self._shutdown_anim_id = None
 
         _animate_text()
 
-        # Opzionali ma utili
         shutdown_win.resizable(False, False)
         shutdown_win.transient(self)
         shutdown_win.grab_set()
-
-        # Mostra e porta in primo piano
         shutdown_win.deiconify()
         shutdown_win.lift()
         shutdown_win.focus_force()
 
-        # Teniamo i riferimenti per pulire a fine shutdown
         self._shutdown_win = shutdown_win
         self._shutdown_pb = pb
 
-        # Avvia la procedura di chiusura nel pool
         self._shutdown_future = self.executor.submit(self._graceful_shutdown)
         self._poll_shutdown_done()
 
     def _poll_shutdown_done(self):
         if self._shutdown_future and self._shutdown_future.done():
-            # Propaga eventuali errori
             try:
                 self._shutdown_future.result()
             except Exception as e:
@@ -1015,35 +1262,29 @@ class MainWindow(tk.Tk):
 
             logging.getLogger().info("Arresto dei worker...")
             try:
-                # Python 3.9+: cancella i task in coda
                 self.executor.shutdown(wait=True, cancel_futures=True)
             except TypeError:
                 self.executor.shutdown(wait=True)
-
             logging.getLogger().info("Spegnimento completato.")
-            # Chiudi la finestrella di shutdown se esiste
+
             if self._shutdown_win is not None and self._shutdown_win.winfo_exists():
                 try:
-                    # Stop animazione testuale
                     if hasattr(self, "_shutdown_anim_id") and self._shutdown_anim_id:
                         try:
                             self._shutdown_win.after_cancel(self._shutdown_anim_id)
                         except Exception:
                             pass
                         self._shutdown_anim_id = None
-
-                    # Stop progressbar
                     if hasattr(self, "_shutdown_pb") and self._shutdown_pb is not None:
                         try:
                             self._shutdown_pb.stop()
                         except Exception:
                             pass
                         self._shutdown_pb = None
-
                     self._shutdown_win.destroy()
                 except Exception:
                     pass
-            self._shutdown_win = None
+                self._shutdown_win = None
             self.destroy()
         else:
             self.after(100, self._poll_shutdown_done)
@@ -1073,13 +1314,11 @@ class MainWindow(tk.Tk):
                 except Exception as e:
                     logging.getLogger().error(f"Errore nella disconnessione BLE: {e}")
                 logging.getLogger().info("Connessione BLE chiusa.")
-
         except Exception as e:
             logging.getLogger().error(f"Errore durante la disconnessione dei dispositivi: {e}")
         finally:
-            # Ferma il loop BLE e attende il thread per evitare "Event loop is closed"
             self._shutdown_ble_loop(join_timeout=3.0)
-        # Non chiudere qui l'executor e non toccare la UI: lo fa il main thread.
+            # L'executor e la UI vengono chiusi nel main thread.
 
 
 if __name__ == "__main__":
