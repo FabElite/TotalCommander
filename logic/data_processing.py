@@ -1,4 +1,5 @@
-import csv
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
 from datetime import datetime
 import time
 import os
@@ -8,24 +9,24 @@ class DataProcessor:
         self.start_time = time.time()
         self.output_dir = "output"
         self.create_output_dir()
-        self.csv_filename = os.path.join(self.output_dir, f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_bike_data_log.csv")
-        self.initialize_csv()
+        self.xlsx_filename = os.path.join(self.output_dir, f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_bike_data_log.xlsx")
+        self.initialize_xlsx()
 
     def create_output_dir(self):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def initialize_csv(self):
-        try:
-            with open(self.csv_filename, mode='x', newline='') as file:
-                writer = csv.writer(file, delimiter=';')
-                writer.writerow([
-                    "timestamp", "ms", "speed_trainer", "cadence_trainer", "power_trainer",
-                    "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
-                    "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz"
-                ])
-        except FileExistsError:
-            pass
+    def initialize_xlsx(self):
+        self.workbook = Workbook()
+        self.sheet = self.workbook.active
+        self.sheet.title = "Bike Data"
+        headers = [
+            "timestamp", "s", "speed_trainer", "cadence_trainer", "power_trainer",
+            "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
+            "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz"
+        ]
+        self.sheet.append(headers)
+        self.workbook.save(self.xlsx_filename)
 
     @staticmethod
     def _format_value(value):
@@ -36,10 +37,10 @@ class DataProcessor:
 
     def handle_bike_data(self, data):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        elapsed_deciseconds = int((time.time() - self.start_time) * 10)
+        elapsed_seconds = round(time.time() - self.start_time, 2)
         row = [
             timestamp,
-            elapsed_deciseconds,
+            elapsed_seconds,
             data.get("Spd", ""),
             data.get("Cad", ""),
             data.get("Pwr", ""),
@@ -51,20 +52,20 @@ class DataProcessor:
             data.get("torque_lorenz", ""),
             data.get("power_lorenz", "")
         ]
-        # Applica formattazione a tutti i campi
         formatted_row = [self._format_value(v) for v in row]
-
-        with open(self.csv_filename, mode='a', newline='') as file:
-            writer = csv.writer(file, delimiter=';')
-            writer.writerow(formatted_row)
+        workbook = load_workbook(self.xlsx_filename)
+        sheet = workbook.active
+        sheet.append(formatted_row)
+        workbook.save(self.xlsx_filename)
 
     @staticmethod
     def read_brake_commands_from_csv(file_path):
+        import csv
         brake_commands = []
         try:
             with open(file_path, mode='r') as file:
                 reader = csv.reader(file, delimiter=';')
-                next(reader)  # Salta la prima riga (intestazione)
+                next(reader) # Salta la prima riga (intestazione)
                 for row in reader:
                     if row[1]:
                         command_type = "livelli"

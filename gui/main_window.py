@@ -293,25 +293,30 @@ class MainWindow(tk.Tk):
     def create_data_fields(self):
         fields = ["power", "cadence", "speed", "resistance", "total_distance", "elapsed_time"]
         self.data_entries = {}
+
         self.data_controls = ttk.Frame(self.frame_data)
-        self.data_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        self.data_controls.grid(row=0, column=0, sticky="ew", padx=0, pady=5)
+
         for i, field in enumerate(fields):
             frame = ttk.Frame(self.data_controls)
-            frame.grid(row=i, column=0, sticky="e", padx=5, pady=5)
-            lbl = ttk.Label(frame, text=field.capitalize())
+            frame.grid(row=i, column=0, sticky="e", padx=5, pady=3)
+
+            lbl = ttk.Label(frame, text=field.capitalize(), width=14, anchor="e")
             lbl.grid(row=0, column=0, padx=5)
-            entry = ttk.Entry(frame, state='readonly', justify='right')
-            entry.grid(row=0, column=1, padx=5)
+
+            # Ridotto: campo stretto, allineato a destra
+            entry = ttk.Entry(frame, state='readonly', justify='right', width=10)
+            entry.grid(row=0, column=1, padx=0)
+
             self.data_entries[field.lower().replace(" ", "_")] = entry
 
+        # Pulsante "Abilita Dati" centrato sotto i campi
         self.btn_toggle_data = ttk.Button(
             self.data_controls,
             text="Abilita Dati",
             command=self.toggle_data,
             style='Data.Disabled.TButton'
         )
-
-        self.btn_toggle_data = ttk.Button(self.data_controls, text="Abilita Dati", command=self.toggle_data)
         self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
 
     def periodic_connection_check(self):
@@ -517,6 +522,7 @@ class MainWindow(tk.Tk):
     def update_data_fields(self, bike_data):
         # UI nel main thread
         self.after(0, self._update_data_fields_ui, bike_data)
+
 
         # Elaborazione dati (non UI)
         lorenz_data = self.lorenz_reader.get_data()
