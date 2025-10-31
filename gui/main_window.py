@@ -166,7 +166,7 @@ class MainWindow(tk.Tk):
         self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
                                             command=self.load_commands_from_csv)
         self.btn_load_commands.grid(row=0, column=1, padx=8, pady=1, sticky='e')
-        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Lancia Comandi Automatici",
+        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Avvia Comandi Automatici",
                                             command=self.launch_auto_commands)
         self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='e')
         self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Ferma Comandi Automatici",
