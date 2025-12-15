@@ -24,6 +24,9 @@ class MainWindow(tk.Tk):
         self.lorenz_update_id = None
         self.periodic_check_id = None
         self.auto_command_id = None
+        self.countdown_timer_id = None  # <-- Aggiunto
+        self.total_test_duration_seconds = 0  # <-- Aggiunto
+        self.remaining_test_duration_seconds = 0  # <-- Aggiunto
         self._shutdown_future = None
         self._shutdown_win = None
 
@@ -53,8 +56,8 @@ class MainWindow(tk.Tk):
         self.settings_file = "settings.json"
 
         # Soglie Δ (defaults) – sovrascritte da settings.json se presenti
-        self.delta_speed_thresholds_kmh = (1.0, 3.0)     # verde <=1.0, arancione <=3.0, rosso >3.0
-        self.delta_power_thresholds_pct = (2.0, 5.0)     # verde <=2%, arancione <=5%, rosso >5%
+        self.delta_speed_thresholds_kmh = (1.0, 3.0)  # verde <=1.0, arancione <=3.0, rosso >3.0
+        self.delta_power_thresholds_pct = (2.0, 5.0)  # verde <=2%, arancione <=5%, rosso >5%
         # Finestra smoothing (default) – overridable da settings
         self.delta_smoothing_window = 5
 
@@ -75,8 +78,8 @@ class MainWindow(tk.Tk):
         self.main_frame.grid(row=0, column=0, sticky="nsew")
 
         # Layout radice
-        self.grid_rowconfigure(0, weight=1)   # zona principale
-        self.grid_rowconfigure(1, weight=0)   # log
+        self.grid_rowconfigure(0, weight=1)  # zona principale
+        self.grid_rowconfigure(1, weight=0)  # log
         self.grid_columnconfigure(0, weight=1)
 
         # Layout main_frame (4 colonne principali)
@@ -84,8 +87,8 @@ class MainWindow(tk.Tk):
         self.main_frame.grid_columnconfigure(1, weight=0)  # centro-sinistra
         self.main_frame.grid_columnconfigure(2, weight=1)  # Dati BLE
         self.main_frame.grid_columnconfigure(3, weight=1)  # Lorenz + Banco (affiancati)
-        self.main_frame.grid_rowconfigure(0, weight=0)     # confronto
-        self.main_frame.grid_rowconfigure(1, weight=1)     # contenuti
+        self.main_frame.grid_rowconfigure(0, weight=0)  # confronto
+        self.main_frame.grid_rowconfigure(1, weight=1)  # contenuti
 
         # Frame sinistro per ricerca, stato connessione e comandi
         self.left_frame = ttk.Frame(self.main_frame)
@@ -156,22 +159,39 @@ class MainWindow(tk.Tk):
         self.commands_table.tag_configure('evenrow', background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
 
-        # Comandi automatici (paddings ridotti)
+        # --- [MODIFICATO] Comandi automatici (layout aggiornato) ---
         self.frame_auto_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi automatici")
         self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=8, pady=(2, 4))
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
         self.frame_auto_commands.grid_columnconfigure(1, weight=1)
-        self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
-        self.led_status.grid(row=1, column=0, padx=8, pady=2)
+
         self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
                                             command=self.load_commands_from_csv)
         self.btn_load_commands.grid(row=0, column=1, padx=8, pady=1, sticky='e')
+
+        self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
+        self.led_status.grid(row=1, column=0, padx=8, pady=2, sticky="w")
         self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Avvia Comandi Automatici",
                                             command=self.launch_auto_commands)
         self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='e')
+
         self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Ferma Comandi Automatici",
                                                  command=self.stop_auto_commands)
         self.btn_stop_auto_commands.grid(row=2, column=1, padx=8, pady=1, sticky='e')
+
+        # Etichette durata
+        self.lbl_total_duration_text = ttk.Label(self.frame_auto_commands, text="Durata Totale Test:")
+        self.lbl_total_duration_text.grid(row=3, column=0, padx=8, pady=(4, 2), sticky='w')
+        self.lbl_total_duration_value = ttk.Label(self.frame_auto_commands, text="--:--:--",
+                                                  font=('Helvetica', 10, 'bold'))
+        self.lbl_total_duration_value.grid(row=3, column=1, padx=8, pady=(4, 2), sticky='w')
+
+        self.lbl_remaining_duration_text = ttk.Label(self.frame_auto_commands, text="Tempo Rimanente:")
+        self.lbl_remaining_duration_text.grid(row=4, column=0, padx=8, pady=2, sticky='w')
+        self.lbl_remaining_duration_value = ttk.Label(self.frame_auto_commands, text="--:--:--",
+                                                      font=('Helvetica', 10, 'bold'))
+        self.lbl_remaining_duration_value.grid(row=4, column=1, padx=8, pady=2, sticky='w')
+        # --- [FINE MODIFICA] ---
 
         # =======================
         # PANNELLO DI CONFRONTO (in alto, largo come BLE + Lorenz + Banco)
@@ -202,8 +222,8 @@ class MainWindow(tk.Tk):
         self.right_frame.grid_columnconfigure(1, weight=1)
 
         # Crea i due blocchi affiancati
-        self.create_lorenz_controls()       # pos (row=0, col=0)
-        self.create_banco_controls()        # pos (row=0, col=1)
+        self.create_lorenz_controls()  # pos (row=0, col=0)
+        self.create_banco_controls()  # pos (row=0, col=1)
 
         # Menu base (solo File)
         self._create_menu()
@@ -234,6 +254,20 @@ class MainWindow(tk.Tk):
         entry.delete(0, tk.END)
         entry.insert(0, text)
         entry.config(state='readonly')
+
+    # --- [NUOVA FUNZIONE] ---
+    def _format_time(self, seconds):
+        """Converte i secondi in una stringa formattata HH:MM:SS."""
+        try:
+            seconds = int(float(seconds))
+            hours = seconds // 3600
+            minutes = (seconds % 3600) // 60
+            seconds = seconds % 60
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        except Exception:
+            return "--:--:--"
+
+    # --- [FINE NUOVA FUNZIONE] ---
 
     # ------------------------------
     # Pannello di confronto (BLE | Δ | Lorenz)
@@ -424,6 +458,7 @@ class MainWindow(tk.Tk):
     # ------------------------------
     def _init_ble_loop(self):
         """Crea un thread dedicato con un event loop asyncio persistente per BLE."""
+
         def _worker():
             self._ble_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._ble_loop)
@@ -621,6 +656,7 @@ class MainWindow(tk.Tk):
                 if ok:
                     self.connection_status.config(text="Non Connesso", fg="red")
                     self.progress.stop()
+
             self.after(0, _ui)
 
     # ------------------------------
@@ -778,23 +814,74 @@ class MainWindow(tk.Tk):
     # ------------------------------
     # CSV / comandi automatici
     # ------------------------------
+    # --- [MODIFICATO] ---
     def load_commands_from_csv(self):
         if self.auto_commands_running:
             logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
             return
+
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
+            # Resetta i timer e le etichette
+            self._stop_countdown_timer()
+            self.lbl_remaining_duration_value.config(text="--:--:--")
+            self.lbl_total_duration_value.config(text="--:--:--")
+            self.total_test_duration_seconds = 0
+
+            # Pulisce la tabella
             for item in self.commands_table.get_children():
                 self.commands_table.delete(item)
+
             commands = DataProcessor.read_brake_commands_from_csv(file_path)
+            if not commands:
+                logging.getLogger().warning("File CSV vuoto o non valido.")
+                return
+
+            total_seconds = 0
             for i, command in enumerate(commands):
+                # Calcola durata totale
+                try:
+                    # command[2] è 't[s]'
+                    wait_time = int(float(command[2]))
+                    total_seconds += wait_time
+                except (ValueError, TypeError, IndexError):
+                    logging.getLogger().warning(f"Valore tempo non valido nel CSV: {command}")
+
+                # Inserisce nella tabella
                 tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                 self.commands_table.insert("", "end", values=command, tags=(tag,))
 
+            # Aggiorna la UI con la durata totale
+            self.total_test_duration_seconds = total_seconds
+            formatted_time = self._format_time(self.total_test_duration_seconds)
+            self.lbl_total_duration_value.config(text=formatted_time)
+            logging.getLogger().info(f"Caricati {len(commands)} comandi. Durata totale: {formatted_time}")
+
+    # --- [FINE MODIFICA] ---
+
+    # --- [MODIFICATO] ---
     def launch_auto_commands(self):
+        if self.auto_commands_running:
+            logging.getLogger().warning("Comandi automatici già in esecuzione.")
+            return
+
         if not self.commands_table.get_children():
             logging.getLogger().info("La tabella dei comandi è vuota.")
             return
+
+        # Assicura che la durata totale sia calcolata (se non lo è già)
+        if self.total_test_duration_seconds == 0:
+            logging.getLogger().warning("Ricalcolo durata test...")
+            commands_list = [self.commands_table.item(item, 'values') for item in
+                             self.commands_table.get_children()]
+            total_seconds = 0
+            for cmd in commands_list:
+                try:
+                    total_seconds += int(float(cmd[2]))
+                except Exception:
+                    pass
+            self.total_test_duration_seconds = total_seconds
+            self.lbl_total_duration_value.config(text=self._format_time(self.total_test_duration_seconds))
 
         commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
         command_items = self.commands_table.get_children()
@@ -826,6 +913,8 @@ class MainWindow(tk.Tk):
                 self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
             else:
                 self.auto_commands_running = False
+                self._stop_countdown_timer()  # <-- Aggiunto
+                self.lbl_remaining_duration_value.config(text="00:00:00")  # <-- Aggiunto
                 self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
                 logging.getLogger().info("Comandi automatici completati")
                 self.setspeed_modbus(0)
@@ -838,11 +927,23 @@ class MainWindow(tk.Tk):
 
         self.auto_commands_running = True
         self.led_status.config(text="Comandi Automatici: ON", fg="green")
+
+        # Avvia countdown
+        self.remaining_test_duration_seconds = self.total_test_duration_seconds
+        self.lbl_remaining_duration_value.config(text=self._format_time(self.remaining_test_duration_seconds))
+        self._start_countdown_timer()
+
         send_next_command(0)
 
+    # --- [FINE MODIFICA] ---
+
+    # --- [MODIFICATO] ---
     def stop_auto_commands(self):
         if self.auto_commands_running:
             self.auto_commands_running = False
+            self._stop_countdown_timer()  # <-- Aggiunto
+            self.lbl_remaining_duration_value.config(text="Interrotto")  # <-- Aggiunto
+
             self.led_status.config(text="Comandi Automatici: OFF", fg="red")
             if hasattr(self, 'auto_command_id') and self.auto_command_id is not None:
                 self.after_cancel(self.auto_command_id)
@@ -855,6 +956,42 @@ class MainWindow(tk.Tk):
                     break
         else:
             logging.getLogger().info("Non ci sono comandi automatici attivi")
+            # Resetta le etichette se non è in esecuzione nulla
+            self.lbl_remaining_duration_value.config(text="--:--:--")
+            self.lbl_total_duration_value.config(text="--:--:--")
+            self.total_test_duration_seconds = 0
+
+    # --- [FINE MODIFICA] ---
+
+    # --- [NUOVE FUNZIONI] ---
+    def _start_countdown_timer(self):
+        """Avvia il timer per il conto alla rovescia (richiama _tick)."""
+        self._stop_countdown_timer()  # Assicura che non ce ne siano altri attivi
+
+        def _tick():
+            if self.auto_commands_running and self.remaining_test_duration_seconds > 0:
+                self.remaining_test_duration_seconds -= 1
+                self.lbl_remaining_duration_value.config(text=self._format_time(self.remaining_test_duration_seconds))
+                # Riprogramma il prossimo tick
+                self.countdown_timer_id = self.after(1000, _tick)
+            elif self.auto_commands_running:
+                # Arrivato a zero (o negativo) ma ancora "running" (in attesa del cleanup)
+                self.lbl_remaining_duration_value.config(text="00:00:00")
+                self.countdown_timer_id = None
+            else:
+                # Stoppato da 'stop_auto_commands' o completato
+                self.countdown_timer_id = None
+
+        # Avvia il primo tick
+        _tick()
+
+    def _stop_countdown_timer(self):
+        """Ferma il timer 'after' del conto alla rovescia, se attivo."""
+        if self.countdown_timer_id is not None:
+            self.after_cancel(self.countdown_timer_id)
+            self.countdown_timer_id = None
+
+    # --- [FINE NUOVE FUNZIONI] ---
 
     # ------------------------------
     # Lorenz (affiancato al Banco)
@@ -1193,6 +1330,8 @@ class MainWindow(tk.Tk):
             except Exception:
                 pass
             self.auto_command_id = None
+
+        self._stop_countdown_timer()  # <-- [MODIFICATO] Aggiunto stop timer
         self.auto_commands_running = False
 
         # Disabilita chiusure multiple
