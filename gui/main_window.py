@@ -33,7 +33,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1375x905")
+        self.geometry("1375x845")
 
         self.style = ttk.Style(self)
 
@@ -183,7 +183,6 @@ class MainWindow(tk.Tk):
                                                  command=self.stop_auto_commands)
         self.btn_stop_auto_commands.grid(row=2, column=1, padx=8, pady=1, sticky='e')
 
-        # Etichette durata
         self.lbl_total_duration_text = ttk.Label(self.frame_auto_commands, text="Durata Totale Test:")
         self.lbl_total_duration_text.grid(row=3, column=0, padx=8, pady=(4, 2), sticky='w')
         self.lbl_total_duration_value = ttk.Label(self.frame_auto_commands, text="--:--:--",
@@ -214,20 +213,21 @@ class MainWindow(tk.Tk):
         self._create_compare_panel()
         self.compare_frame.grid(row=0, column=2, columnspan=2, sticky="nsew", padx=10, pady=(5, 0))
 
-        # Dati BLE FTMS (riga 1, colonna 2)
-        self.frame_data = ttk.LabelFrame(self.main_frame, text="Dati BLE FTMS")
-        self.frame_data.grid(row=1, column=2, sticky="nsew", padx=10, pady=5)
-        self.create_data_fields()
-
         # Lato destro: Lorenz e Banco AFFIANCATI nella stessa riga
         self.right_frame = ttk.Frame(self.main_frame)
-        self.right_frame.grid(row=1, column=3, sticky="nsew", padx=10, pady=10)
+        self.right_frame.grid(row=1, column=2, columnspan=2, sticky="nsew", padx=10, pady=10)
         self.right_frame.grid_columnconfigure(0, weight=1)
         self.right_frame.grid_columnconfigure(1, weight=1)
+        self.right_frame.grid_columnconfigure(2, weight=1)
+
+        # Dati BLE FTMS (riga 1, colonna 2)
+        self.frame_data = ttk.LabelFrame(self.right_frame, text="Dati BLE FTMS")
+        self.frame_data.grid(row=0, column=0, sticky="nsew", padx=(0,5), pady=5)
+        self.create_data_fields()
 
         # Sensore Temperatura (sotto il Banco)
         self.frame_serial = ttk.LabelFrame(self.right_frame, text="Gestione Sensore Temperatura")
-        self.frame_serial.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=5, pady=10)  # Sotto Lorenz e Banco
+        self.frame_serial.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=10)  # Sotto Lorenz e Banco
 
         self.serial_controls = ttk.Frame(self.frame_serial)
         self.serial_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
@@ -247,21 +247,21 @@ class MainWindow(tk.Tk):
         self.btn_disconnect_serial.grid(row=2, column=1, padx=5, pady=5)
 
         # Etichette e entries in 2 colonne per i valori (row 3+)
-        ttk.Label(self.serial_controls, text="Valore1 [°C]").grid(row=3, column=0, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore1 [°C]").grid(row=0, column=3, sticky="e", padx=5, pady=2)
         self.value1_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value1_label.grid(row=0, column=3, padx=5, pady=2)
+        self.value1_label.grid(row=0, column=4, padx=5, pady=2)
 
-        ttk.Label(self.serial_controls, text="Valore2 [°C]").grid(row=3, column=2, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore2 [°C]").grid(row=1, column=3, sticky="e", padx=5, pady=2)
         self.value2_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value2_label.grid(row=1, column=3, padx=5, pady=2)
+        self.value2_label.grid(row=1, column=4, padx=5, pady=2)
 
-        ttk.Label(self.serial_controls, text="Valore3 [°C]").grid(row=4, column=0, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore3 [°C]").grid(row=0, column=5, sticky="e", padx=5, pady=2)
         self.value3_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value3_label.grid(row=2, column=3, padx=5, pady=2)
+        self.value3_label.grid(row=0, column=6, padx=5, pady=2)
 
-        ttk.Label(self.serial_controls, text="Valore4 [°C]").grid(row=4, column=2, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore4 [°C]").grid(row=1, column=5, sticky="e", padx=5, pady=2)
         self.value4_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value4_label.grid(row=3, column=3, padx=5, pady=2)
+        self.value4_label.grid(row=1, column=6, padx=5, pady=2)
 
         # Crea i due blocchi affiancati
         self.create_lorenz_controls()  # pos (row=0, col=0)
@@ -652,7 +652,7 @@ class MainWindow(tk.Tk):
                     self.device_list.itemconfig(tk.END, {'bg': 'lightcoral'})
                 except Exception:
                     pass
-            logging.getLogger().info(f"Dispositivo trovato: {name} - {address} - RSSI: {rssi}")
+                logging.getLogger().info(f"Dispositivo trovato: {name} - {address} - RSSI: {rssi}")
         self.progress.stop()
 
     def connect_device(self):
@@ -1046,7 +1046,7 @@ class MainWindow(tk.Tk):
     def create_lorenz_controls(self):
         self.frame_lorenz = ttk.LabelFrame(self.right_frame, text="Gestione Lorenz")
         # Affiancato: colonna 0
-        self.frame_lorenz.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=10)
+        self.frame_lorenz.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
         self.lorenz_controls = ttk.Frame(self.frame_lorenz)
         self.lorenz_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
@@ -1090,7 +1090,7 @@ class MainWindow(tk.Tk):
     def create_banco_controls(self):
         self.banco_controls = ttk.LabelFrame(self.right_frame, text="Gestione Banco")
         # Affiancato: colonna 1 (stessa riga del Lorenz)
-        self.banco_controls.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=10)
+        self.banco_controls.grid(row=0, column=2, sticky="nsew", padx=(5, 0), pady=5)
 
         lbl_ip = ttk.Label(self.banco_controls, text="PORTA IP:")
         lbl_ip.grid(row=0, column=0, padx=5, pady=5, sticky="e")
