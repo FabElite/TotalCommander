@@ -16,6 +16,8 @@ from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
 from logic.data_processing import DataProcessor
 from tkinter import filedialog
+import serial.tools.list_ports
+from shared_lib.SerialDataLib import SerialDataReader
 
 
 class MainWindow(tk.Tk):
@@ -31,7 +33,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1375x760")
+        self.geometry("1375x905")
 
         self.style = ttk.Style(self)
 
@@ -52,6 +54,8 @@ class MainWindow(tk.Tk):
         self.executor = ThreadPoolExecutor(max_workers=5)
         self.auto_commands_running = False
         self.lorenz_reader = LorenzReader()
+        self.serial_reader = SerialDataReader(baudrate=115200)
+        self.serial_update_id = None
 
         self.settings_file = "settings.json"
 
@@ -221,10 +225,47 @@ class MainWindow(tk.Tk):
         self.right_frame.grid_columnconfigure(0, weight=1)
         self.right_frame.grid_columnconfigure(1, weight=1)
 
+        # Sensore Temperatura (sotto il Banco)
+        self.frame_serial = ttk.LabelFrame(self.right_frame, text="Gestione Sensore Temperatura")
+        self.frame_serial.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=5, pady=10)  # Sotto Lorenz e Banco
+
+        self.serial_controls = ttk.Frame(self.frame_serial)
+        self.serial_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+
+        # Combobox per selezionare COM
+        ttk.Label(self.serial_controls, text="COM Port:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.com_port_combo = ttk.Combobox(self.serial_controls, values=self._get_available_com_ports(), width=15)
+        self.com_port_combo.grid(row=0, column=1, padx=5, pady=5)
+
+        self.serial_status = tk.Label(self.serial_controls, text="Temperatura: Non Connesso", fg="red")
+        self.serial_status.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="w")
+
+        self.btn_connect_serial = ttk.Button(self.serial_controls, text="Connetti", command=self.connect_serial)
+        self.btn_connect_serial.grid(row=2, column=0, padx=5, pady=5)
+        self.btn_disconnect_serial = ttk.Button(self.serial_controls, text="Disconnetti",
+                                                command=self.disconnect_serial)
+        self.btn_disconnect_serial.grid(row=2, column=1, padx=5, pady=5)
+
+        # Etichette e entries in 2 colonne per i valori (row 3+)
+        ttk.Label(self.serial_controls, text="Valore1 [°C]").grid(row=3, column=0, sticky="e", padx=5, pady=2)
+        self.value1_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
+        self.value1_label.grid(row=0, column=3, padx=5, pady=2)
+
+        ttk.Label(self.serial_controls, text="Valore2 [°C]").grid(row=3, column=2, sticky="e", padx=5, pady=2)
+        self.value2_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
+        self.value2_label.grid(row=1, column=3, padx=5, pady=2)
+
+        ttk.Label(self.serial_controls, text="Valore3 [°C]").grid(row=4, column=0, sticky="e", padx=5, pady=2)
+        self.value3_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
+        self.value3_label.grid(row=2, column=3, padx=5, pady=2)
+
+        ttk.Label(self.serial_controls, text="Valore4 [°C]").grid(row=4, column=2, sticky="e", padx=5, pady=2)
+        self.value4_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
+        self.value4_label.grid(row=3, column=3, padx=5, pady=2)
+
         # Crea i due blocchi affiancati
         self.create_lorenz_controls()  # pos (row=0, col=0)
         self.create_banco_controls()  # pos (row=0, col=1)
-
         # Menu base (solo File)
         self._create_menu()
 
@@ -756,7 +797,13 @@ class MainWindow(tk.Tk):
         self.after(0, self._update_data_fields_ui, bike_data)
         # Elaborazione dati (non UI)
         lorenz_data = self.lorenz_reader.get_data()
-        combined_data = {**bike_data, **lorenz_data}
+        # Aggiungi dati seriali (se connesso)
+        serial_data = {}
+        if self.serial_reader.connected:
+            serial_data = self.serial_reader.get_data()
+        else:
+            logging.getLogger().warning("Sensore seriale non connesso: dati non inclusi.")
+        combined_data = {**bike_data, **lorenz_data, **serial_data}
         self.data_processor.handle_bike_data(combined_data)
 
     def _update_data_fields_ui(self, bike_data):
@@ -1076,6 +1123,55 @@ class MainWindow(tk.Tk):
                                          command=lambda: self.setspeed_modbus(0))
         self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=5, pady=10, sticky="ew")
 
+    def _get_available_com_ports(self):
+        """Elenca le COM ports disponibili."""
+        ports = serial.tools.list_ports.comports()
+        return [port.device for port in ports]
+
+    def connect_serial(self):
+        com_port = self.com_port_combo.get()
+        if not com_port:
+            logging.getLogger().warning("Seleziona una COM port prima di connettere.")
+            return
+        logging.getLogger().info(f"Richiesta connessione sensore temperatura su {com_port}...")
+        self.executor.submit(self._connect_serial_worker, com_port)
+
+    def _connect_serial_worker(self, com_port):
+        if self.serial_reader.open_connection(com_port):
+            self.after(0, self._update_serial_ui, True)
+        else:
+            self.after(0, self._update_serial_ui, False)
+
+    def _update_serial_ui(self, is_connected):
+        if is_connected:
+            self.serial_status.config(text="Temperatura: Connesso", fg="green")
+            logging.getLogger().info("Sensore temperatura connesso")
+            self.start_serial_update()
+        else:
+            self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
+            logging.getLogger().warning("Sensore temperatura non connesso o connessione fallita.")
+
+    def start_serial_update(self):
+        self.update_serial_data()
+        self.serial_update_id = self.after(500, self.start_serial_update)
+
+    def stop_serial_update(self):
+        if self.serial_update_id is not None:
+            self.after_cancel(self.serial_update_id)
+            self.serial_update_id = None
+
+    def update_serial_data(self):
+        data = self.serial_reader.get_data()
+        val1 = data.get('Valore1')
+        val2 = data.get('Valore2')
+        self._set_ro(self.value1_label, f"{val1:.2f}" if val1 is not None else 'N/A')
+        self._set_ro(self.value2_label, f"{val2:.2f}" if val2 is not None else 'N/A')
+
+    def disconnect_serial(self):
+        if self.serial_reader.close_connection():
+            self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
+            self.stop_serial_update()
+
     def create_labeled_entry(self, parent, label_text, row):
         label = ttk.Label(parent, text=label_text)
         label.grid(row=row, column=0, sticky="e", padx=5, pady=2)
@@ -1331,7 +1427,8 @@ class MainWindow(tk.Tk):
                 pass
             self.auto_command_id = None
 
-        self._stop_countdown_timer()  # <-- [MODIFICATO] Aggiunto stop timer
+        self.stop_serial_update()
+        self._stop_countdown_timer()
         self.auto_commands_running = False
 
         # Disabilita chiusure multiple
@@ -1439,6 +1536,11 @@ class MainWindow(tk.Tk):
                 logging.getLogger().info("Chiusura connessione Lorenz...")
                 self.lorenz_reader.close_connection()
                 logging.getLogger().info("Connessione Lorenz chiusa.")
+
+            if self.serial_reader.connected:
+                logging.getLogger().info("Chiusura connessione sensore temperatura...")
+                self.serial_reader.close_connection()
+                logging.getLogger().info("Connessione sensore temperatura chiusa.")
 
             if self.modbus.is_connesso():
                 logging.getLogger().info("Chiusura connessione Modbus...")
