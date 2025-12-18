@@ -24,7 +24,7 @@ class DataProcessor:
             "timestamp", "s", "speed_trainer", "cadence_trainer", "power_trainer",
             "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
             "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz",
-            "Valore1", "Valore2"
+            "Valore1", "Valore2", "Valore3", "Valore4"
         ]
         self.sheet.append(headers)
         self.workbook.save(self.xlsx_filename)
@@ -53,7 +53,9 @@ class DataProcessor:
             data.get("torque_lorenz", ""),
             data.get("power_lorenz", ""),
             data.get("Valore1", ""),
-            data.get("Valore2", "")
+            data.get("Valore2", ""),
+            data.get("Valore3", ""),
+            data.get("Valore4", "")
         ]
         formatted_row = [self._format_value(v) for v in row]
         workbook = load_workbook(self.xlsx_filename)

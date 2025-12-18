@@ -9,6 +9,7 @@ import sys
 import subprocess
 import asyncio
 import threading
+import math
 from collections import deque  # <-- per smoothing Δ
 from shared_lib.bluetooth_manager import BLEManager
 from shared_lib.LorenzLib import LorenzReader
@@ -18,7 +19,6 @@ from logic.data_processing import DataProcessor
 from tkinter import filedialog
 import serial.tools.list_ports
 from shared_lib.SerialDataLib import SerialDataReader
-
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -1194,8 +1194,19 @@ class MainWindow(tk.Tk):
         data = self.serial_reader.get_data()
         val1 = data.get('Valore1')
         val2 = data.get('Valore2')
-        self._set_ro(self.value1_label, f"{val1:.2f}" if val1 is not None else 'N/A')
-        self._set_ro(self.value2_label, f"{val2:.2f}" if val2 is not None else 'N/A')
+        val3 = data.get('Valore3')
+        val4 = data.get('Valore4')
+
+        def format_value(val):
+            if val is not None and not math.isnan(val):
+                return f"{val:.2f}"
+            else:
+                return 'N/A'
+
+        self._set_ro(self.value1_label, format_value(val1))
+        self._set_ro(self.value2_label, format_value(val2))
+        self._set_ro(self.value3_label, format_value(val3))
+        self._set_ro(self.value4_label, format_value(val4))
 
     def disconnect_serial(self):
         if self.serial_reader.close_connection():
