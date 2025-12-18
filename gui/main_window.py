@@ -33,7 +33,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1375x845")
+        self.geometry("1375x855")
 
         self.style = ttk.Style(self)
 
@@ -175,11 +175,11 @@ class MainWindow(tk.Tk):
 
         self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
         self.led_status.grid(row=1, column=0, padx=8, pady=2, sticky="w")
-        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Avvia Comandi Automatici",
+        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Start Comandi Automatici",
                                             command=self.launch_auto_commands)
         self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='e')
 
-        self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Ferma Comandi Automatici",
+        self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Stop Comandi Automatici",
                                                  command=self.stop_auto_commands)
         self.btn_stop_auto_commands.grid(row=2, column=1, padx=8, pady=1, sticky='e')
 
@@ -196,6 +196,13 @@ class MainWindow(tk.Tk):
         self.lbl_remaining_duration_value.grid(row=4, column=1, padx=8, pady=2, sticky='w')
         # --- [FINE MODIFICA] ---
 
+        # Nuovo wrapper per il lato destro
+        self.right_wrapper = ttk.Frame(self.main_frame)
+        self.right_wrapper.grid(row=0, column=2, rowspan=2, columnspan=2, sticky="nsew", padx=10, pady=5)
+        self.right_wrapper.grid_rowconfigure(0, weight=0)  # Confronto fisso
+        self.right_wrapper.grid_rowconfigure(1, weight=1)  # Right frame espande
+        self.right_wrapper.grid_columnconfigure(0, weight=1)
+
         # =======================
         # PANNELLO DI CONFRONTO (in alto, largo come BLE + Lorenz + Banco)
         # =======================
@@ -211,13 +218,13 @@ class MainWindow(tk.Tk):
         self._delta_power_hist = deque(maxlen=win)
 
         self._create_compare_panel()
-        self.compare_frame.grid(row=0, column=2, columnspan=2, sticky="nsew", padx=10, pady=(5, 0))
+        self.compare_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=(5, 2))
 
         # Lato destro: Lorenz e Banco AFFIANCATI nella stessa riga
-        self.right_frame = ttk.Frame(self.main_frame)
-        self.right_frame.grid(row=1, column=2, columnspan=2, sticky="nsew", padx=10, pady=10)
-        self.right_frame.grid_columnconfigure(0, weight=1)
-        self.right_frame.grid_columnconfigure(1, weight=1)
+        self.right_frame = ttk.Frame(self.right_wrapper)
+        self.right_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
+        self.right_frame.grid_columnconfigure(0, weight=0)
+        self.right_frame.grid_columnconfigure(1, weight=0)
         self.right_frame.grid_columnconfigure(2, weight=1)
 
         # Dati BLE FTMS (riga 1, colonna 2)
@@ -227,7 +234,7 @@ class MainWindow(tk.Tk):
 
         # Sensore Temperatura (sotto il Banco)
         self.frame_serial = ttk.LabelFrame(self.right_frame, text="Gestione Sensore Temperatura")
-        self.frame_serial.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=10)  # Sotto Lorenz e Banco
+        self.frame_serial.grid(row=1, column=0, columnspan=3, sticky="new", padx=5, pady=(2, 5))
 
         self.serial_controls = ttk.Frame(self.frame_serial)
         self.serial_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
@@ -276,6 +283,7 @@ class MainWindow(tk.Tk):
         self.offset_label.config(state='readonly')
 
         # Log
+        self.autoscroll_log_var = tk.BooleanVar(value=True)
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
         self.frame_log.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.frame_log.grid_columnconfigure(0, weight=1)
@@ -283,6 +291,27 @@ class MainWindow(tk.Tk):
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.log_queue = queue.Queue()
         self._process_log_queue()
+        chk_autoscroll = ttk.Checkbutton(
+            self.frame_log,
+            text="Auto-scroll",
+            variable=self.autoscroll_log_var
+        )
+        chk_autoscroll.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 5))
+        self.frame_log.grid_columnconfigure(0, weight=1)
+        self.frame_log.grid_rowconfigure(0, weight=1)
+
+        self.log_scrollbar = ttk.Scrollbar(self.frame_log, orient="vertical")
+        self.log_scrollbar.grid(row=0, column=1, sticky="ns", pady=10)
+
+        self.log_text = tk.Text(
+            self.frame_log,
+            state='disabled',
+            height=13,
+            yscrollcommand=self.log_scrollbar.set
+        )
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        self.log_scrollbar.config(command=self.log_text.yview)
 
         self.periodic_connection_check()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -315,7 +344,7 @@ class MainWindow(tk.Tk):
     # ------------------------------
     def _create_compare_panel(self):
         # Frame (internamente 3 colonne: BLE | Δ | Lorenz)
-        self.compare_frame = ttk.LabelFrame(self.main_frame, text="Confronto BLE ↔ Lorenz")
+        self.compare_frame = ttk.LabelFrame(self.right_wrapper, text="Confronto BLE ↔ Lorenz")
         self.compare_frame.grid_columnconfigure(0, weight=1)  # BLE
         self.compare_frame.grid_columnconfigure(1, weight=0)  # Δ
         self.compare_frame.grid_columnconfigure(2, weight=1)  # Lorenz
@@ -488,7 +517,8 @@ class MainWindow(tk.Tk):
                 self.log_text.config(state='normal')
                 self.log_text.insert(tk.END, record + '\n')
                 self.log_text.config(state='disabled')
-                self.log_text.yview(tk.END)
+                if self.autoscroll_log_var.get():
+                    self.log_text.yview(tk.END)
         except queue.Empty:
             pass
         finally:
@@ -1054,9 +1084,9 @@ class MainWindow(tk.Tk):
         self.lorenz_status = tk.Label(self.lorenz_controls, text="Lorenz: Non Connesso", fg="red")
         self.lorenz_status.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="w")
 
-        self.btn_connect_lorenz = ttk.Button(self.lorenz_controls, text="Connetti Lorenz", command=self.connect_lorenz)
+        self.btn_connect_lorenz = ttk.Button(self.lorenz_controls, text="Connetti", command=self.connect_lorenz)
         self.btn_connect_lorenz.grid(row=1, column=0, padx=5, pady=5)
-        self.btn_disconnect_lorenz = ttk.Button(self.lorenz_controls, text="Disconnetti Lorenz",
+        self.btn_disconnect_lorenz = ttk.Button(self.lorenz_controls, text="Disconnetti",
                                                 command=self.disconnect_lorenz)
         self.btn_disconnect_lorenz.grid(row=1, column=1, padx=5, pady=5)
         self.btn_read_offset = ttk.Button(self.lorenz_controls, text="Leggi Offset", command=self.read_lorenz_offset)
