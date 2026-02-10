@@ -163,7 +163,7 @@ class MainWindow(tk.Tk):
         self.commands_table.tag_configure('evenrow', background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
 
-        # --- [MODIFICATO] Comandi automatici (layout aggiornato) ---
+        # ---  Comandi automatici ---
         self.frame_auto_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi automatici")
         self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=8, pady=(2, 4))
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
@@ -194,7 +194,6 @@ class MainWindow(tk.Tk):
         self.lbl_remaining_duration_value = ttk.Label(self.frame_auto_commands, text="--:--:--",
                                                       font=('Helvetica', 10, 'bold'))
         self.lbl_remaining_duration_value.grid(row=4, column=1, padx=8, pady=2, sticky='w')
-        # --- [FINE MODIFICA] ---
 
         # Nuovo wrapper per il lato destro
         self.right_wrapper = ttk.Frame(self.main_frame)
@@ -233,7 +232,7 @@ class MainWindow(tk.Tk):
         self.create_data_fields()
 
         # Sensore Temperatura (sotto il Banco)
-        self.frame_serial = ttk.LabelFrame(self.right_frame, text="Gestione Sensore Temperatura")
+        self.frame_serial = ttk.LabelFrame(self.right_frame, text="Gestione Sensore COM")
         self.frame_serial.grid(row=1, column=0, columnspan=3, sticky="new", padx=5, pady=(2, 5))
 
         self.serial_controls = ttk.Frame(self.frame_serial)
@@ -254,19 +253,19 @@ class MainWindow(tk.Tk):
         self.btn_disconnect_serial.grid(row=2, column=1, padx=5, pady=5)
 
         # Etichette e entries in 2 colonne per i valori (row 3+)
-        ttk.Label(self.serial_controls, text="Valore1 [°C]").grid(row=0, column=3, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore 1").grid(row=0, column=3, sticky="e", padx=5, pady=2)
         self.value1_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
         self.value1_label.grid(row=0, column=4, padx=5, pady=2)
 
-        ttk.Label(self.serial_controls, text="Valore2 [°C]").grid(row=1, column=3, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore 2").grid(row=1, column=3, sticky="e", padx=5, pady=2)
         self.value2_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
         self.value2_label.grid(row=1, column=4, padx=5, pady=2)
 
-        ttk.Label(self.serial_controls, text="Valore3 [°C]").grid(row=0, column=5, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore 3").grid(row=0, column=5, sticky="e", padx=5, pady=2)
         self.value3_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
         self.value3_label.grid(row=0, column=6, padx=5, pady=2)
 
-        ttk.Label(self.serial_controls, text="Valore4 [°C]").grid(row=1, column=5, sticky="e", padx=5, pady=2)
+        ttk.Label(self.serial_controls, text="Valore 4").grid(row=1, column=5, sticky="e", padx=5, pady=2)
         self.value4_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
         self.value4_label.grid(row=1, column=6, padx=5, pady=2)
 
@@ -336,8 +335,6 @@ class MainWindow(tk.Tk):
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         except Exception:
             return "--:--:--"
-
-    # --- [FINE NUOVA FUNZIONE] ---
 
     # ------------------------------
     # Pannello di confronto (BLE | Δ | Lorenz)
@@ -891,7 +888,6 @@ class MainWindow(tk.Tk):
     # ------------------------------
     # CSV / comandi automatici
     # ------------------------------
-    # --- [MODIFICATO] ---
     def load_commands_from_csv(self):
         if self.auto_commands_running:
             logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
@@ -934,9 +930,6 @@ class MainWindow(tk.Tk):
             self.lbl_total_duration_value.config(text=formatted_time)
             logging.getLogger().info(f"Caricati {len(commands)} comandi. Durata totale: {formatted_time}")
 
-    # --- [FINE MODIFICA] ---
-
-    # --- [MODIFICATO] ---
     def launch_auto_commands(self):
         if self.auto_commands_running:
             logging.getLogger().warning("Comandi automatici già in esecuzione.")
@@ -1012,9 +1005,6 @@ class MainWindow(tk.Tk):
 
         send_next_command(0)
 
-    # --- [FINE MODIFICA] ---
-
-    # --- [MODIFICATO] ---
     def stop_auto_commands(self):
         if self.auto_commands_running:
             self.auto_commands_running = False
@@ -1038,9 +1028,6 @@ class MainWindow(tk.Tk):
             self.lbl_total_duration_value.config(text="--:--:--")
             self.total_test_duration_seconds = 0
 
-    # --- [FINE MODIFICA] ---
-
-    # --- [NUOVE FUNZIONI] ---
     def _start_countdown_timer(self):
         """Avvia il timer per il conto alla rovescia (richiama _tick)."""
         self._stop_countdown_timer()  # Assicura che non ce ne siano altri attivi
