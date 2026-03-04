@@ -126,14 +126,15 @@ class MainWindow(tk.Tk):
         self.progress = ttk.Progressbar(self.frame_status, mode='indeterminate')
         self.progress.grid(row=0, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
 
-        # Label nome + indirizzo dispositivo connesso
-        self.lbl_connected_device = ttk.Label(
+        # Label nome + indirizzo dispositivo connesso — height=2 fisso per non shiftare il layout
+        self.lbl_connected_device = tk.Label(
             self.frame_status,
             text="—",
             font=('Helvetica', 8),
             foreground='#555555',
             wraplength=160,
-            justify='center'
+            justify='center',
+            height=2
         )
         self.lbl_connected_device.grid(row=1, column=0, columnspan=3, padx=5, pady=(0, 4))
 
