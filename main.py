@@ -1,9 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from gui.main_window import MainWindow
-import tkinter as tk
 import sys
-import queue
 
 class TextHandler(logging.Handler):
     """Custom logging handler that sends log messages to a thread-safe queue."""
@@ -17,7 +15,7 @@ class TextHandler(logging.Handler):
 
 def setup_initial_logging():
     """Configura il logging per file e console. Da chiamare all'avvio."""
-    LOG_FILENAME = "app.log"
+    log_filename = "app.log"
     log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # Ottieni il root logger
@@ -29,7 +27,7 @@ def setup_initial_logging():
         logger.removeHandler(handler)
 
     # Handler per file rotativo
-    file_handler = RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=3)
+    file_handler = RotatingFileHandler(log_filename, maxBytes=5 * 1024 * 1024, backupCount=3)
     file_handler.setFormatter(log_formatter)
     logger.addHandler(file_handler)
 
@@ -47,7 +45,6 @@ def add_gui_logging_handler(log_queue): # <-- Accetta la coda
     text_handler = TextHandler(log_queue)
     text_handler.setFormatter(log_formatter)
     logging.getLogger().addHandler(text_handler)
-    logging.getLogger().info("Handler della GUI (via coda) aggiunto al logger.")
 
 
 if __name__ == "__main__":
@@ -56,4 +53,5 @@ if __name__ == "__main__":
     app = MainWindow()
     # Passa la coda dell'app, non il widget
     add_gui_logging_handler(app.log_queue)
+    logging.getLogger().info("Programma avviato")
     app.mainloop()
