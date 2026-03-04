@@ -33,7 +33,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1375x855")
+        self.geometry("1375x820")
 
         self.style = ttk.Style(self)
 
@@ -317,7 +317,7 @@ class MainWindow(tk.Tk):
         self.log_text = tk.Text(
             self.frame_log,
             state='disabled',
-            height=13,
+            height=9,
             yscrollcommand=self.log_scrollbar.set
         )
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -348,7 +348,6 @@ class MainWindow(tk.Tk):
         else:
             self.lbl_connected_device.config(text="—", foreground='#555555')
 
-    # --- [NUOVA FUNZIONE] ---
     def _format_time(self, seconds):
         """Converte i secondi in una stringa formattata HH:MM:SS."""
         try:
@@ -400,10 +399,17 @@ class MainWindow(tk.Tk):
         )
         self.cmp_delta_header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
 
-        # Etichette Δ: due righe (riga 1 = media con colore; riga 2 = istantaneo in grigio)
-        self.cmp_delta_speed = tk.Label(center, text="—", width=16, anchor="center", fg="#666666", justify='center')
+        # Etichette Δ: altezza fissa a 2 righe per evitare shift del layout
+        # quando il valore puntuale compare/scompare (es. Lorenz fermo)
+        self.cmp_delta_speed = tk.Label(
+            center, text="—", width=18, anchor="center", fg="#666666",
+            justify='center', height=2
+        )
         self.cmp_delta_speed.grid(row=1, column=0, padx=2, pady=2, sticky="ew")
-        self.cmp_delta_power = tk.Label(center, text="—", width=16, anchor="center", fg="#666666", justify='center')
+        self.cmp_delta_power = tk.Label(
+            center, text="—", width=18, anchor="center", fg="#666666",
+            justify='center', height=2
+        )
         self.cmp_delta_power.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
 
         # --- Colonna destra: LORENZ ---
@@ -647,13 +653,20 @@ class MainWindow(tk.Tk):
 
         # Contatore pacchetti ricevuti
         self._packet_count = 0
-        self.lbl_packet_count = ttk.Label(
+        ttk.Label(
             self.data_controls,
-            text="Pacchetti ricevuti: 0",
+            text="Pacchetti ricevuti:",
             font=('Helvetica', 8),
             foreground='#555555'
+        ).grid(row=len(fields) + 1, column=0, columnspan=2, padx=10, pady=(4, 0))
+        self.lbl_packet_count = tk.Label(
+            self.data_controls,
+            text="0",
+            font=('Helvetica', 28, 'bold'),
+            foreground='#003399',
+            width=6
         )
-        self.lbl_packet_count.grid(row=len(fields) + 1, column=0, columnspan=2, padx=10, pady=(0, 4))
+        self.lbl_packet_count.grid(row=len(fields) + 2, column=0, columnspan=2, padx=10, pady=(0, 6))
 
     # ------------------------------
     # Status check periodic
@@ -915,7 +928,7 @@ class MainWindow(tk.Tk):
     def _update_data_fields_ui(self, bike_data):
         # Incrementa contatore pacchetti
         self._packet_count += 1
-        self.lbl_packet_count.config(text=f"Pacchetti ricevuti: {self._packet_count}")
+        self.lbl_packet_count.config(text=str(self._packet_count))
         # Mappa tra chiavi di bike_data e nomi dei campi UI
         key_mapping = {
             'Cad': 'cadence',
@@ -962,7 +975,7 @@ class MainWindow(tk.Tk):
             entry.config(state='readonly')
         # Reset contatore pacchetti
         self._packet_count = 0
-        self.lbl_packet_count.config(text="Pacchetti ricevuti: 0")
+        self.lbl_packet_count.config(text="0")
         # Reset BLE last values + buffer smoothing
         self._last_ble_speed = None
         self._last_ble_power = None
