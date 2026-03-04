@@ -286,8 +286,6 @@ class MainWindow(tk.Tk):
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
         self.frame_log.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.frame_log.grid_columnconfigure(0, weight=1)
-        self.log_text = tk.Text(self.frame_log, state='disabled', height=13)
-        self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.log_queue = queue.Queue()
         self._process_log_queue()
         chk_autoscroll = ttk.Checkbutton(
@@ -625,7 +623,8 @@ class MainWindow(tk.Tk):
     # Status check periodic
     # ------------------------------
     def periodic_connection_check(self):
-        self.executor.submit(lambda: asyncio.run(self._async_check_ble_status()))
+        # Usa il loop BLE persistente già esistente, coerente con il resto del codice
+        asyncio.run_coroutine_threadsafe(self._async_check_ble_status(), self._ble_loop)
         self._check_and_update_modbus_status()
         self.periodic_check_id = self.after(1000, self.periodic_connection_check)
 
@@ -820,16 +819,17 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore disabilitazione notifiche FTMS: {e}")
 
     def update_data_fields(self, bike_data):
-        # UI nel main thread
+        # Aggiorna la UI subito, nel thread GUI (thread-safe via after)
         self.after(0, self._update_data_fields_ui, bike_data)
-        # Elaborazione dati (non UI)
+        # Elaborazione dati pesante (lock Lorenz + scrittura CSV) → thread pool
+        # Non blocca il loop asyncio BLE che ha invocato questa callback
+        self.executor.submit(self._process_bike_data, bike_data)
+
+    def _process_bike_data(self, bike_data):
         lorenz_data = self.lorenz_reader.get_data()
-        # Aggiungi dati seriali (se connesso)
         serial_data = {}
         if self.serial_reader.connected:
             serial_data = self.serial_reader.get_data()
-        else:
-            logging.getLogger().warning("Sensore seriale non connesso: dati non inclusi.")
         combined_data = {**bike_data, **lorenz_data, **serial_data}
         self.data_processor.handle_bike_data(combined_data)
 
@@ -1169,6 +1169,7 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("Sensore temperatura non connesso o connessione fallita.")
 
     def start_serial_update(self):
+        self.stop_serial_update()  # Cancella sempre il loop precedente, se esiste
         self.update_serial_data()
         self.serial_update_id = self.after(500, self.start_serial_update)
 
@@ -1196,9 +1197,20 @@ class MainWindow(tk.Tk):
         self._set_ro(self.value4_label, format_value(val4))
 
     def disconnect_serial(self):
-        if self.serial_reader.close_connection():
+        self.btn_disconnect_serial.config(state='disabled')
+        self.stop_serial_update()  # Cancella il timer after() — sicuro nel GUI thread
+        self.executor.submit(self._disconnect_serial_worker)
+
+    def _disconnect_serial_worker(self):
+        # Gira nel thread pool: può bloccarsi senza congelare la GUI
+        ok = self.serial_reader.close_connection()
+        self.after(0, self._update_serial_disconnect_ui, ok)
+
+    def _update_serial_disconnect_ui(self, ok):
+        self.btn_disconnect_serial.config(state='normal')
+        if ok:
             self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
-            self.stop_serial_update()
+            logging.getLogger().info("Sensore seriale disconnesso.")
 
     def create_labeled_entry(self, parent, label_text, row):
         label = ttk.Label(parent, text=label_text)
@@ -1265,6 +1277,7 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("Lorenz non connesso o connessione fallita.")
 
     def start_lorenz_update(self):
+        self.stop_lorenz_update()  # Cancella sempre il loop precedente, se esiste
         self.update_lorenz_data()
         self.lorenz_update_id = self.after(500, self.start_lorenz_update)
 
@@ -1274,9 +1287,21 @@ class MainWindow(tk.Tk):
             self.lorenz_update_id = None
 
     def disconnect_lorenz(self):
-        if self.lorenz_reader.close_connection():
+        logging.getLogger().info("Richiesta disconnessione Lorenz...")
+        self.btn_disconnect_lorenz.config(state='disabled')
+        self.stop_lorenz_update()  # Cancella il timer after() — sicuro nel GUI thread
+        self.executor.submit(self._disconnect_lorenz_worker)
+
+    def _disconnect_lorenz_worker(self):
+        # Gira nel thread pool: può bloccarsi senza congelare la GUI
+        ok = self.lorenz_reader.close_connection()
+        self.after(0, self._update_lorenz_disconnect_ui, ok)
+
+    def _update_lorenz_disconnect_ui(self, ok):
+        self.btn_disconnect_lorenz.config(state='normal')
+        if ok:
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
-            self.stop_lorenz_update()
+            logging.getLogger().info("Lorenz disconnesso.")
 
     def read_lorenz_offset(self):
         self.lorenz_reader.read_offset()
@@ -1289,12 +1314,13 @@ class MainWindow(tk.Tk):
     def toggle_modbus_connection(self):
         logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
         self.btn_connect_banco.config(state='disabled')
-        self.executor.submit(self._toggle_modbus_worker)
+        # Leggi il valore del widget nel GUI thread, prima di passarlo al thread pool
+        ip_address = self.entry_ip.get()
+        self.executor.submit(self._toggle_modbus_worker, ip_address)
 
-    def _toggle_modbus_worker(self):
+    def _toggle_modbus_worker(self, ip_address):
         try:
             if not self.modbus.is_connesso():
-                ip_address = self.entry_ip.get()
                 self.modbus.connetti(ip_address, 502)
             else:
                 self.modbus.disconnetti()
