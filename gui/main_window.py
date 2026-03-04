@@ -657,13 +657,13 @@ class MainWindow(tk.Tk):
         ttk.Label(
             self.data_controls,
             text="Pacchetti ricevuti:",
-            font=('Helvetica', 8),
+            font=('Helvetica', 8, 'bold'),
             foreground='#555555'
         ).grid(row=len(fields) + 1, column=0, columnspan=2, padx=10, pady=(4, 0))
         self.lbl_packet_count = tk.Label(
             self.data_controls,
             text="0",
-            font=('Helvetica', 28, 'bold'),
+            font=('Helvetica', 22, 'bold'),
             foreground='#003399',
             width=6
         )
