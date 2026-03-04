@@ -67,6 +67,9 @@ class MainWindow(tk.Tk):
 
         self._shutdown_anim_id = None
         self._shutdown_pb = None
+        self._ble_was_connected = False       # traccia lo stato precedente per rilevare disconnessioni
+        self._connected_device_name = None    # nome del dispositivo connesso
+        self._connected_device_address = None # indirizzo del dispositivo connesso
 
         # --- Loop asyncio dedicato al BLE (persistente) ---
         self._ble_loop = None
@@ -122,6 +125,17 @@ class MainWindow(tk.Tk):
         self.connection_status.grid(row=0, column=0, padx=5, pady=6)
         self.progress = ttk.Progressbar(self.frame_status, mode='indeterminate')
         self.progress.grid(row=0, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
+
+        # Label nome + indirizzo dispositivo connesso
+        self.lbl_connected_device = ttk.Label(
+            self.frame_status,
+            text="—",
+            font=('Helvetica', 8),
+            foreground='#555555',
+            wraplength=160,
+            justify='center'
+        )
+        self.lbl_connected_device.grid(row=1, column=0, columnspan=3, padx=5, pady=(0, 4))
 
         # Comandi manuali
         self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi manuali")
@@ -321,6 +335,18 @@ class MainWindow(tk.Tk):
         entry.delete(0, tk.END)
         entry.insert(0, text)
         entry.config(state='readonly')
+
+    def _update_connected_device_label(self):
+        """Aggiorna la label del dispositivo connesso nel pannello stato."""
+        if self._connected_device_name or self._connected_device_address:
+            name = self._connected_device_name or "Sconosciuto"
+            addr = self._connected_device_address or "?"
+            self.lbl_connected_device.config(
+                text=f"{name}\n{addr}",
+                foreground='#006600'
+            )
+        else:
+            self.lbl_connected_device.config(text="—", foreground='#555555')
 
     # --- [NUOVA FUNZIONE] ---
     def _format_time(self, seconds):
@@ -619,6 +645,16 @@ class MainWindow(tk.Tk):
         )
         self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
 
+        # Contatore pacchetti ricevuti
+        self._packet_count = 0
+        self.lbl_packet_count = ttk.Label(
+            self.data_controls,
+            text="Pacchetti ricevuti: 0",
+            font=('Helvetica', 8),
+            foreground='#555555'
+        )
+        self.lbl_packet_count.grid(row=len(fields) + 1, column=0, columnspan=2, padx=10, pady=(0, 4))
+
     # ------------------------------
     # Status check periodic
     # ------------------------------
@@ -639,10 +675,44 @@ class MainWindow(tk.Tk):
     def _update_ble_status_ui(self, is_connected, error=False):
         if error:
             self.connection_status.config(text="Errore BLE", fg="orange")
+
         elif is_connected:
             self.connection_status.config(text="Connesso", fg="green")
+            self._ble_was_connected = True
+
         else:
+            # Rilevata disconnessione inattesa (era connesso, ora non lo è più)
+            if self._ble_was_connected:
+                self._on_ble_unexpected_disconnect()
             self.connection_status.config(text="Non Connesso", fg="red")
+            self._ble_was_connected = False
+
+    def _on_ble_unexpected_disconnect(self):
+        """Chiamato quando il BLE passa da connesso a disconnesso senza un'azione esplicita dell'utente."""
+        sep = "=" * 55
+        logging.getLogger().warning(sep)
+        logging.getLogger().warning("*** DISCONNESSIONE BLE - connessione persa ***")
+        if self._connected_device_name or self._connected_device_address:
+            logging.getLogger().warning(
+                f"    Dispositivo: {self._connected_device_name or '?'}  [{self._connected_device_address or '?'}]"
+            )
+        logging.getLogger().warning(sep)
+
+        # Resetta i flag interni del BLEManager (notifiche, client, ecc.)
+        # In caso di disconnessione inattesa disconnect_device() non viene mai chiamato,
+        # quindi i flag rimarrebbero sporchi impedendo la riabilitazione delle notifiche.
+        self.ble_manager.reset_connection_state()
+
+        # Resetta info dispositivo
+        self._connected_device_name = None
+        self._connected_device_address = None
+        self._update_connected_device_label()
+
+        # Se le notifiche dati erano attive, riportare il pulsante allo stato corretto
+        if self.btn_toggle_data.cget('text') == 'Disabilita Dati':
+            self.btn_toggle_data.config(text='Abilita Dati', style='Data.Disabled.TButton')
+            self._clear_data_fields_ui()
+            logging.getLogger().warning("    Notifiche FTMS disabilitate automaticamente.")
 
     def _check_and_update_modbus_status(self):
         if self.modbus.is_connesso():
@@ -686,21 +756,27 @@ class MainWindow(tk.Tk):
         if not selected_device:
             return
         try:
-            address = selected_device.split(" - ")[1]
+            parts = selected_device.split(" - ")
+            name = parts[0]
+            address = parts[1]
         except Exception:
             logging.getLogger().warning("Formato elemento lista dispositivi inatteso; impossibile estrarre address.")
             return
         self.progress.start()
-        self.executor.submit(self._connect_device, address)
+        self.executor.submit(self._connect_device, address, name)
 
-    def _connect_device(self, address):
+    def _connect_device(self, address, name=""):
         logging.getLogger().info(f"Tentativo connessione a {address}")
         fut = asyncio.run_coroutine_threadsafe(
             self.ble_manager.connect_to_device(address, connection_timeout=15.0),
             self._ble_loop
         )
         try:
-            fut.result()
+            result = fut.result()
+            if result:
+                self._connected_device_name = name
+                self._connected_device_address = address
+                self.after(0, self._update_connected_device_label)
         except Exception as e:
             logging.getLogger().error(f"Errore imprevisto nella gestione della connessione BLE: {e}")
         finally:
@@ -721,9 +797,12 @@ class MainWindow(tk.Tk):
         finally:
             def _ui():
                 if ok:
+                    self._ble_was_connected = False  # disconnessione volontaria, non triggera l'alert
+                    self._connected_device_name = None
+                    self._connected_device_address = None
+                    self._update_connected_device_label()
                     self.connection_status.config(text="Non Connesso", fg="red")
                     self.progress.stop()
-
             self.after(0, _ui)
 
     # ------------------------------
@@ -834,6 +913,9 @@ class MainWindow(tk.Tk):
         self.data_processor.handle_bike_data(combined_data)
 
     def _update_data_fields_ui(self, bike_data):
+        # Incrementa contatore pacchetti
+        self._packet_count += 1
+        self.lbl_packet_count.config(text=f"Pacchetti ricevuti: {self._packet_count}")
         # Mappa tra chiavi di bike_data e nomi dei campi UI
         key_mapping = {
             'Cad': 'cadence',
@@ -872,12 +954,15 @@ class MainWindow(tk.Tk):
         self._update_compare_panel()
 
     def _clear_data_fields_ui(self):
-        """Pulisce tutti i campi dati nella UI."""
+        """Pulisce tutti i campi dati nella UI e resetta il contatore pacchetti."""
         logging.getLogger().debug("Pulizia campi dati UI...")
         for entry in self.data_entries.values():
             entry.config(state='normal')
             entry.delete(0, tk.END)
             entry.config(state='readonly')
+        # Reset contatore pacchetti
+        self._packet_count = 0
+        self.lbl_packet_count.config(text="Pacchetti ricevuti: 0")
         # Reset BLE last values + buffer smoothing
         self._last_ble_speed = None
         self._last_ble_power = None
@@ -1197,20 +1282,9 @@ class MainWindow(tk.Tk):
         self._set_ro(self.value4_label, format_value(val4))
 
     def disconnect_serial(self):
-        self.btn_disconnect_serial.config(state='disabled')
-        self.stop_serial_update()  # Cancella il timer after() — sicuro nel GUI thread
-        self.executor.submit(self._disconnect_serial_worker)
-
-    def _disconnect_serial_worker(self):
-        # Gira nel thread pool: può bloccarsi senza congelare la GUI
-        ok = self.serial_reader.close_connection()
-        self.after(0, self._update_serial_disconnect_ui, ok)
-
-    def _update_serial_disconnect_ui(self, ok):
-        self.btn_disconnect_serial.config(state='normal')
-        if ok:
+        if self.serial_reader.close_connection():
             self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
-            logging.getLogger().info("Sensore seriale disconnesso.")
+            self.stop_serial_update()
 
     def create_labeled_entry(self, parent, label_text, row):
         label = ttk.Label(parent, text=label_text)
@@ -1314,13 +1388,12 @@ class MainWindow(tk.Tk):
     def toggle_modbus_connection(self):
         logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
         self.btn_connect_banco.config(state='disabled')
-        # Leggi il valore del widget nel GUI thread, prima di passarlo al thread pool
-        ip_address = self.entry_ip.get()
-        self.executor.submit(self._toggle_modbus_worker, ip_address)
+        self.executor.submit(self._toggle_modbus_worker)
 
-    def _toggle_modbus_worker(self, ip_address):
+    def _toggle_modbus_worker(self):
         try:
             if not self.modbus.is_connesso():
+                ip_address = self.entry_ip.get()
                 self.modbus.connetti(ip_address, 502)
             else:
                 self.modbus.disconnetti()
