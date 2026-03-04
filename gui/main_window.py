@@ -70,6 +70,9 @@ class MainWindow(tk.Tk):
         self._ble_was_connected = False       # traccia lo stato precedente per rilevare disconnessioni
         self._connected_device_name = None    # nome del dispositivo connesso
         self._connected_device_address = None # indirizzo del dispositivo connesso
+        self._lorenz_was_connected = False    # idem per Lorenz
+        self._serial_was_connected = False    # idem per sensore seriale
+        self._modbus_was_connected = False    # idem per Modbus
 
         # --- Loop asyncio dedicato al BLE (persistente) ---
         self._ble_loop = None
@@ -694,6 +697,8 @@ class MainWindow(tk.Tk):
     def periodic_connection_check(self):
         # Usa il loop BLE persistente già esistente, coerente con il resto del codice
         asyncio.run_coroutine_threadsafe(self._async_check_ble_status(), self._ble_loop)
+        self._check_lorenz_status()
+        self._check_serial_status()
         self._check_and_update_modbus_status()
         self.periodic_check_id = self.after(1000, self.periodic_connection_check)
 
@@ -748,12 +753,59 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("    Notifiche FTMS disabilitate automaticamente.")
 
     def _check_and_update_modbus_status(self):
-        if self.modbus.is_connesso():
+        is_connected = self.modbus.is_connesso()
+        if is_connected:
             self.btn_connect_banco.config(text="Disconnetti")
             self.banco_status.config(text="Connesso", fg="green")
+            self._modbus_was_connected = True
         else:
+            if self._modbus_was_connected:
+                self._on_modbus_unexpected_disconnect()
             self.btn_connect_banco.config(text="Connetti")
             self.banco_status.config(text="Non Connesso", fg="red")
+            self._modbus_was_connected = False
+
+    def _on_modbus_unexpected_disconnect(self):
+        sep = "=" * 55
+        logging.getLogger().warning(sep)
+        logging.getLogger().warning("*** DISCONNESSIONE MODBUS - connessione persa ***")
+        logging.getLogger().warning(sep)
+
+    def _check_lorenz_status(self):
+        is_connected = self.lorenz_reader.connected
+        if is_connected:
+            self._lorenz_was_connected = True
+        else:
+            if self._lorenz_was_connected:
+                self._on_lorenz_unexpected_disconnect()
+            self._lorenz_was_connected = False
+
+    def _on_lorenz_unexpected_disconnect(self):
+        sep = "=" * 55
+        logging.getLogger().warning(sep)
+        logging.getLogger().warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
+        logging.getLogger().warning(sep)
+        # Ferma il loop di aggiornamento UI e resetta la label di stato
+        self.stop_lorenz_update()
+        self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
+
+    def _check_serial_status(self):
+        is_connected = self.serial_reader.connected
+        if is_connected:
+            self._serial_was_connected = True
+        else:
+            if self._serial_was_connected:
+                self._on_serial_unexpected_disconnect()
+            self._serial_was_connected = False
+
+    def _on_serial_unexpected_disconnect(self):
+        sep = "=" * 55
+        logging.getLogger().warning(sep)
+        logging.getLogger().warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
+        logging.getLogger().warning(sep)
+        # Ferma il loop di aggiornamento UI e resetta la label di stato
+        self.stop_serial_update()
+        self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
 
     # ------------------------------
     # Ricerca/Connessione BLE
@@ -1366,9 +1418,21 @@ class MainWindow(tk.Tk):
         self._set_ro(self.value4_label, format_value(val4))
 
     def disconnect_serial(self):
-        if self.serial_reader.close_connection():
+        logging.getLogger().info("Richiesta disconnessione sensore seriale...")
+        self._serial_was_connected = False   # disconnessione volontaria, non triggera l'alert
+        self.btn_disconnect_serial.config(state='disabled')
+        self.stop_serial_update()
+        self.executor.submit(self._disconnect_serial_worker)
+
+    def _disconnect_serial_worker(self):
+        ok = self.serial_reader.close_connection()
+        self.after(0, self._update_serial_disconnect_ui, ok)
+
+    def _update_serial_disconnect_ui(self, ok):
+        self.btn_disconnect_serial.config(state='normal')
+        if ok:
             self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
-            self.stop_serial_update()
+            logging.getLogger().info("Sensore seriale disconnesso.")
 
     def create_labeled_entry(self, parent, label_text, row):
         label = ttk.Label(parent, text=label_text)
@@ -1446,8 +1510,9 @@ class MainWindow(tk.Tk):
 
     def disconnect_lorenz(self):
         logging.getLogger().info("Richiesta disconnessione Lorenz...")
+        self._lorenz_was_connected = False   # disconnessione volontaria, non triggera l'alert
         self.btn_disconnect_lorenz.config(state='disabled')
-        self.stop_lorenz_update()  # Cancella il timer after() — sicuro nel GUI thread
+        self.stop_lorenz_update()
         self.executor.submit(self._disconnect_lorenz_worker)
 
     def _disconnect_lorenz_worker(self):
@@ -1472,14 +1537,15 @@ class MainWindow(tk.Tk):
     def toggle_modbus_connection(self):
         logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
         self.btn_connect_banco.config(state='disabled')
-        self.executor.submit(self._toggle_modbus_worker)
+        ip_address = self.entry_ip.get()  # lettura widget nel GUI thread
+        self.executor.submit(self._toggle_modbus_worker, ip_address)
 
-    def _toggle_modbus_worker(self):
+    def _toggle_modbus_worker(self, ip_address):
         try:
             if not self.modbus.is_connesso():
-                ip_address = self.entry_ip.get()
                 self.modbus.connetti(ip_address, 502)
             else:
+                self._modbus_was_connected = False  # disconnessione volontaria, non triggera l'alert
                 self.modbus.disconnetti()
         except Exception as e:
             logging.getLogger().error(f"Errore durante l'operazione Modbus: {e}")
