@@ -322,8 +322,15 @@ class MainWindow(tk.Tk):
             yscrollcommand=self.log_scrollbar.set
         )
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
         self.log_scrollbar.config(command=self.log_text.yview)
+
+        # Tag per colorare le righe in base al livello di log
+        self.log_text.tag_configure('DEBUG',    foreground='#888888')
+        self.log_text.tag_configure('INFO',     foreground='#111111')
+        self.log_text.tag_configure('WARNING',  foreground='#B86000')
+        self.log_text.tag_configure('ERROR',    foreground='#CC0000')
+        self.log_text.tag_configure('CRITICAL', foreground='#ffffff', background='#CC0000',
+                                    font=('Helvetica', 9, 'bold'))
 
         self.periodic_connection_check()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -542,8 +549,20 @@ class MainWindow(tk.Tk):
         try:
             while True:
                 record = self.log_queue.get_nowait()
+                # Rileva il livello dal testo formattato (es. "... - WARNING - ...")
+                tag = 'INFO'
+                upper = record.upper()
+                if ' - CRITICAL - ' in upper:
+                    tag = 'CRITICAL'
+                elif ' - ERROR - ' in upper:
+                    tag = 'ERROR'
+                elif ' - WARNING - ' in upper:
+                    tag = 'WARNING'
+                elif ' - DEBUG - ' in upper:
+                    tag = 'DEBUG'
+
                 self.log_text.config(state='normal')
-                self.log_text.insert(tk.END, record + '\n')
+                self.log_text.insert(tk.END, record + '\n', tag)
                 self.log_text.config(state='disabled')
                 if self.autoscroll_log_var.get():
                     self.log_text.yview(tk.END)
