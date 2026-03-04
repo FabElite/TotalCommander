@@ -1235,9 +1235,60 @@ class MainWindow(tk.Tk):
         self.speed_banco_spin.set(0.0)
         self.speed_banco_spin.grid(row=2, column=1, padx=5, pady=5)
 
-        self.btn_zero_speed = ttk.Button(self.banco_controls, text="ZERO SPEED",
-                                         command=lambda: self.setspeed_modbus(0))
-        self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=5, pady=10, sticky="ew")
+        # Pulsante STOP in stile "emergency":
+        # - rosso pieno
+        # - testo grande in bianco
+        # - icona Unicode ⏹ a sinistra
+        # - cursor mano
+        self.btn_zero_speed = tk.Button(
+            self.banco_controls,
+            text="⏹  STOP BANCO",
+            command=self.emergency_stop,
+            font=('Helvetica', 14, 'bold'),
+            bg="#D0021B",  # rosso "stop"
+            fg="white",
+            activebackground="#B00000",
+            activeforeground="white",
+            relief='raised',
+            bd=3,
+            cursor='hand2',
+        )
+        self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=6, pady=12, sticky="ew")
+
+        # Suggerimento accessibilità: bordo focus più visibile
+        try:
+            self.btn_zero_speed.config(highlightthickness=2, highlightbackground="#660000", highlightcolor="#FFFFFF")
+        except Exception:
+            pass
+
+    def emergency_stop(self, event=None):
+        """
+        Interrompe immediatamente i comandi automatici (se attivi)
+        e porta la velocità del banco a 0 km/h.
+        Fornisce un feedback visivo 'flash' sul pulsante di stop.
+        """
+        try:
+            # 1) Ferma eventuali comandi automatici
+            if getattr(self, "auto_commands_running", False):
+                self.stop_auto_commands()
+
+            # 2) Porta a zero la velocità del banco
+            self.setspeed_modbus(0)
+
+            # 3) Feedback visivo sul pulsante: breve flash/darken
+            try:
+                btn = self.btn_zero_speed  # definito nella create_banco_controls()
+                original_bg = btn.cget("bg")
+                btn.config(bg="#7A0000")  # scurisci per il flash
+                self.after(180, lambda: btn.config(bg=original_bg))
+            except Exception:
+                pass
+
+            # 4) Log esplicito
+            logging.getLogger().warning("*** EMERGENCY STOP ATTIVATO: speed=0, auto-cmd OFF ***")
+
+        except Exception as e:
+            logging.getLogger().error(f"Errore durante l'emergency_stop: {e}")
 
     def _get_available_com_ports(self):
         """Elenca le COM ports disponibili."""
