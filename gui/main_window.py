@@ -1673,6 +1673,10 @@ class MainWindow(tk.Tk):
         """
         logging.getLogger().info("Avvio procedura di spegnimento controllato...")
         try:
+            # Flush finale dati — prima di tutto il resto per non perdere righe
+            logging.getLogger().info("Flush finale dati su disco...")
+            self.data_processor.close()
+            logging.getLogger().info("Dati salvati.")
             if self.lorenz_reader.connected:
                 logging.getLogger().info("Chiusura connessione Lorenz...")
                 self.lorenz_reader.close_connection()
