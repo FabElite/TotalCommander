@@ -270,7 +270,6 @@ class MainWindow(tk.Tk):
         self.power_lorenz_label  = self._make_live_entry(frame_lorenz_data, "Power",     0)
         self.speed_avg_label     = self._make_live_entry(frame_lorenz_data, "Speed Avg", 1)
         self.torque_lorenz_label = self._make_live_entry(frame_lorenz_data, "Torque",    2)
-        self.offset_label        = self._make_live_entry(frame_lorenz_data, "Offset",    3)
 
         frame_com_data = ttk.LabelFrame(live, text="Dati COM")
         frame_com_data.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
@@ -343,13 +342,19 @@ class MainWindow(tk.Tk):
             tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
                      font=('Helvetica', 8)).grid(row=0, column=1)
             setattr(self, attr, led)
-            # Label nome dispositivo solo per BLE
+            # Nome + indirizzo solo per BLE (due righe nello stesso gruppo)
             if attr == 'led_ble':
                 self.lbl_connected_device = tk.Label(
                     g, text=u'—', bg='#1e1e2e', fg='#666688',
                     font=('Helvetica', 8), anchor='w'
                 )
                 self.lbl_connected_device.grid(row=0, column=2, padx=(6, 0))
+                self.lbl_connected_address = tk.Label(
+                    g, text=u'', bg='#1e1e2e', fg='#555577',
+                    font=('Helvetica', 7), anchor='w'
+                )
+                self.lbl_connected_address.grid(row=1, column=1, columnspan=2,
+                                                padx=(3, 0), pady=(0, 1))
 
         tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=6, padx=(10, 14))
 
@@ -424,7 +429,9 @@ class MainWindow(tk.Tk):
 
         self.btn_read_offset = ttk.Button(lorenz, text="Leggi Offset",
                                           command=self.read_lorenz_offset)
-        self.btn_read_offset.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+        self.btn_read_offset.grid(row=1, column=0, sticky="ew", padx=6, pady=2)
+        self.offset_label = ttk.Entry(lorenz, state='readonly', justify='right', width=9)
+        self.offset_label.grid(row=1, column=1, sticky="ew", padx=(2, 6), pady=2)
 
         _avg = ttk.Frame(lorenz)
         _avg.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
@@ -515,12 +522,15 @@ class MainWindow(tk.Tk):
         entry.config(state='readonly')
 
     def _update_connected_device_label(self):
-        """Aggiorna la label del dispositivo connesso nella status bar."""
+        """Aggiorna nome e indirizzo BLE nella status bar."""
         if self._connected_device_name or self._connected_device_address:
-            name = self._connected_device_name or self._connected_device_address
-            self.lbl_connected_device.config(text=name, fg='#88ffaa')
+            self.lbl_connected_device.config(
+                text=self._connected_device_name or u'Sconosciuto', fg='#88ffaa')
+            self.lbl_connected_address.config(
+                text=self._connected_device_address or u'', fg='#7799bb')
         else:
             self.lbl_connected_device.config(text=u'—', fg='#666688')
+            self.lbl_connected_address.config(text=u'')
 
     def _format_time(self, seconds):
         """Converte i secondi in una stringa formattata HH:MM:SS."""
