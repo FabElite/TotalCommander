@@ -776,14 +776,18 @@ class MainWindow(tk.Tk):
             self._clear_data_fields_ui()
             logging.getLogger().warning("    Notifiche FTMS disabilitate automaticamente.")
 
-    def _check_and_update_modbus_status(self):
+    def _check_and_update_modbus_status(self, from_user_action=False):
         is_connected = self.modbus.is_connesso()
         if is_connected:
             self.banco_status.config(text="Connesso", fg="green")
+            if not self._modbus_was_connected:
+                logging.getLogger().info("Modbus connesso.")
             self._modbus_was_connected = True
         else:
             if self._modbus_was_connected:
                 self._on_modbus_unexpected_disconnect()
+            elif from_user_action:
+                logging.getLogger().warning("Modbus: nessuna connessione attiva da chiudere.")
             self.banco_status.config(text="Non Connesso", fg="red")
             self._modbus_was_connected = False
 
@@ -890,8 +894,11 @@ class MainWindow(tk.Tk):
             self.after(0, self.progress.stop)
 
     def disconnect_device(self):
+        if not self.ble_manager.get_connection_status():
+            logging.getLogger().info("Nessun dispositivo BLE connesso.")
+            return
         self.progress.start()
-        logging.getLogger().info("Richiesta Disconnessione")
+        logging.getLogger().info("Richiesta Disconnessione BLE...")
         self.executor.submit(self._disconnect_device)
 
     def _disconnect_device(self):
@@ -903,13 +910,16 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore disconnessione BLE: {e}")
         finally:
             def _ui():
+                self.progress.stop()
                 if ok:
-                    self._ble_was_connected = False  # disconnessione volontaria, non triggera l'alert
+                    self._ble_was_connected = False
                     self._connected_device_name = None
                     self._connected_device_address = None
                     self._update_connected_device_label()
                     self.connection_status.config(text="Non Connesso", fg="red")
-                    self.progress.stop()
+                    logging.getLogger().info("Dispositivo BLE disconnesso.")
+                else:
+                    logging.getLogger().warning("Disconnessione BLE non riuscita o dispositivo già disconnesso.")
             self.after(0, _ui)
 
     # ------------------------------
@@ -1493,7 +1503,6 @@ class MainWindow(tk.Tk):
     def disconnect_serial(self):
         logging.getLogger().info("Richiesta disconnessione sensore seriale...")
         self._serial_was_connected = False   # disconnessione volontaria, non triggera l'alert
-        self.btn_disconnect_serial.config(state='disabled')
         self.stop_serial_update()
         self.executor.submit(self._disconnect_serial_worker)
 
@@ -1502,10 +1511,11 @@ class MainWindow(tk.Tk):
         self.after(0, self._update_serial_disconnect_ui, ok)
 
     def _update_serial_disconnect_ui(self, ok):
-        self.btn_disconnect_serial.config(state='normal')
         if ok:
             self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
             logging.getLogger().info("Sensore seriale disconnesso.")
+        else:
+            logging.getLogger().warning("Sensore seriale: nessuna connessione attiva da chiudere.")
 
     def create_labeled_entry(self, parent, label_text, row):
         label = ttk.Label(parent, text=label_text)
@@ -1584,20 +1594,19 @@ class MainWindow(tk.Tk):
     def disconnect_lorenz(self):
         logging.getLogger().info("Richiesta disconnessione Lorenz...")
         self._lorenz_was_connected = False   # disconnessione volontaria, non triggera l'alert
-        self.btn_disconnect_lorenz.config(state='disabled')
         self.stop_lorenz_update()
         self.executor.submit(self._disconnect_lorenz_worker)
 
     def _disconnect_lorenz_worker(self):
-        # Gira nel thread pool: può bloccarsi senza congelare la GUI
         ok = self.lorenz_reader.close_connection()
         self.after(0, self._update_lorenz_disconnect_ui, ok)
 
     def _update_lorenz_disconnect_ui(self, ok):
-        self.btn_disconnect_lorenz.config(state='normal')
         if ok:
             self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
             logging.getLogger().info("Lorenz disconnesso.")
+        else:
+            logging.getLogger().warning("Lorenz: nessuna connessione attiva da chiudere.")
 
     def read_lorenz_offset(self):
         self.lorenz_reader.read_offset()
@@ -1618,7 +1627,7 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore durante la connessione Modbus: {e}")
         finally:
-            self.after(0, self._check_and_update_modbus_status)
+            self.after(0, lambda: self._check_and_update_modbus_status(from_user_action=True))
 
     def disconnect_modbus(self):
         logging.getLogger().info("Richiesta disconnessione Modbus...")
@@ -1631,7 +1640,7 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore durante la disconnessione Modbus: {e}")
         finally:
-            self.after(0, self._check_and_update_modbus_status)
+            self.after(0, lambda: self._check_and_update_modbus_status(from_user_action=True))
 
     def clicked_button_setspeed_modbus(self):
         try:
