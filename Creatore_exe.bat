@@ -8,6 +8,7 @@ pyinstaller --noconfirm --onefile --windowed ^
   --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\gui;gui" ^
   --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\logic;logic" ^
   --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\.venv\Lib\site-packages\shared_lib\LorenzProtokollDll_x64.dll;shared_lib" ^
+  --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\justo.ico;." ^
   --hidden-import=winrt.windows.foundation.collections ^
   --hidden-import=winrt ^
   --icon=justo.ico ^
