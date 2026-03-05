@@ -10,6 +10,7 @@ import subprocess
 import asyncio
 import threading
 import math
+import time
 from collections import deque  # <-- per smoothing Δ
 from shared_lib.bluetooth_manager import BLEManager
 from shared_lib.LorenzLib import LorenzReader
@@ -33,7 +34,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1340x829")
+        self.geometry("900x870")
 
         self.style = ttk.Style(self)
 
@@ -83,83 +84,54 @@ class MainWindow(tk.Tk):
         # Carica impostazioni (incluso soglie delta e smoothing)
         self.load_settings()
 
-        # Frame principale
-        self.main_frame = ttk.Frame(self)
-        self.main_frame.grid(row=0, column=0, sticky="nsew")
-
-        # Layout radice
-        self.grid_rowconfigure(0, weight=1)  # zona principale
-        self.grid_rowconfigure(1, weight=0)  # log
+        # ── ROOT GRID ──────────────────────────────────────────────────
+        self.grid_rowconfigure(0, weight=0)   # status bar
+        self.grid_rowconfigure(1, weight=0)   # barra connessioni
+        self.grid_rowconfigure(2, weight=1)   # contenuto principale
+        self.grid_rowconfigure(3, weight=0)   # log
         self.grid_columnconfigure(0, weight=1)
 
-        # Layout main_frame (4 colonne principali)
-        self.main_frame.grid_columnconfigure(0, weight=0)  # sinistra
-        self.main_frame.grid_columnconfigure(1, weight=0)  # centro-sinistra
-        self.main_frame.grid_columnconfigure(2, weight=1)  # Dati BLE
-        self.main_frame.grid_columnconfigure(3, weight=1)  # Lorenz + Banco (affiancati)
-        self.main_frame.grid_rowconfigure(0, weight=0)  # confronto
-        self.main_frame.grid_rowconfigure(1, weight=1)  # contenuti
+        # Stato heartbeat BLE
+        self._last_packet_time = None
+        self._heartbeat_reset_id = None
 
-        # Frame sinistro per ricerca, stato connessione e comandi
-        self.left_frame = ttk.Frame(self.main_frame)
-        self.left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=5, pady=(8, 8))
-        self.left_frame.grid_columnconfigure(0, weight=1)
+        # Buffer Δ e ultimi valori BLE/Lorenz
+        win = max(1, int(self.delta_smoothing_window))
+        self._delta_speed_hist = deque(maxlen=win)
+        self._delta_power_hist = deque(maxlen=win)
+        self._last_ble_speed = None
+        self._last_ble_power = None
+        self._last_lrz_speed = None
+        self._last_lrz_power = None
 
-        # Ricerca/Connessione BLE
-        self.frame_search = ttk.LabelFrame(self.left_frame, text="Ricerca Dispositivi BLE")
-        self.frame_search.grid(row=0, column=0, sticky="nsew", padx=5, pady=(4, 4))
-        self.frame_search.grid_columnconfigure(0, weight=1)
+        # ── ROW 0: STATUS BAR ──────────────────────────────────────────
+        self._create_status_bar()
 
-        self.device_list = tk.Listbox(self.frame_search, height=7)
-        self.device_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=4)
-        self.btn_search = ttk.Button(self.frame_search, text="Cerca Dispositivi", command=self.search_devices)
-        self.btn_search.grid(row=1, column=0, sticky="ew", padx=10, pady=2)
-        self.btn_connect = ttk.Button(self.frame_search, text="Connetti", command=self.connect_device)
-        self.btn_connect.grid(row=2, column=0, sticky="ew", padx=10, pady=2)
-        self.btn_disconnect = ttk.Button(self.frame_search, text="Disconnetti", command=self.disconnect_device)
-        self.btn_disconnect.grid(row=3, column=0, sticky="ew", padx=10, pady=3)
+        # ── ROW 1: BARRA CONNESSIONI ───────────────────────────────────
+        self._create_connections_bar()
 
-        # Stato connessione
-        self.frame_status = ttk.LabelFrame(self.left_frame, text="Stato Connessione")
-        self.frame_status.grid(row=1, column=0, sticky="ew", padx=5, pady=(2, 4))
-        self.frame_status.grid_columnconfigure(0, weight=1)
-        self.frame_status.grid_columnconfigure(1, weight=1)
-        self.connection_status = tk.Label(self.frame_status, text="Non Connesso", fg="red")
-        self.connection_status.grid(row=0, column=0, padx=5, pady=6)
-        self.progress = ttk.Progressbar(self.frame_status, mode='indeterminate')
-        self.progress.grid(row=0, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
+        # ── ROW 2: CONTENUTO PRINCIPALE ────────────────────────────────
+        content = ttk.Frame(self)
+        content.grid(row=2, column=0, sticky="nsew", padx=6, pady=(0, 4))
+        content.grid_columnconfigure(0, weight=0)
+        content.grid_columnconfigure(1, weight=1)
+        content.grid_rowconfigure(0, weight=1)
 
-        # Label nome + indirizzo dispositivo connesso — height=2 fisso per non shiftare il layout
-        self.lbl_connected_device = tk.Label(
-            self.frame_status,
-            text="—",
-            font=('Helvetica', 8),
-            foreground='#555555',
-            wraplength=160,
-            justify='center',
-            height=2
-        )
-        self.lbl_connected_device.grid(row=1, column=0, columnspan=3, padx=5, pady=(0, 4))
+        # ── COLONNA SINISTRA: CSV + Auto comandi + Manuali ─────────────
+        left = ttk.Frame(content)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        left.grid_columnconfigure(0, weight=1)
+        left.grid_rowconfigure(0, weight=1)
+        left.grid_rowconfigure(1, weight=0)
+        left.grid_rowconfigure(2, weight=0)
 
-        # Comandi manuali
-        self.frame_commands = ttk.LabelFrame(self.left_frame, text="Comandi manuali")
-        self.frame_commands.grid(row=2, column=0, sticky="ew", padx=5, pady=(2, 6))
-        self.create_command_controls()
-
-        # Colonna intermedia (CSV + Auto comandi)
-        self.middle_left_frame = ttk.Frame(self.main_frame)
-        self.middle_left_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=5, pady=(4, 6))
-        self.middle_left_frame.grid_rowconfigure(0, weight=1)
-        self.middle_left_frame.grid_columnconfigure(0, weight=1)
-
-        # Comandi da CSV (stile compatto ulteriore)
-        self.automatic_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi da CSV")
-        self.automatic_commands.grid(row=0, column=0, sticky="nsew", padx=5, pady=(2, 2))
+        # Tabella CSV
+        self.automatic_commands = ttk.LabelFrame(left, text="Comandi da CSV")
+        self.automatic_commands.grid(row=0, column=0, sticky="nsew", pady=(0, 4))
         self.automatic_commands.grid_rowconfigure(0, weight=1)
         self.automatic_commands.grid_columnconfigure(0, weight=1)
         self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
         self.scrollbar.grid(row=0, column=1, sticky="ns")
-
         self.commands_table = ttk.Treeview(
             self.automatic_commands,
             columns=("Comando", "Val", "t[s]", "Vb[km/h]"),
@@ -167,191 +139,128 @@ class MainWindow(tk.Tk):
             yscrollcommand=self.scrollbar.set,
             style='Compact.Treeview'
         )
-        self.commands_table.heading("Comando", text="Comando")
-        self.commands_table.heading("Val", text="Val")
-        self.commands_table.heading("t[s]", text="t[s]")
-        self.commands_table.heading("Vb[km/h]", text="Vb[km/h]")
-        self.commands_table.column("Comando", width=95, anchor='center')
-        self.commands_table.column("Val", width=70, anchor='center')
-        self.commands_table.column("t[s]", width=55, anchor='center')
-        self.commands_table.column("Vb[km/h]", width=85, anchor='center')
+        self.commands_table.heading("Comando",   text="Comando")
+        self.commands_table.heading("Val",       text="Val")
+        self.commands_table.heading("t[s]",      text="t[s]")
+        self.commands_table.heading("Vb[km/h]",  text="Vb[km/h]")
+        self.commands_table.column("Comando",    width=95,  anchor='center')
+        self.commands_table.column("Val",        width=70,  anchor='center')
+        self.commands_table.column("t[s]",       width=55,  anchor='center')
+        self.commands_table.column("Vb[km/h]",   width=85,  anchor='center')
         self.commands_table.grid(row=0, column=0, sticky="nsew", padx=8, pady=4)
         self.scrollbar.config(command=self.commands_table.yview)
-        self.commands_table.tag_configure('oddrow', background='lightgrey')
-        self.commands_table.tag_configure('evenrow', background='white')
+        self.commands_table.tag_configure('oddrow',     background='lightgrey')
+        self.commands_table.tag_configure('evenrow',    background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
 
-        # ---  Comandi automatici ---
-        self.frame_auto_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi automatici")
-        self.frame_auto_commands.grid(row=1, column=0, sticky="w", padx=8, pady=(2, 4))
+        # Comandi automatici
+        self.frame_auto_commands = ttk.LabelFrame(left, text="Comandi automatici")
+        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", pady=(0, 4))
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
         self.frame_auto_commands.grid_columnconfigure(1, weight=1)
 
-        self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
+        self._csv_single_cycle_seconds = 0
+        self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF",
+                                   fg="red", font=('Helvetica', 9))
+        self.led_status.grid(row=0, column=0, columnspan=2, padx=8, pady=(4, 2), sticky="w")
+
+        self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica CSV",
                                             command=self.load_commands_from_csv)
-        self.btn_load_commands.grid(row=1, column=0, padx=8, pady=1, sticky='w')
-
-        self._csv_single_cycle_seconds = 0  # durata di UN ciclo CSV
-
-        self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
-        self.led_status.grid(row=0, column=0, padx=8, pady=2, columnspan=2, sticky="w")
-        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Start Comandi Automatici",
+        self.btn_load_commands.grid(row=1, column=0, padx=(8, 4), pady=2, sticky='ew')
+        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text=u"▶  Start",
                                             command=self.launch_auto_commands)
-        self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='w')
+        self.btn_auto_commands.grid(row=1, column=1, padx=(4, 8), pady=2, sticky='ew')
 
-        # --- N. Cicli sulla stessa riga di Stop ---
         frame_cicli = ttk.Frame(self.frame_auto_commands)
-        frame_cicli.grid(row=2, column=0, padx=8, pady=1, sticky='w')
+        frame_cicli.grid(row=2, column=0, padx=8, pady=2, sticky='w')
         ttk.Label(frame_cicli, text="N. Cicli:").grid(row=0, column=0, padx=(0, 4))
-        self.cycles_spinbox = ttk.Spinbox(
-            frame_cicli,
-            from_=1, to=9999, increment=1, width=6,
-            command=self._on_cycles_changed
-        )
+        self.cycles_spinbox = ttk.Spinbox(frame_cicli, from_=1, to=9999, increment=1, width=6,
+                                          command=self._on_cycles_changed)
         self.cycles_spinbox.set(1)
         self.cycles_spinbox.grid(row=0, column=1)
         self.cycles_spinbox.bind("<FocusOut>", lambda e: self._on_cycles_changed())
-        self.cycles_spinbox.bind("<Return>", lambda e: self._on_cycles_changed())
+        self.cycles_spinbox.bind("<Return>",   lambda e: self._on_cycles_changed())
 
-        self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Stop Comandi Automatici",
+        self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text=u"■  Stop",
                                                  command=self.stop_auto_commands)
-        self.btn_stop_auto_commands.grid(row=2, column=1, padx=8, pady=1, sticky='e')
+        self.btn_stop_auto_commands.grid(row=2, column=1, padx=(4, 8), pady=2, sticky='ew')
 
-        self.lbl_total_duration_text = ttk.Label(self.frame_auto_commands, text="Durata Totale Test:")
-        self.lbl_total_duration_text.grid(row=3, column=0, padx=8, pady=(4, 2), sticky='w')
-        self.lbl_total_duration_value = ttk.Label(self.frame_auto_commands, text="--:--:--",
-                                                  font=('Helvetica', 10, 'bold'))
-        self.lbl_total_duration_value.grid(row=3, column=1, padx=8, pady=(4, 2), sticky='w')
+        dur_row = ttk.Frame(self.frame_auto_commands)
+        dur_row.grid(row=3, column=0, columnspan=2, sticky='ew', padx=8, pady=(2, 6))
+        ttk.Label(dur_row, text="Totale:").grid(row=0, column=0, sticky='w', padx=(0, 4))
+        self.lbl_total_duration_value = ttk.Label(dur_row, text="--:--:--",
+                                                  font=('Helvetica', 9, 'bold'))
+        self.lbl_total_duration_value.grid(row=0, column=1, sticky='w', padx=(0, 14))
+        ttk.Label(dur_row, text="Rimanente:").grid(row=0, column=2, sticky='w', padx=(0, 4))
+        self.lbl_remaining_duration_value = ttk.Label(dur_row, text="--:--:--",
+                                                      font=('Helvetica', 9, 'bold'))
+        self.lbl_remaining_duration_value.grid(row=0, column=3, sticky='w')
 
-        self.lbl_remaining_duration_text = ttk.Label(self.frame_auto_commands, text="Tempo Rimanente:")
-        self.lbl_remaining_duration_text.grid(row=4, column=0, padx=8, pady=2, sticky='w')
-        self.lbl_remaining_duration_value = ttk.Label(self.frame_auto_commands, text="--:--:--",
-                                                      font=('Helvetica', 10, 'bold'))
-        self.lbl_remaining_duration_value.grid(row=4, column=1, padx=8, pady=2, sticky='w')
+        # Comandi manuali BLE
+        self.frame_commands = ttk.LabelFrame(left, text="Comandi manuali BLE")
+        self.frame_commands.grid(row=2, column=0, sticky="ew", pady=(0, 4))
+        self.create_command_controls()
 
-        # Nuovo wrapper per il lato destro
-        self.right_wrapper = ttk.Frame(self.main_frame)
-        self.right_wrapper.grid(row=0, column=2, rowspan=2, columnspan=2, sticky="nsew", padx=10, pady=5)
-        self.right_wrapper.grid_rowconfigure(0, weight=0)  # Confronto fisso
-        self.right_wrapper.grid_rowconfigure(1, weight=1)  # Right frame espande
-        self.right_wrapper.grid_columnconfigure(0, weight=1)
+        # ── COLONNA DESTRA: Confronto + Dati live ──────────────────────
+        right = ttk.Frame(content)
+        right.grid(row=0, column=1, sticky="nsew")
+        right.grid_columnconfigure(0, weight=1)
+        right.grid_rowconfigure(0, weight=0)
+        right.grid_rowconfigure(1, weight=1)
 
-        # =======================
-        # PANNELLO DI CONFRONTO (in alto, largo come BLE + Lorenz + Banco)
-        # =======================
-        # Variabili per memorizzare gli ultimi valori BLE/Lorenz (per Δ)
-        self._last_ble_speed = None
-        self._last_ble_power = None
-        self._last_lrz_speed = None
-        self._last_lrz_power = None
-
-        # Buffer per smoothing Δ
-        win = max(1, int(self.delta_smoothing_window))
-        self._delta_speed_hist = deque(maxlen=win)
-        self._delta_power_hist = deque(maxlen=win)
-
+        # Pannello confronto BLE ↔ Lorenz
+        self.right_wrapper = right  # compatibilità con _create_compare_panel
         self._create_compare_panel()
-        self.compare_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=(5, 2))
+        self.compare_frame.grid(row=0, column=0, sticky="ew", pady=(0, 4))
 
-        # Lato destro: Lorenz e Banco AFFIANCATI nella stessa riga
-        self.right_frame = ttk.Frame(self.right_wrapper)
-        self.right_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
-        self.right_frame.grid_columnconfigure(0, weight=0)
-        self.right_frame.grid_columnconfigure(1, weight=0)
-        self.right_frame.grid_columnconfigure(2, weight=1)
+        # Dati live — 3 box affiancati
+        live = ttk.Frame(right)
+        live.grid(row=1, column=0, sticky="nsew")
+        live.grid_columnconfigure(0, weight=1)
+        live.grid_columnconfigure(1, weight=1)
+        live.grid_columnconfigure(2, weight=1)
+        live.grid_rowconfigure(0, weight=1)
 
-        # Dati BLE FTMS (riga 1, colonna 2)
-        self.frame_data = ttk.LabelFrame(self.right_frame, text="Dati BLE FTMS")
-        self.frame_data.grid(row=0, column=0, sticky="nsew", padx=(0,5), pady=5)
+        self.frame_data = ttk.LabelFrame(live, text="Dati BLE FTMS")
+        self.frame_data.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         self.create_data_fields()
 
-        # Sensore Temperatura (sotto il Banco)
-        self.frame_serial = ttk.LabelFrame(self.right_frame, text="Gestione Sensore COM")
-        self.frame_serial.grid(row=1, column=0, columnspan=3, sticky="new", padx=5, pady=(2, 5))
+        frame_lorenz_data = ttk.LabelFrame(live, text="Dati Lorenz")
+        frame_lorenz_data.grid(row=0, column=1, sticky="nsew", padx=4)
+        frame_lorenz_data.grid_columnconfigure(1, weight=1)
+        self.offset_label        = self._make_live_entry(frame_lorenz_data, "Offset",    0)
+        self.speed_avg_label     = self._make_live_entry(frame_lorenz_data, "Speed Avg", 1)
+        self.torque_lorenz_label = self._make_live_entry(frame_lorenz_data, "Torque",    2)
+        self.power_lorenz_label  = self._make_live_entry(frame_lorenz_data, "Power",     3)
 
-        self.serial_controls = ttk.Frame(self.frame_serial)
-        self.serial_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        frame_com_data = ttk.LabelFrame(live, text="Dati COM")
+        frame_com_data.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
+        frame_com_data.grid_columnconfigure(1, weight=1)
+        self.value1_label = self._make_live_entry(frame_com_data, "Valore 1", 0)
+        self.value2_label = self._make_live_entry(frame_com_data, "Valore 2", 1)
+        self.value3_label = self._make_live_entry(frame_com_data, "Valore 3", 2)
+        self.value4_label = self._make_live_entry(frame_com_data, "Valore 4", 3)
 
-        # Combobox per selezionare COM
-        ttk.Label(self.serial_controls, text="COM Port:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.com_port_combo = ttk.Combobox(self.serial_controls, values=self._get_available_com_ports(), width=15)
-        self.com_port_combo.grid(row=0, column=1, padx=5, pady=5)
-        self.btn_refresh_com = tk.Button(
-            self.serial_controls, text="🔄",
-            command=self._refresh_com_ports,
-            font=('Segoe UI Emoji', 13),
-            relief='flat', bd=1, cursor='hand2',
-            padx=4, pady=2
-        )
-        self.btn_refresh_com.grid(row=0, column=2, padx=(0, 5), pady=5)
-
-        self.serial_status = tk.Label(self.serial_controls, text="Temperatura: Non Connesso", fg="red")
-        self.serial_status.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="w")
-
-        self.btn_connect_serial = ttk.Button(self.serial_controls, text="Connetti", command=self.connect_serial)
-        self.btn_connect_serial.grid(row=2, column=0, padx=5, pady=5)
-        self.btn_disconnect_serial = ttk.Button(self.serial_controls, text="Disconnetti",
-                                                command=self.disconnect_serial)
-        self.btn_disconnect_serial.grid(row=2, column=1, padx=5, pady=5)
-
-        # Etichette e entries in 2 colonne per i valori (row 3+)
-        ttk.Label(self.serial_controls, text="Valore 1").grid(row=0, column=3, sticky="e", padx=5, pady=2)
-        self.value1_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value1_label.grid(row=0, column=4, padx=5, pady=2)
-
-        ttk.Label(self.serial_controls, text="Valore 2").grid(row=1, column=3, sticky="e", padx=5, pady=2)
-        self.value2_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value2_label.grid(row=1, column=4, padx=5, pady=2)
-
-        ttk.Label(self.serial_controls, text="Valore 3").grid(row=0, column=5, sticky="e", padx=5, pady=2)
-        self.value3_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value3_label.grid(row=0, column=6, padx=5, pady=2)
-
-        ttk.Label(self.serial_controls, text="Valore 4").grid(row=1, column=5, sticky="e", padx=5, pady=2)
-        self.value4_label = ttk.Entry(self.serial_controls, width=12, state='readonly', justify='right')
-        self.value4_label.grid(row=1, column=6, padx=5, pady=2)
-
-        # Crea i due blocchi affiancati
-        self.create_lorenz_controls()  # pos (row=0, col=0)
-        self.create_banco_controls()  # pos (row=0, col=1)
-        # Menu base (solo File)
-        self._create_menu()
-
-        # Aggiorna offset all'avvio
-        self.offset_label.config(state='normal')
-        self.offset_label.delete(0, tk.END)
-        self.offset_label.insert(0, f"{self.lorenz_reader.offset:.2f}")
-        self.offset_label.config(state='readonly')
-
-        # Log
+        # ── ROW 3: LOG ─────────────────────────────────────────────────
         self.autoscroll_log_var = tk.BooleanVar(value=True)
         self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
-        self.frame_log.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.frame_log.grid(row=3, column=0, sticky="nsew", padx=6, pady=(0, 6))
         self.frame_log.grid_columnconfigure(0, weight=1)
+        self.frame_log.grid_rowconfigure(0, weight=1)
         self.log_queue = queue.Queue()
         self._process_log_queue()
         chk_autoscroll = ttk.Checkbutton(
-            self.frame_log,
-            text="Auto-scroll",
-            variable=self.autoscroll_log_var
+            self.frame_log, text="Auto-scroll", variable=self.autoscroll_log_var
         )
         chk_autoscroll.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 5))
-        self.frame_log.grid_columnconfigure(0, weight=1)
-        self.frame_log.grid_rowconfigure(0, weight=1)
-
         self.log_scrollbar = ttk.Scrollbar(self.frame_log, orient="vertical")
-        self.log_scrollbar.grid(row=0, column=1, sticky="ns", pady=10)
-
+        self.log_scrollbar.grid(row=0, column=1, sticky="ns", pady=6)
         self.log_text = tk.Text(
-            self.frame_log,
-            state='disabled',
-            height=9,
+            self.frame_log, state='disabled', height=8,
             yscrollcommand=self.log_scrollbar.set
         )
-        self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
         self.log_scrollbar.config(command=self.log_text.yview)
-
-        # Tag per colorare le righe in base al livello di log
         self.log_text.tag_configure('DEBUG',    foreground='#888888')
         self.log_text.tag_configure('INFO',     foreground='#111111')
         self.log_text.tag_configure('WARNING',  foreground='#B86000')
@@ -359,12 +268,235 @@ class MainWindow(tk.Tk):
         self.log_text.tag_configure('CRITICAL', foreground='#ffffff', background='#CC0000',
                                     font=('Helvetica', 9, 'bold'))
 
+        # Aggiorna offset all'avvio
+        self._set_ro(self.offset_label, f"{self.lorenz_reader.offset:.2f}")
+
+        self._create_menu()
         self.periodic_connection_check()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     # ------------------------------
     # Helper per entry readonly
     # ------------------------------
+
+    # ------------------------------
+    # Status bar globale
+    # ------------------------------
+    def _create_status_bar(self):
+        bar = tk.Frame(self, bg='#1e1e2e', pady=5)
+        bar.grid(row=0, column=0, sticky="ew")
+        bar.grid_columnconfigure(99, weight=1)
+
+        tk.Label(bar, text="TOTAL COMMANDER IV", bg='#1e1e2e', fg='#8888aa',
+                 font=('Helvetica', 9, 'bold')).grid(row=0, column=0, padx=(12, 16))
+        tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=1, padx=(0, 14))
+
+        for col, (attr, label) in enumerate([
+            ('led_ble',    'BLE'),
+            ('led_lorenz', 'Lorenz'),
+            ('led_banco',  'Banco'),
+            ('led_com',    'COM'),
+        ], start=2):
+            g = tk.Frame(bar, bg='#1e1e2e')
+            g.grid(row=0, column=col, padx=10)
+            led = tk.Label(g, text=u'●', bg='#1e1e2e', fg='#555555', font=('Helvetica', 14))
+            led.grid(row=0, column=0, padx=(0, 3))
+            tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
+                     font=('Helvetica', 8)).grid(row=0, column=1)
+            setattr(self, attr, led)
+
+        tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=6, padx=(10, 14))
+
+        # Heartbeat BLE: lampeggia ad ogni pacchetto ricevuto
+        g_hb = tk.Frame(bar, bg='#1e1e2e')
+        g_hb.grid(row=0, column=7, padx=10)
+        self.led_heartbeat = tk.Label(g_hb, text=u'●', bg='#1e1e2e', fg='#555555',
+                                      font=('Helvetica', 14))
+        self.led_heartbeat.grid(row=0, column=0, padx=(0, 3))
+        self.lbl_hz = tk.Label(g_hb, text='-- Hz', bg='#1e1e2e', fg='#aaaacc',
+                               font=('Helvetica', 8))
+        self.lbl_hz.grid(row=0, column=1)
+
+        tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=8, padx=(10, 14))
+
+        g_auto = tk.Frame(bar, bg='#1e1e2e')
+        g_auto.grid(row=0, column=9, padx=10)
+        self.led_auto = tk.Label(g_auto, text=u'●', bg='#1e1e2e', fg='#555555',
+                                 font=('Helvetica', 14))
+        self.led_auto.grid(row=0, column=0, padx=(0, 3))
+        self.lbl_auto_status = tk.Label(g_auto, text='Auto: OFF', bg='#1e1e2e', fg='#aaaacc',
+                                        font=('Helvetica', 8))
+        self.lbl_auto_status.grid(row=0, column=1)
+
+    def _create_connections_bar(self):
+        bar = ttk.Frame(self)
+        bar.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 2))
+        bar.grid_columnconfigure(0, weight=3)
+        bar.grid_columnconfigure(1, weight=2)
+        bar.grid_columnconfigure(2, weight=2)
+        bar.grid_columnconfigure(3, weight=2)
+
+        # ── BLE ──────────────────────────────────────────────────────
+        ble = ttk.LabelFrame(bar, text="BLE")
+        ble.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=2)
+        ble.grid_columnconfigure(0, weight=1)
+
+        self.device_list = tk.Listbox(ble, height=4, font=('Helvetica', 8))
+        self.device_list.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 2))
+
+        self.btn_search = ttk.Button(ble, text="Cerca Dispositivi", command=self.search_devices)
+        self.btn_search.grid(row=1, column=0, sticky="ew", padx=6, pady=2)
+
+        _rb = ttk.Frame(ble)
+        _rb.grid(row=2, column=0, sticky="ew", padx=6, pady=2)
+        _rb.grid_columnconfigure(0, weight=1)
+        _rb.grid_columnconfigure(1, weight=1)
+        self.btn_connect = ttk.Button(_rb, text="Connetti", command=self.connect_device)
+        self.btn_connect.grid(row=0, column=0, sticky="ew", padx=(0, 2))
+        self.btn_disconnect = ttk.Button(_rb, text="Disconnetti", command=self.disconnect_device)
+        self.btn_disconnect.grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+        self.progress = ttk.Progressbar(ble, mode='indeterminate')
+        self.progress.grid(row=3, column=0, sticky="ew", padx=6, pady=(2, 2))
+
+        self.lbl_connected_device = tk.Label(
+            ble, text=u"—", font=('Helvetica', 8), fg='#555555',
+            wraplength=200, justify='center'
+        )
+        self.lbl_connected_device.grid(row=4, column=0, padx=6, pady=(0, 4))
+
+        # ── LORENZ ───────────────────────────────────────────────────
+        lorenz = ttk.LabelFrame(bar, text="Lorenz")
+        lorenz.grid(row=0, column=1, sticky="nsew", padx=4, pady=2)
+        lorenz.grid_columnconfigure(0, weight=1)
+        lorenz.grid_columnconfigure(1, weight=1)
+        self.lorenz_controls = lorenz
+
+        _rl = ttk.Frame(lorenz)
+        _rl.grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 2))
+        _rl.grid_columnconfigure(0, weight=1)
+        _rl.grid_columnconfigure(1, weight=1)
+        self.btn_connect_lorenz = ttk.Button(_rl, text="Connetti", command=self.connect_lorenz)
+        self.btn_connect_lorenz.grid(row=0, column=0, sticky="ew", padx=(0, 2))
+        self.btn_disconnect_lorenz = ttk.Button(_rl, text="Disconnetti",
+                                                command=self.disconnect_lorenz)
+        self.btn_disconnect_lorenz.grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+        self.btn_read_offset = ttk.Button(lorenz, text="Leggi Offset",
+                                          command=self.read_lorenz_offset)
+        self.btn_read_offset.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+
+        _avg = ttk.Frame(lorenz)
+        _avg.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+        _avg.grid_columnconfigure(1, weight=1)
+        ttk.Label(_avg, text="Media:").grid(row=0, column=0, sticky="e", padx=(0, 4))
+        self.avg_entry = ttk.Entry(_avg, width=8, justify='right')
+        self.avg_entry.grid(row=0, column=1, sticky="ew")
+        self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
+        self.avg_entry.bind("<Return>",   self.update_lorenz_avg)
+        self.avg_entry.bind("<FocusOut>", self.update_lorenz_avg)
+
+        self.invert_speed_var = tk.BooleanVar(value=self.lorenz_reader.invert_speed)
+        ttk.Checkbutton(lorenz, text="Inverti Velocità",
+                        variable=self.invert_speed_var,
+                        command=self.toggle_invert_speed
+                        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=6, pady=(2, 6))
+
+        # ── BANCO ────────────────────────────────────────────────────
+        banco = ttk.LabelFrame(bar, text="Banco")
+        banco.grid(row=0, column=2, sticky="nsew", padx=4, pady=2)
+        banco.grid_columnconfigure(1, weight=1)
+        self.banco_controls = banco
+
+        ttk.Label(banco, text="IP:").grid(row=0, column=0, sticky="e", padx=(6, 4), pady=(6, 2))
+        self.entry_ip = ttk.Entry(banco, width=14)
+        self.entry_ip.insert(0, "192.168.0.10")
+        self.entry_ip.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(6, 2))
+
+        _rbo = ttk.Frame(banco)
+        _rbo.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+        _rbo.grid_columnconfigure(0, weight=1)
+        _rbo.grid_columnconfigure(1, weight=1)
+        self.btn_connect_banco = ttk.Button(_rbo, text="Connetti", command=self.connect_modbus)
+        self.btn_connect_banco.grid(row=0, column=0, sticky="ew", padx=(0, 2))
+        self.btn_disconnect_banco = ttk.Button(_rbo, text="Disconnetti",
+                                               command=self.disconnect_modbus)
+        self.btn_disconnect_banco.grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+        _vel = ttk.Frame(banco)
+        _vel.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+        ttk.Label(_vel, text="Vel [km/h]:").grid(row=0, column=0, sticky="e", padx=(0, 4))
+        self.speed_banco_spin = ttk.Spinbox(
+            _vel, from_=0.0, to=100.0, increment=0.1, format="%.1f", width=8
+        )
+        self.speed_banco_spin.set(0.0)
+        self.speed_banco_spin.grid(row=0, column=1, padx=(0, 4))
+        self.btn_set_speed = ttk.Button(_vel, text="Set",
+                                        command=self.clicked_button_setspeed_modbus)
+        self.btn_set_speed.grid(row=0, column=2)
+
+        self.btn_zero_speed = tk.Button(
+            banco, text=u"⏹  STOP BANCO",
+            command=self.emergency_stop,
+            font=('Helvetica', 12, 'bold'),
+            bg="#D0021B", fg="white",
+            activebackground="#B00000", activeforeground="white",
+            relief='raised', bd=3, cursor='hand2', height=2,
+        )
+        self.btn_zero_speed.grid(row=3, column=0, columnspan=2, sticky="ew",
+                                 padx=6, pady=(4, 6))
+        try:
+            self.btn_zero_speed.config(highlightthickness=2,
+                                       highlightbackground="#660000",
+                                       highlightcolor="#FFFFFF")
+        except Exception:
+            pass
+
+        # ── SENSORE COM ──────────────────────────────────────────────
+        com = ttk.LabelFrame(bar, text="Sensore COM")
+        com.grid(row=0, column=3, sticky="nsew", padx=(4, 0), pady=2)
+        com.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(com, text="Porta:").grid(row=0, column=0, sticky="e",
+                                           padx=(6, 4), pady=(6, 2))
+        self.com_port_combo = ttk.Combobox(com, values=self._get_available_com_ports(), width=10)
+        self.com_port_combo.grid(row=0, column=1, sticky="ew", padx=(0, 2), pady=(6, 2))
+        self.btn_refresh_com = tk.Button(
+            com, text=u"🔄", command=self._refresh_com_ports,
+            font=('Segoe UI Emoji', 11), relief='flat', bd=1, cursor='hand2', padx=2, pady=1
+        )
+        self.btn_refresh_com.grid(row=0, column=2, padx=(0, 6), pady=(6, 2))
+
+        _rc = ttk.Frame(com)
+        _rc.grid(row=1, column=0, columnspan=3, sticky="ew", padx=6, pady=(2, 6))
+        _rc.grid_columnconfigure(0, weight=1)
+        _rc.grid_columnconfigure(1, weight=1)
+        self.btn_connect_serial = ttk.Button(_rc, text="Connetti", command=self.connect_serial)
+        self.btn_connect_serial.grid(row=0, column=0, sticky="ew", padx=(0, 2))
+        self.btn_disconnect_serial = ttk.Button(_rc, text="Disconnetti",
+                                                command=self.disconnect_serial)
+        self.btn_disconnect_serial.grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+    def _set_led(self, led, state):
+        """Imposta colore LED: ok=verde, err=rosso, warn=arancione, off=grigio."""
+        colors = {'ok': '#00cc44', 'err': '#cc2222', 'warn': '#cc8800', 'off': '#555555'}
+        led.config(fg=colors.get(state, '#555555'))
+
+    def _make_live_entry(self, parent, label_text, row):
+        """Helper: crea label + entry readonly per i pannelli dati live."""
+        tk.Label(parent, text=label_text, font=('Helvetica', 9),
+                 anchor='e', width=10).grid(row=row, column=0, sticky='e',
+                                            padx=(8, 4), pady=2)
+        e = ttk.Entry(parent, state='readonly', justify='right', width=10)
+        e.grid(row=row, column=1, sticky='ew', padx=(0, 8), pady=2)
+        return e
+
+    def _heartbeat_timeout(self):
+        """Chiamato 2 secondi dopo l'ultimo pacchetto BLE ricevuto."""
+        self.led_heartbeat.config(fg='#555555')
+        self.lbl_hz.config(text='-- Hz')
+        self._heartbeat_reset_id = None
+
     def _set_ro(self, entry, text):
         entry.config(state='normal')
         entry.delete(0, tk.END)
@@ -377,7 +509,7 @@ class MainWindow(tk.Tk):
             name = self._connected_device_name or "Sconosciuto"
             addr = self._connected_device_address or "?"
             self.lbl_connected_device.config(
-                text=f"{name}\n{addr}",
+                text=f"{name}  {addr}",
                 foreground='#006600'
             )
         else:
@@ -429,7 +561,7 @@ class MainWindow(tk.Tk):
         # Header dinamico con finestra media
         self.cmp_delta_header = ttk.Label(
             center,
-            text=f"Δ (Speed: km/h, Power: %) – media N={self.delta_smoothing_window}",
+            text=f"Δ % – media N={self.delta_smoothing_window}",
             anchor="center"
         )
         self.cmp_delta_header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
@@ -680,40 +812,22 @@ class MainWindow(tk.Tk):
         fields = ["power", "cadence", "speed", "resistance", "total_distance", "elapsed_time"]
         self.data_entries = {}
         self.data_controls = ttk.Frame(self.frame_data)
-        self.data_controls.grid(row=0, column=0, sticky="ew", padx=0, pady=5)
+        self.data_controls.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        self.data_controls.grid_columnconfigure(1, weight=1)
+
         for i, field in enumerate(fields):
-            frame = ttk.Frame(self.data_controls)
-            frame.grid(row=i, column=0, sticky="e", padx=5, pady=2)
-            lbl = ttk.Label(frame, text=field.capitalize(), width=14, anchor="e")
-            lbl.grid(row=0, column=0, padx=5)
-            entry = ttk.Entry(frame, state='readonly', justify='right', width=10)
-            entry.grid(row=0, column=1, padx=0)
+            tk.Label(self.data_controls, text=field.capitalize(), font=('Helvetica', 9),
+                     anchor='e', width=14).grid(row=i, column=0, sticky='e', padx=(6, 4), pady=2)
+            entry = ttk.Entry(self.data_controls, state='readonly', justify='right', width=10)
+            entry.grid(row=i, column=1, sticky='ew', padx=(0, 6), pady=2)
             self.data_entries[field.lower().replace(" ", "_")] = entry
 
         self.btn_toggle_data = ttk.Button(
-            self.data_controls,
-            text="Abilita Dati",
-            command=self.toggle_data,
-            style='Data.Disabled.TButton'
+            self.data_controls, text="Abilita Dati",
+            command=self.toggle_data, style='Data.Disabled.TButton'
         )
-        self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=5)
-
-        # Contatore pacchetti ricevuti
-        self._packet_count = 0
-        ttk.Label(
-            self.data_controls,
-            text="Pacchetti ricevuti:",
-            font=('Helvetica', 8, 'bold'),
-            foreground='#555555'
-        ).grid(row=len(fields) + 1, column=0, columnspan=2, padx=10, pady=(4, 0))
-        self.lbl_packet_count = tk.Label(
-            self.data_controls,
-            text="0",
-            font=('Helvetica', 22, 'bold'),
-            foreground='#003399',
-            width=6
-        )
-        self.lbl_packet_count.grid(row=len(fields) + 2, column=0, columnspan=2, padx=10, pady=(0, 6))
+        self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2,
+                                  padx=6, pady=(4, 6), sticky='ew')
 
     # ------------------------------
     # Status check periodic
@@ -736,17 +850,14 @@ class MainWindow(tk.Tk):
 
     def _update_ble_status_ui(self, is_connected, error=False):
         if error:
-            self.connection_status.config(text="Errore BLE", fg="orange")
-
+            self._set_led(self.led_ble, 'warn')
         elif is_connected:
-            self.connection_status.config(text="Connesso", fg="green")
+            self._set_led(self.led_ble, 'ok')
             self._ble_was_connected = True
-
         else:
-            # Rilevata disconnessione inattesa (era connesso, ora non lo è più)
             if self._ble_was_connected:
                 self._on_ble_unexpected_disconnect()
-            self.connection_status.config(text="Non Connesso", fg="red")
+            self._set_led(self.led_ble, 'err')
             self._ble_was_connected = False
 
     def _on_ble_unexpected_disconnect(self):
@@ -779,7 +890,7 @@ class MainWindow(tk.Tk):
     def _check_and_update_modbus_status(self, from_user_action=False):
         is_connected = self.modbus.is_connesso()
         if is_connected:
-            self.banco_status.config(text="Connesso", fg="green")
+            self._set_led(self.led_banco, 'ok')
             if not self._modbus_was_connected:
                 logging.getLogger().info("Modbus connesso.")
             self._modbus_was_connected = True
@@ -788,7 +899,7 @@ class MainWindow(tk.Tk):
                 self._on_modbus_unexpected_disconnect()
             elif from_user_action:
                 logging.getLogger().warning("Modbus: nessuna connessione attiva da chiudere.")
-            self.banco_status.config(text="Non Connesso", fg="red")
+            self._set_led(self.led_banco, 'err')
             self._modbus_was_connected = False
 
     def _on_modbus_unexpected_disconnect(self):
@@ -800,10 +911,12 @@ class MainWindow(tk.Tk):
     def _check_lorenz_status(self):
         is_connected = self.lorenz_reader.connected
         if is_connected:
+            self._set_led(self.led_lorenz, 'ok')
             self._lorenz_was_connected = True
         else:
             if self._lorenz_was_connected:
                 self._on_lorenz_unexpected_disconnect()
+            self._set_led(self.led_lorenz, 'err')
             self._lorenz_was_connected = False
 
     def _on_lorenz_unexpected_disconnect(self):
@@ -811,17 +924,17 @@ class MainWindow(tk.Tk):
         logging.getLogger().warning(sep)
         logging.getLogger().warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
         logging.getLogger().warning(sep)
-        # Ferma il loop di aggiornamento UI e resetta la label di stato
         self.stop_lorenz_update()
-        self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
 
     def _check_serial_status(self):
         is_connected = self.serial_reader.connected
         if is_connected:
+            self._set_led(self.led_com, 'ok')
             self._serial_was_connected = True
         else:
             if self._serial_was_connected:
                 self._on_serial_unexpected_disconnect()
+            self._set_led(self.led_com, 'err')
             self._serial_was_connected = False
 
     def _on_serial_unexpected_disconnect(self):
@@ -829,9 +942,7 @@ class MainWindow(tk.Tk):
         logging.getLogger().warning(sep)
         logging.getLogger().warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
         logging.getLogger().warning(sep)
-        # Ferma il loop di aggiornamento UI e resetta la label di stato
         self.stop_serial_update()
-        self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
 
     # ------------------------------
     # Ricerca/Connessione BLE
@@ -916,7 +1027,6 @@ class MainWindow(tk.Tk):
                     self._connected_device_name = None
                     self._connected_device_address = None
                     self._update_connected_device_label()
-                    self.connection_status.config(text="Non Connesso", fg="red")
                     logging.getLogger().info("Dispositivo BLE disconnesso.")
                 else:
                     logging.getLogger().warning("Disconnessione BLE non riuscita o dispositivo già disconnesso.")
@@ -1030,9 +1140,17 @@ class MainWindow(tk.Tk):
         self.data_processor.handle_bike_data(combined_data)
 
     def _update_data_fields_ui(self, bike_data):
-        # Incrementa contatore pacchetti
-        self._packet_count += 1
-        self.lbl_packet_count.config(text=str(self._packet_count))
+        # Heartbeat BLE: LED lampeggiante + frequenza
+        _now = time.monotonic()
+        if self._last_packet_time is not None:
+            _dt = _now - self._last_packet_time
+            if _dt > 0:
+                self.lbl_hz.config(text=f"{1.0 / _dt:.1f} Hz")
+        self._last_packet_time = _now
+        self.led_heartbeat.config(fg='#00cc44')
+        if self._heartbeat_reset_id:
+            self.after_cancel(self._heartbeat_reset_id)
+        self._heartbeat_reset_id = self.after(2000, self._heartbeat_timeout)
         # Mappa tra chiavi di bike_data e nomi dei campi UI
         key_mapping = {
             'Cad': 'cadence',
@@ -1077,9 +1195,13 @@ class MainWindow(tk.Tk):
             entry.config(state='normal')
             entry.delete(0, tk.END)
             entry.config(state='readonly')
-        # Reset contatore pacchetti
-        self._packet_count = 0
-        self.lbl_packet_count.config(text="0")
+        # Reset heartbeat
+        if self._heartbeat_reset_id:
+            self.after_cancel(self._heartbeat_reset_id)
+            self._heartbeat_reset_id = None
+        self.led_heartbeat.config(fg='#555555')
+        self.lbl_hz.config(text='-- Hz')
+        self._last_packet_time = None
         # Reset BLE last values + buffer smoothing
         self._last_ble_speed = None
         self._last_ble_power = None
@@ -1210,6 +1332,8 @@ class MainWindow(tk.Tk):
                 self._stop_countdown_timer()
                 self.lbl_remaining_duration_value.config(text="00:00:00")
                 self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
+                self._set_led(self.led_auto, 'warn')
+                self.lbl_auto_status.config(text="Auto: OK")
                 logging.getLogger().info(f"Comandi automatici completati ({num_cycles} ciclo/i)")
                 self.setspeed_modbus(0)
                 self.commands_table.tag_configure('oddrow', background='lightgrey')
@@ -1221,6 +1345,8 @@ class MainWindow(tk.Tk):
 
         self.auto_commands_running = True
         self.led_status.config(text=f"Comandi Automatici: ON  [Ciclo 1/{num_cycles}]", fg="green")
+        self._set_led(self.led_auto, 'ok')
+        self.lbl_auto_status.config(text="Auto: ON")
 
         # Avvia countdown
         self.remaining_test_duration_seconds = self.total_test_duration_seconds
@@ -1236,6 +1362,8 @@ class MainWindow(tk.Tk):
             self.lbl_remaining_duration_value.config(text="Interrotto")  # <-- Aggiunto
 
             self.led_status.config(text="Comandi Automatici: OFF", fg="red")
+            self._set_led(self.led_auto, 'err')
+            self.lbl_auto_status.config(text="Auto: OFF")
             if hasattr(self, 'auto_command_id') and self.auto_command_id is not None:
                 self.after_cancel(self.auto_command_id)
                 self.auto_command_id = None
@@ -1310,111 +1438,6 @@ class MainWindow(tk.Tk):
 
     # --- [FINE NUOVE FUNZIONI] ---
 
-    # ------------------------------
-    # Lorenz (affiancato al Banco)
-    # ------------------------------
-    def create_lorenz_controls(self):
-        self.frame_lorenz = ttk.LabelFrame(self.right_frame, text="Gestione Lorenz")
-        # Affiancato: colonna 0
-        self.frame_lorenz.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-
-        self.lorenz_controls = ttk.Frame(self.frame_lorenz)
-        self.lorenz_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-
-        self.lorenz_status = tk.Label(self.lorenz_controls, text="Lorenz: Non Connesso", fg="red")
-        self.lorenz_status.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="w")
-
-        self.btn_connect_lorenz = ttk.Button(self.lorenz_controls, text="Connetti", command=self.connect_lorenz)
-        self.btn_connect_lorenz.grid(row=1, column=0, padx=5, pady=5)
-        self.btn_disconnect_lorenz = ttk.Button(self.lorenz_controls, text="Disconnetti",
-                                                command=self.disconnect_lorenz)
-        self.btn_disconnect_lorenz.grid(row=1, column=1, padx=5, pady=5)
-        self.btn_read_offset = ttk.Button(self.lorenz_controls, text="Leggi Offset", command=self.read_lorenz_offset)
-        self.btn_read_offset.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
-
-        self.offset_label = self.create_labeled_entry(self.lorenz_controls, "Offset", 3)
-        self.speed_avg_label = self.create_labeled_entry(self.lorenz_controls, "Speed Avg", 4)
-        self.torque_lorenz_label = self.create_labeled_entry(self.lorenz_controls, "Torque Lorenz", 5)
-        self.power_lorenz_label = self.create_labeled_entry(self.lorenz_controls, "Power Lorenz", 6)
-
-        lbl_avg = ttk.Label(self.lorenz_controls, text="Media Campioni")
-        lbl_avg.grid(row=7, column=0, sticky="e", padx=5, pady=2)
-        self.avg_entry = ttk.Entry(self.lorenz_controls, width=15, justify='right')
-        self.avg_entry.grid(row=7, column=1, padx=5, pady=2)
-        self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
-        self.avg_entry.bind("<Return>", self.update_lorenz_avg)
-        self.avg_entry.bind("<FocusOut>", self.update_lorenz_avg)
-
-        self.invert_speed_var = tk.BooleanVar(value=self.lorenz_reader.invert_speed)
-        chk_invert_speed = ttk.Checkbutton(
-            self.lorenz_controls,
-            text="Inverti Segno Velocità",
-            variable=self.invert_speed_var,
-            command=self.toggle_invert_speed
-        )
-        chk_invert_speed.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-
-    # ------------------------------
-    # Banco (affiancato al Lorenz)
-    # ------------------------------
-    def create_banco_controls(self):
-        self.banco_controls = ttk.LabelFrame(self.right_frame, text="Gestione Banco")
-        # Affiancato: colonna 1 (stessa riga del Lorenz)
-        self.banco_controls.grid(row=0, column=2, sticky="nsew", padx=(5, 0), pady=5)
-
-        lbl_ip = ttk.Label(self.banco_controls, text="PORTA IP:")
-        lbl_ip.grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.entry_ip = ttk.Entry(self.banco_controls, width=12)
-        self.entry_ip.insert(0, "192.168.0.10")
-        self.entry_ip.grid(row=0, column=1, padx=5, pady=5)
-
-        self.btn_connect_banco = ttk.Button(self.banco_controls, text="Connetti",
-                                            command=self.connect_modbus)
-        self.btn_connect_banco.grid(row=1, column=0, padx=5, pady=5)
-        self.btn_disconnect_banco = ttk.Button(self.banco_controls, text="Disconnetti",
-                                               command=self.disconnect_modbus)
-        self.btn_disconnect_banco.grid(row=1, column=1, padx=5, pady=5)
-        self.banco_status = tk.Label(self.banco_controls, text="Non Connesso", fg="red")
-        self.banco_status.grid(row=2, column=0, columnspan=2, padx=5, pady=(0, 4))
-
-        self.btn_set_speed = ttk.Button(self.banco_controls, text="Set Velocità [km/h]:",
-                                        command=self.clicked_button_setspeed_modbus)
-        self.btn_set_speed.grid(row=3, column=0, padx=5, pady=5)
-
-        self.speed_banco_spin = ttk.Spinbox(
-            self.banco_controls,
-            from_=0.0,
-            to=100.0,
-            increment=0.1,
-            format="%.1f",
-            width=12
-        )
-        self.speed_banco_spin.set(0.0)
-        self.speed_banco_spin.grid(row=3, column=1, padx=5, pady=5)
-
-        # Pulsante STOP in stile "emergency" — altezza doppia
-        self.btn_zero_speed = tk.Button(
-            self.banco_controls,
-            text="⏹  STOP BANCO",
-            command=self.emergency_stop,
-            font=('Helvetica', 14, 'bold'),
-            bg="#D0021B",
-            fg="white",
-            activebackground="#B00000",
-            activeforeground="white",
-            relief='raised',
-            bd=3,
-            cursor='hand2',
-            height=2,
-        )
-        self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=6, pady=12, sticky="ew")
-
-        # Suggerimento accessibilità: bordo focus più visibile
-        try:
-            self.btn_zero_speed.config(highlightthickness=2, highlightbackground="#660000", highlightcolor="#FFFFFF")
-        except Exception:
-            pass
-
     def emergency_stop(self, event=None):
         """
         Interrompe immediatamente i comandi automatici (se attivi)
@@ -1465,11 +1488,9 @@ class MainWindow(tk.Tk):
 
     def _update_serial_ui(self, is_connected):
         if is_connected:
-            self.serial_status.config(text="Temperatura: Connesso", fg="green")
             logging.getLogger().info("Sensore temperatura connesso")
             self.start_serial_update()
         else:
-            self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
             logging.getLogger().warning("Sensore temperatura non connesso o connessione fallita.")
 
     def start_serial_update(self):
@@ -1512,7 +1533,6 @@ class MainWindow(tk.Tk):
 
     def _update_serial_disconnect_ui(self, ok):
         if ok:
-            self.serial_status.config(text="Temperatura: Non Connesso", fg="red")
             logging.getLogger().info("Sensore seriale disconnesso.")
         else:
             logging.getLogger().warning("Sensore seriale: nessuna connessione attiva da chiudere.")
@@ -1574,11 +1594,9 @@ class MainWindow(tk.Tk):
 
     def _update_lorenz_ui(self, is_connected):
         if is_connected:
-            self.lorenz_status.config(text="Lorenz: Connesso", fg="green")
             logging.getLogger().info("Lorenz Connesso")
             self.start_lorenz_update()
         else:
-            self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
             logging.getLogger().warning("Lorenz non connesso o connessione fallita.")
 
     def start_lorenz_update(self):
@@ -1603,7 +1621,6 @@ class MainWindow(tk.Tk):
 
     def _update_lorenz_disconnect_ui(self, ok):
         if ok:
-            self.lorenz_status.config(text="Lorenz: Non Connesso", fg="red")
             logging.getLogger().info("Lorenz disconnesso.")
         else:
             logging.getLogger().warning("Lorenz: nessuna connessione attiva da chiudere.")
