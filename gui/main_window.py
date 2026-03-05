@@ -11,6 +11,7 @@ import asyncio
 import threading
 import math
 import time
+import datetime
 from collections import deque  # <-- per smoothing Δ
 from shared_lib.bluetooth_manager import BLEManager
 from shared_lib.LorenzLib import LorenzReader
@@ -34,7 +35,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander IV")
-        self.geometry("1100x850")
+        self.geometry("1200x850")
 
         self.style = ttk.Style(self)
 
@@ -117,17 +118,17 @@ class MainWindow(tk.Tk):
         content.grid_columnconfigure(1, weight=1)
         content.grid_rowconfigure(0, weight=1)
 
-        # ── COLONNA SINISTRA: CSV + Auto comandi + Manuali ─────────────
+        # ── COLONNA SINISTRA: col A (CSV+auto) | col B (BLE+Banco) ────
         left = ttk.Frame(content)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        left.grid_columnconfigure(0, weight=1)
-        left.grid_rowconfigure(0, weight=1)
-        left.grid_rowconfigure(1, weight=0)
-        left.grid_rowconfigure(2, weight=0)
+        left.grid_columnconfigure(0, weight=1)   # col A espandibile
+        left.grid_columnconfigure(1, weight=0)   # col B larghezza fissa
+        left.grid_rowconfigure(0, weight=1)      # CSV si espande
+        left.grid_rowconfigure(1, weight=0)      # auto comandi fisso
 
-        # Tabella CSV
+        # ── COL A – Tabella CSV ─────────────────────────────────────────
         self.automatic_commands = ttk.LabelFrame(left, text="Comandi da CSV")
-        self.automatic_commands.grid(row=0, column=0, sticky="nsew", pady=(0, 4))
+        self.automatic_commands.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
         self.automatic_commands.grid_rowconfigure(0, weight=1)
         self.automatic_commands.grid_columnconfigure(0, weight=1)
         self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
@@ -153,9 +154,9 @@ class MainWindow(tk.Tk):
         self.commands_table.tag_configure('evenrow',    background='white')
         self.commands_table.tag_configure('currentrow', background='yellow')
 
-        # Comandi automatici
+        # ── COL A – Comandi automatici ──────────────────────────────────
         self.frame_auto_commands = ttk.LabelFrame(left, text="Comandi automatici")
-        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
         self.frame_auto_commands.grid_columnconfigure(1, weight=1)
 
@@ -185,8 +186,9 @@ class MainWindow(tk.Tk):
                                                  command=self.stop_auto_commands)
         self.btn_stop_auto_commands.grid(row=2, column=1, padx=(4, 8), pady=2, sticky='ew')
 
+        # Riga durate
         dur_row = ttk.Frame(self.frame_auto_commands)
-        dur_row.grid(row=3, column=0, columnspan=2, sticky='ew', padx=8, pady=(2, 6))
+        dur_row.grid(row=3, column=0, columnspan=2, sticky='ew', padx=8, pady=(2, 2))
         ttk.Label(dur_row, text="Totale:").grid(row=0, column=0, sticky='w', padx=(0, 4))
         self.lbl_total_duration_value = ttk.Label(dur_row, text="--:--:--",
                                                   font=('Helvetica', 9, 'bold'))
@@ -196,20 +198,31 @@ class MainWindow(tk.Tk):
                                                       font=('Helvetica', 9, 'bold'))
         self.lbl_remaining_duration_value.grid(row=0, column=3, sticky='w')
 
-        # Riga inferiore: Comandi manuali BLE + Controllo Banco affiancati
-        bottom_row = ttk.Frame(left)
-        bottom_row.grid(row=2, column=0, sticky="ew", pady=(0, 4))
-        bottom_row.grid_columnconfigure(0, weight=1)
-        bottom_row.grid_columnconfigure(1, weight=1)
+        # Riga ora inizio / ora fine
+        time_row = ttk.Frame(self.frame_auto_commands)
+        time_row.grid(row=4, column=0, columnspan=2, sticky='ew', padx=8, pady=(2, 6))
+        ttk.Label(time_row, text="Inizio:").grid(row=0, column=0, sticky='w', padx=(0, 4))
+        self.lbl_ora_inizio = ttk.Label(time_row, text="--:--:--",
+                                        font=('Helvetica', 9, 'bold'), foreground='#005500')
+        self.lbl_ora_inizio.grid(row=0, column=1, sticky='w', padx=(0, 14))
+        ttk.Label(time_row, text="Fine:").grid(row=0, column=2, sticky='w', padx=(0, 4))
+        self.lbl_ora_fine = ttk.Label(time_row, text="--:--:--",
+                                      font=('Helvetica', 9, 'bold'), foreground='#550000')
+        self.lbl_ora_fine.grid(row=0, column=3, sticky='w')
 
-        # Comandi manuali BLE
-        self.frame_commands = ttk.LabelFrame(bottom_row, text="Comandi manuali BLE")
-        self.frame_commands.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        # ── COL B – contenitore senza spazi vuoti ──────────────────────
+        col_b = ttk.Frame(left)
+        col_b.grid(row=0, column=1, rowspan=2, sticky="new", padx=(4, 0))
+        col_b.grid_columnconfigure(0, weight=1)
+
+        # Comandi manuali BLE (in alto)
+        self.frame_commands = ttk.LabelFrame(col_b, text="Comandi manuali BLE")
+        self.frame_commands.grid(row=0, column=0, sticky="ew", pady=(0, 4))
         self.create_command_controls()
 
-        # Controllo Banco
-        frame_banco_ctrl = ttk.LabelFrame(bottom_row, text="Controllo Banco")
-        frame_banco_ctrl.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+        # Controllo Banco (subito sotto, nessun gap)
+        frame_banco_ctrl = ttk.LabelFrame(col_b, text="Controllo Banco")
+        frame_banco_ctrl.grid(row=1, column=0, sticky="ew")
         frame_banco_ctrl.grid_columnconfigure(0, weight=1)
 
         _vel = ttk.Frame(frame_banco_ctrl)
@@ -1240,6 +1253,8 @@ class MainWindow(tk.Tk):
             self._stop_countdown_timer()
             self.lbl_remaining_duration_value.config(text="--:--:--")
             self.lbl_total_duration_value.config(text="--:--:--")
+            self.lbl_ora_inizio.config(text="--:--:--", foreground='#005500')
+            self.lbl_ora_fine.config(text="--:--:--", foreground='#550000')
             self.total_test_duration_seconds = 0
             self._csv_single_cycle_seconds = 0
 
@@ -1351,6 +1366,10 @@ class MainWindow(tk.Tk):
                 self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
                 self._set_led(self.led_auto, 'warn')
                 self.lbl_auto_status.config(text="Auto: OK")
+                self.lbl_ora_fine.config(
+                    text=datetime.datetime.now().strftime("%H:%M:%S"),
+                    foreground='#005500'
+                )
                 logging.getLogger().info(f"Comandi automatici completati ({num_cycles} ciclo/i)")
                 self.setspeed_modbus(0)
                 self.commands_table.tag_configure('oddrow', background='lightgrey')
@@ -1365,6 +1384,12 @@ class MainWindow(tk.Tk):
         self._set_led(self.led_auto, 'ok')
         self.lbl_auto_status.config(text="Auto: ON")
 
+        # Ora inizio (reale) e ora fine (stima)
+        _now = datetime.datetime.now()
+        self.lbl_ora_inizio.config(text=_now.strftime("%H:%M:%S"), foreground='#005500')
+        _fine_stima = _now + datetime.timedelta(seconds=self.total_test_duration_seconds)
+        self.lbl_ora_fine.config(text=_fine_stima.strftime("%H:%M:%S") + " ~", foreground='#885500')
+
         # Avvia countdown
         self.remaining_test_duration_seconds = self.total_test_duration_seconds
         self.lbl_remaining_duration_value.config(text=self._format_time(self.remaining_test_duration_seconds))
@@ -1375,9 +1400,12 @@ class MainWindow(tk.Tk):
     def stop_auto_commands(self):
         if self.auto_commands_running:
             self.auto_commands_running = False
-            self._stop_countdown_timer()  # <-- Aggiunto
-            self.lbl_remaining_duration_value.config(text="Interrotto")  # <-- Aggiunto
-
+            self._stop_countdown_timer()
+            self.lbl_remaining_duration_value.config(text="Interrotto")
+            self.lbl_ora_fine.config(
+                text=datetime.datetime.now().strftime("%H:%M:%S"),
+                foreground='#550000'
+            )
             self.led_status.config(text="Comandi Automatici: OFF", fg="red")
             self._set_led(self.led_auto, 'err')
             self.lbl_auto_status.config(text="Auto: OFF")
