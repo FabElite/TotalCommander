@@ -183,19 +183,35 @@ class MainWindow(tk.Tk):
 
         # ---  Comandi automatici ---
         self.frame_auto_commands = ttk.LabelFrame(self.middle_left_frame, text="Comandi automatici")
-        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=8, pady=(2, 4))
+        self.frame_auto_commands.grid(row=1, column=0, sticky="w", padx=8, pady=(2, 4))
         self.frame_auto_commands.grid_columnconfigure(0, weight=1)
         self.frame_auto_commands.grid_columnconfigure(1, weight=1)
 
         self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica Comandi da CSV",
                                             command=self.load_commands_from_csv)
-        self.btn_load_commands.grid(row=0, column=1, padx=8, pady=1, sticky='e')
+        self.btn_load_commands.grid(row=1, column=0, padx=8, pady=1, sticky='w')
+
+        self._csv_single_cycle_seconds = 0  # durata di UN ciclo CSV
 
         self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF", fg="red")
-        self.led_status.grid(row=1, column=0, padx=8, pady=2, sticky="w")
+        self.led_status.grid(row=0, column=0, padx=8, pady=2, columnspan=2, sticky="w")
         self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text="Start Comandi Automatici",
                                             command=self.launch_auto_commands)
-        self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='e')
+        self.btn_auto_commands.grid(row=1, column=1, padx=8, pady=1, sticky='w')
+
+        # --- N. Cicli sulla stessa riga di Stop ---
+        frame_cicli = ttk.Frame(self.frame_auto_commands)
+        frame_cicli.grid(row=2, column=0, padx=8, pady=1, sticky='w')
+        ttk.Label(frame_cicli, text="N. Cicli:").grid(row=0, column=0, padx=(0, 4))
+        self.cycles_spinbox = ttk.Spinbox(
+            frame_cicli,
+            from_=1, to=9999, increment=1, width=6,
+            command=self._on_cycles_changed
+        )
+        self.cycles_spinbox.set(1)
+        self.cycles_spinbox.grid(row=0, column=1)
+        self.cycles_spinbox.bind("<FocusOut>", lambda e: self._on_cycles_changed())
+        self.cycles_spinbox.bind("<Return>", lambda e: self._on_cycles_changed())
 
         self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text="Stop Comandi Automatici",
                                                  command=self.stop_auto_commands)
@@ -260,6 +276,14 @@ class MainWindow(tk.Tk):
         ttk.Label(self.serial_controls, text="COM Port:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.com_port_combo = ttk.Combobox(self.serial_controls, values=self._get_available_com_ports(), width=15)
         self.com_port_combo.grid(row=0, column=1, padx=5, pady=5)
+        self.btn_refresh_com = tk.Button(
+            self.serial_controls, text="🔄",
+            command=self._refresh_com_ports,
+            font=('Segoe UI Emoji', 13),
+            relief='flat', bd=1, cursor='hand2',
+            padx=4, pady=2
+        )
+        self.btn_refresh_com.grid(row=0, column=2, padx=(0, 5), pady=5)
 
         self.serial_status = tk.Label(self.serial_controls, text="Temperatura: Non Connesso", fg="red")
         self.serial_status.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="w")
@@ -1070,6 +1094,7 @@ class MainWindow(tk.Tk):
             self.lbl_remaining_duration_value.config(text="--:--:--")
             self.lbl_total_duration_value.config(text="--:--:--")
             self.total_test_duration_seconds = 0
+            self._csv_single_cycle_seconds = 0
 
             # Pulisce la tabella
             for item in self.commands_table.get_children():
@@ -1080,13 +1105,12 @@ class MainWindow(tk.Tk):
                 logging.getLogger().warning("File CSV vuoto o non valido.")
                 return
 
-            total_seconds = 0
+            single_cycle_seconds = 0
             for i, command in enumerate(commands):
-                # Calcola durata totale
+                # Calcola durata di un singolo ciclo
                 try:
-                    # command[2] è 't[s]'
                     wait_time = int(float(command[2]))
-                    total_seconds += wait_time
+                    single_cycle_seconds += wait_time
                 except (ValueError, TypeError, IndexError):
                     logging.getLogger().warning(f"Valore tempo non valido nel CSV: {command}")
 
@@ -1094,11 +1118,12 @@ class MainWindow(tk.Tk):
                 tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                 self.commands_table.insert("", "end", values=command, tags=(tag,))
 
-            # Aggiorna la UI con la durata totale
-            self.total_test_duration_seconds = total_seconds
-            formatted_time = self._format_time(self.total_test_duration_seconds)
-            self.lbl_total_duration_value.config(text=formatted_time)
-            logging.getLogger().info(f"Caricati {len(commands)} comandi. Durata totale: {formatted_time}")
+            # Salva durata singolo ciclo e aggiorna la UI con cicli × durata
+            self._csv_single_cycle_seconds = single_cycle_seconds
+            self._update_total_duration_label()
+            logging.getLogger().info(
+                f"Caricati {len(commands)} comandi. Durata 1 ciclo: {self._format_time(single_cycle_seconds)}"
+            )
 
     def launch_auto_commands(self):
         if self.auto_commands_running:
@@ -1109,34 +1134,55 @@ class MainWindow(tk.Tk):
             logging.getLogger().info("La tabella dei comandi è vuota.")
             return
 
-        # Assicura che la durata totale sia calcolata (se non lo è già)
-        if self.total_test_duration_seconds == 0:
+        # Leggi numero di cicli
+        try:
+            num_cycles = max(1, int(self.cycles_spinbox.get()))
+        except (ValueError, TypeError):
+            num_cycles = 1
+
+        # Calcola la durata totale = cicli × durata singolo ciclo
+        if self._csv_single_cycle_seconds == 0:
             logging.getLogger().warning("Ricalcolo durata test...")
             commands_list = [self.commands_table.item(item, 'values') for item in
                              self.commands_table.get_children()]
-            total_seconds = 0
+            single_cycle_seconds = 0
             for cmd in commands_list:
                 try:
-                    total_seconds += int(float(cmd[2]))
+                    single_cycle_seconds += int(float(cmd[2]))
                 except Exception:
                     pass
-            self.total_test_duration_seconds = total_seconds
-            self.lbl_total_duration_value.config(text=self._format_time(self.total_test_duration_seconds))
+            self._csv_single_cycle_seconds = single_cycle_seconds
+
+        self.total_test_duration_seconds = self._csv_single_cycle_seconds * num_cycles
+        self.lbl_total_duration_value.config(text=self._format_time(self.total_test_duration_seconds))
 
         commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
         command_items = self.commands_table.get_children()
         for index, item in enumerate(command_items):
             self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
 
-        def send_next_command(index):
-            if index < len(commands) and self.auto_commands_running:
+        total_commands = len(commands) * num_cycles
+
+        def send_next_command(absolute_index):
+            if absolute_index < total_commands and self.auto_commands_running:
+                # Indice all'interno del ciclo corrente
+                index = absolute_index % len(commands)
+                cycle = absolute_index // len(commands) + 1
+
                 command_type, value, wait_time, speed_banco = commands[index]
                 wait_time = int(wait_time)
 
-                if index > 0:
-                    self.commands_table.item(command_items[index - 1],
-                                             tags=('evenrow' if (index - 1) % 2 == 0 else 'oddrow',))
+                # Evidenzia la riga corrente nella tabella (solo ciclo visivo)
+                if absolute_index > 0:
+                    prev_index = (absolute_index - 1) % len(commands)
+                    self.commands_table.item(command_items[prev_index],
+                                             tags=('evenrow' if prev_index % 2 == 0 else 'oddrow',))
                 self.commands_table.item(command_items[index], tags=('currentrow',))
+
+                # Aggiorna titolo ciclo nel led_status
+                self.led_status.config(
+                    text=f"Comandi Automatici: ON  [Ciclo {cycle}/{num_cycles}]", fg="green"
+                )
 
                 if command_type == "potenza":
                     self.send_power_command(value)
@@ -1150,13 +1196,13 @@ class MainWindow(tk.Tk):
                 else:
                     print("speed_banco is None or 'None'")
 
-                self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(index + 1))
+                self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(absolute_index + 1))
             else:
                 self.auto_commands_running = False
-                self._stop_countdown_timer()  # <-- Aggiunto
-                self.lbl_remaining_duration_value.config(text="00:00:00")  # <-- Aggiunto
+                self._stop_countdown_timer()
+                self.lbl_remaining_duration_value.config(text="00:00:00")
                 self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
-                logging.getLogger().info("Comandi automatici completati")
+                logging.getLogger().info(f"Comandi automatici completati ({num_cycles} ciclo/i)")
                 self.setspeed_modbus(0)
                 self.commands_table.tag_configure('oddrow', background='lightgrey')
                 self.commands_table.tag_configure('evenrow', background='white')
@@ -1166,7 +1212,7 @@ class MainWindow(tk.Tk):
                     self.toggle_data()
 
         self.auto_commands_running = True
-        self.led_status.config(text="Comandi Automatici: ON", fg="green")
+        self.led_status.config(text=f"Comandi Automatici: ON  [Ciclo 1/{num_cycles}]", fg="green")
 
         # Avvia countdown
         self.remaining_test_duration_seconds = self.total_test_duration_seconds
@@ -1197,6 +1243,35 @@ class MainWindow(tk.Tk):
             self.lbl_remaining_duration_value.config(text="--:--:--")
             self.lbl_total_duration_value.config(text="--:--:--")
             self.total_test_duration_seconds = 0
+
+    def _on_cycles_changed(self):
+        """Aggiorna la label durata totale quando cambia il numero di cicli."""
+        self._update_total_duration_label()
+
+    def _update_total_duration_label(self):
+        """Ricalcola e mostra la durata totale = cicli × durata singolo ciclo."""
+        if self._csv_single_cycle_seconds == 0:
+            return  # nessun CSV caricato, niente da aggiornare
+        try:
+            num_cycles = max(1, int(self.cycles_spinbox.get()))
+        except (ValueError, TypeError):
+            num_cycles = 1
+        total = self._csv_single_cycle_seconds * num_cycles
+        self.total_test_duration_seconds = total
+        self.lbl_total_duration_value.config(text=self._format_time(total))
+
+    def _refresh_com_ports(self):
+        """Aggiorna l'elenco delle COM port disponibili senza perdere la selezione corrente."""
+        current = self.com_port_combo.get()
+        ports = self._get_available_com_ports()
+        self.com_port_combo['values'] = ports
+        if current in ports:
+            self.com_port_combo.set(current)   # mantieni la selezione precedente se ancora presente
+        elif ports:
+            self.com_port_combo.set(ports[0])  # altrimenti seleziona la prima disponibile
+        else:
+            self.com_port_combo.set('')
+        logging.getLogger().info(f"COM port aggiornate: {ports}")
 
     def _start_countdown_timer(self):
         """Avvia il timer per il conto alla rovescia (richiama _tick)."""

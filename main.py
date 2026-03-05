@@ -45,7 +45,7 @@ if __name__ == "__main__":
     logging.info("Avvio del programma...")
     app = MainWindow()
 
-    # ✅ Imposta l'icona sulla barra del titolo e taskbar
+    # Imposta l'icona sulla barra del titolo e taskbar
     try:
         app.iconbitmap(resource_path("justo.ico"))
     except Exception as e:

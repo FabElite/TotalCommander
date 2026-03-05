@@ -18339,3 +18339,1744 @@
 2026-03-04 11:10:51,430 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
 2026-03-04 11:10:55,416 - root - INFO - Abilitate notifiche FTMS
 2026-03-04 11:10:55,539 - shared_lib.bluetooth_manager - INFO - Notifiche indoor bike data abilitate.
+2026-03-04 11:23:58,902 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:23:58,903 - root - INFO - Avvio del programma...
+2026-03-04 11:23:58,992 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:23:58,994 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:23:58,994 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:23:59,058 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:24:01,999 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 11:24:07,099 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -32)}
+2026-03-04 11:24:07,102 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -32
+2026-03-04 11:24:07,839 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:24:07,840 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:24:08,103 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:24:10,407 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:24:10,409 - root - ERROR - Errore abilitazione notifiche FTMS: Characteristic 00002ad2-0000-1000-8000-00805f9b34fb was not found!
+2026-03-04 11:24:11,350 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 11:24:11,368 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 11:24:11,368 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 11:24:13,171 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 11:24:13,189 - root - INFO - Lorenz Connesso
+2026-03-04 11:24:25,327 - root - INFO - Disabilitate notifiche FTMS
+2026-03-04 11:24:25,328 - shared_lib.bluetooth_manager - INFO - Le notifiche indoor bike data sono già disabilitate.
+2026-03-04 11:24:26,015 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:24:26,016 - root - ERROR - Errore abilitazione notifiche FTMS: Characteristic 00002ad2-0000-1000-8000-00805f9b34fb was not found!
+2026-03-04 11:24:34,596 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:24:34,596 - root - INFO - Avvio del programma...
+2026-03-04 11:24:34,685 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:24:34,686 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:24:34,687 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:24:34,751 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:24:36,231 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 11:24:41,326 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -42)}
+2026-03-04 11:24:41,329 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -42
+2026-03-04 11:24:41,880 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:24:41,880 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:24:44,681 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:24:45,319 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:24:45,357 - shared_lib.bluetooth_manager - INFO - Notifiche indoor bike data abilitate.
+2026-03-04 11:24:47,647 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 11:24:47,664 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 11:24:47,665 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 11:24:49,477 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 11:24:49,478 - root - INFO - Lorenz Connesso
+2026-03-04 11:26:06,797 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:26:06,797 - root - INFO - Avvio del programma...
+2026-03-04 11:26:06,958 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:06,961 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:06,961 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:26:07,087 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:26:12,903 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:26:12,903 - root - INFO - Avvio del programma...
+2026-03-04 11:26:13,100 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:13,104 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:13,104 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:26:13,254 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:26:15,811 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:26:15,922 - root - INFO - Arresto dei worker...
+2026-03-04 11:26:15,922 - root - INFO - Spegnimento completato.
+2026-03-04 11:26:20,889 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:26:20,889 - root - INFO - Avvio del programma...
+2026-03-04 11:26:21,072 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:21,076 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:21,076 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:26:21,234 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:26:25,703 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:26:25,807 - root - INFO - Arresto dei worker...
+2026-03-04 11:26:25,807 - root - INFO - Spegnimento completato.
+2026-03-04 11:26:30,493 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:26:30,494 - root - INFO - Avvio del programma...
+2026-03-04 11:26:30,647 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:30,650 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:30,651 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:26:30,792 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:26:57,745 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:26:57,745 - root - INFO - Avvio del programma...
+2026-03-04 11:26:57,930 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:57,934 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:26:57,935 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:26:58,133 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:27:24,421 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:27:24,422 - root - INFO - Avvio del programma...
+2026-03-04 11:27:24,588 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:24,591 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:24,591 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:27:24,725 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:27:28,925 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:27:29,029 - root - INFO - Arresto dei worker...
+2026-03-04 11:27:29,029 - root - INFO - Spegnimento completato.
+2026-03-04 11:27:33,093 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:27:33,093 - root - INFO - Avvio del programma...
+2026-03-04 11:27:33,240 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:33,243 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:33,243 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:27:33,348 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:27:35,776 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:27:35,877 - root - INFO - Arresto dei worker...
+2026-03-04 11:27:35,878 - root - INFO - Spegnimento completato.
+2026-03-04 11:27:39,772 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:27:39,772 - root - INFO - Avvio del programma...
+2026-03-04 11:27:39,963 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:39,967 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:39,967 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:27:40,124 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:27:42,291 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:27:42,396 - root - INFO - Arresto dei worker...
+2026-03-04 11:27:42,398 - root - INFO - Spegnimento completato.
+2026-03-04 11:27:46,761 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:27:46,761 - root - INFO - Avvio del programma...
+2026-03-04 11:27:46,962 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:46,965 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:27:46,965 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:27:47,103 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:28:43,285 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:28:43,286 - root - INFO - Avvio del programma...
+2026-03-04 11:28:43,486 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:28:43,489 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:28:43,489 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:28:43,598 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:28:57,280 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:28:57,385 - root - INFO - Arresto dei worker...
+2026-03-04 11:28:57,385 - root - INFO - Spegnimento completato.
+2026-03-04 11:29:11,780 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:29:11,780 - root - INFO - Avvio del programma...
+2026-03-04 11:29:11,867 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:11,869 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:11,869 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:29:11,934 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:29:22,083 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:29:22,182 - root - INFO - Arresto dei worker...
+2026-03-04 11:29:22,183 - root - INFO - Spegnimento completato.
+2026-03-04 11:29:26,985 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:29:26,986 - root - INFO - Avvio del programma...
+2026-03-04 11:29:27,138 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:27,141 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:27,141 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:29:27,252 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:29:29,982 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:29:30,083 - root - INFO - Arresto dei worker...
+2026-03-04 11:29:30,083 - root - INFO - Spegnimento completato.
+2026-03-04 11:29:32,934 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:29:32,934 - root - INFO - Avvio del programma...
+2026-03-04 11:29:33,100 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:33,103 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:33,103 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:29:33,220 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:29:35,899 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:29:35,999 - root - INFO - Arresto dei worker...
+2026-03-04 11:29:35,999 - root - INFO - Spegnimento completato.
+2026-03-04 11:29:41,457 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:29:41,457 - root - INFO - Avvio del programma...
+2026-03-04 11:29:41,655 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:41,658 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:41,659 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:29:41,804 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:29:44,269 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:29:44,369 - root - INFO - Arresto dei worker...
+2026-03-04 11:29:44,370 - root - INFO - Spegnimento completato.
+2026-03-04 11:29:48,185 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:29:48,185 - root - INFO - Avvio del programma...
+2026-03-04 11:29:48,367 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:48,370 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:48,371 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:29:48,504 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:29:50,277 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:29:50,380 - root - INFO - Arresto dei worker...
+2026-03-04 11:29:50,381 - root - INFO - Spegnimento completato.
+2026-03-04 11:29:58,608 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:29:58,608 - root - INFO - Avvio del programma...
+2026-03-04 11:29:58,799 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:58,802 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:29:58,802 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:29:58,940 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:31:09,610 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:31:09,611 - root - INFO - Avvio del programma...
+2026-03-04 11:31:09,824 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:31:09,828 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:31:09,829 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:31:09,981 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:31:17,605 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 11:31:22,712 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -56), 'E4:B3:23:A1:A6:76': ('RIVO', -74)}
+2026-03-04 11:31:23,188 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:31:23,188 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:31:25,692 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:32:13,753 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:32:13,753 - root - INFO - Chiusura connessione BLE...
+2026-03-04 11:32:13,874 - shared_lib.bluetooth_manager - INFO - Disconnessione completata.
+2026-03-04 11:32:13,875 - root - INFO - Connessione BLE chiusa.
+2026-03-04 11:32:13,964 - root - INFO - Arresto dei worker...
+2026-03-04 11:32:13,964 - root - INFO - Spegnimento completato.
+2026-03-04 11:35:52,871 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:35:52,871 - root - INFO - Avvio del programma...
+2026-03-04 11:35:52,961 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:35:52,963 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:35:52,963 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:35:53,029 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:35:54,163 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 11:35:59,285 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -42), 'E4:B3:23:A1:A6:76': ('RIVO', -78)}
+2026-03-04 11:35:59,286 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -42
+2026-03-04 11:36:00,354 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:36:00,355 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:36:02,717 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:36:13,652 - root - INFO - Richiesta Disconnessione
+2026-03-04 11:36:13,783 - shared_lib.bluetooth_manager - INFO - Disconnessione completata.
+2026-03-04 11:36:18,402 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 11:36:18,419 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 11:36:18,419 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 11:36:19,059 - root - INFO - Nessun dispositivo connesso, abilitazione FTMS non possibile
+2026-03-04 11:36:20,251 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 11:36:20,251 - root - INFO - Lorenz Connesso
+2026-03-04 11:36:21,435 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 11:36:21,438 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 11:36:21,438 - root - INFO - Sensore temperatura connesso
+2026-03-04 11:36:23,449 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:36:23,450 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:36:24,259 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:36:24,260 - root - ERROR - Errore abilitazione notifiche FTMS: Service Discovery has not been performed yet
+2026-03-04 11:36:25,604 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:36:27,850 - root - INFO - Disabilitate notifiche FTMS
+2026-03-04 11:36:27,851 - shared_lib.bluetooth_manager - INFO - Le notifiche indoor bike data sono già disabilitate.
+2026-03-04 11:36:29,402 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:36:29,445 - shared_lib.bluetooth_manager - INFO - Notifiche indoor bike data abilitate.
+2026-03-04 11:36:51,573 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:36:51,573 - root - INFO - Chiusura connessione Lorenz...
+2026-03-04 11:36:51,573 - shared_lib.LorenzLib - INFO - Lorenz close port.
+2026-03-04 11:36:51,575 - shared_lib.LorenzLib - INFO - Unloaded LorenzProtokollDLL_x64.dll
+2026-03-04 11:36:51,576 - root - INFO - Connessione Lorenz chiusa.
+2026-03-04 11:36:51,576 - root - INFO - Chiusura connessione sensore temperatura...
+2026-03-04 11:36:51,576 - root - INFO - Connessione sensore chiusa
+2026-03-04 11:36:51,576 - root - INFO - Connessione sensore temperatura chiusa.
+2026-03-04 11:36:51,577 - root - INFO - Chiusura connessione BLE...
+2026-03-04 11:36:51,697 - shared_lib.bluetooth_manager - INFO - Disconnessione completata.
+2026-03-04 11:36:51,698 - root - INFO - Connessione BLE chiusa.
+2026-03-04 11:36:51,778 - root - INFO - Arresto dei worker...
+2026-03-04 11:36:51,778 - root - INFO - Spegnimento completato.
+2026-03-04 11:43:55,716 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:43:55,716 - root - INFO - Avvio del programma...
+2026-03-04 11:43:55,810 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_114355_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 11:43:55,810 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:43:55,811 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:43:55,811 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:43:55,881 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:43:58,048 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 11:44:03,149 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -42)}
+2026-03-04 11:44:03,151 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -42
+2026-03-04 11:44:03,976 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 11:44:03,993 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 11:44:03,993 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 11:44:05,797 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 11:44:05,814 - root - INFO - Lorenz Connesso
+2026-03-04 11:44:07,616 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 11:44:07,620 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 11:44:07,621 - root - INFO - Sensore temperatura connesso
+2026-03-04 11:44:08,447 - root - INFO - Nessun dispositivo connesso, abilitazione FTMS non possibile
+2026-03-04 11:44:12,896 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:44:12,896 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:44:15,874 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:44:16,400 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:44:16,488 - shared_lib.bluetooth_manager - INFO - Notifiche indoor bike data abilitate.
+2026-03-04 11:44:18,192 - root - INFO - Invio comando livello: 0/200
+2026-03-04 11:44:18,228 - shared_lib.bluetooth_manager - INFO - Notifiche control point abilitate.
+2026-03-04 11:44:18,228 - shared_lib.bluetooth_manager - INFO - Invio comando resistenza a 0/200
+2026-03-04 11:44:18,287 - shared_lib.bluetooth_manager - INFO - Comando resistenza ricevuto correttamente
+2026-03-04 11:44:25,815 - logic.data_processing - INFO - Flush periodico: salvataggio 9 righe nuove.
+2026-03-04 11:44:55,822 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:45:05,228 - root - INFO - Apertura cartella di lavoro: C:\Users\fossato\PycharmProjects\TotalCommander\gui
+2026-03-04 11:45:13,088 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 11:45:13,088 - root - INFO - Flush finale dati su disco...
+2026-03-04 11:45:13,089 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 11:45:13,102 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_114355_bike_data_log.xlsx
+2026-03-04 11:45:13,102 - root - INFO - Dati salvati.
+2026-03-04 11:45:13,102 - root - INFO - Chiusura connessione Lorenz...
+2026-03-04 11:45:13,102 - shared_lib.LorenzLib - INFO - Lorenz close port.
+2026-03-04 11:45:13,130 - shared_lib.LorenzLib - INFO - Unloaded LorenzProtokollDLL_x64.dll
+2026-03-04 11:45:13,130 - root - INFO - Connessione Lorenz chiusa.
+2026-03-04 11:45:13,130 - root - INFO - Chiusura connessione sensore temperatura...
+2026-03-04 11:45:13,131 - root - INFO - Connessione sensore chiusa
+2026-03-04 11:45:13,131 - root - INFO - Connessione sensore temperatura chiusa.
+2026-03-04 11:45:13,131 - root - INFO - Chiusura connessione BLE...
+2026-03-04 11:45:13,254 - shared_lib.bluetooth_manager - INFO - Disconnessione completata.
+2026-03-04 11:45:13,254 - root - INFO - Connessione BLE chiusa.
+2026-03-04 11:45:13,295 - root - INFO - Arresto dei worker...
+2026-03-04 11:45:13,296 - root - INFO - Spegnimento completato.
+2026-03-04 11:45:44,276 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 11:45:44,276 - root - INFO - Avvio del programma...
+2026-03-04 11:45:44,362 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_114544_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 11:45:44,362 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:45:44,363 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 11:45:44,363 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 11:45:44,426 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 11:45:45,401 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 11:45:50,492 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -34)}
+2026-03-04 11:45:50,493 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -34
+2026-03-04 11:45:50,960 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 11:45:50,961 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 11:45:53,302 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 11:45:53,928 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 11:45:53,993 - shared_lib.bluetooth_manager - INFO - Notifiche indoor bike data abilitate.
+2026-03-04 11:45:55,783 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 11:45:55,800 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 11:45:55,800 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 11:45:57,617 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 11:45:57,619 - root - INFO - Lorenz Connesso
+2026-03-04 11:45:58,431 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 11:45:58,434 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 11:45:58,434 - root - INFO - Sensore temperatura connesso
+2026-03-04 11:46:14,363 - logic.data_processing - INFO - Flush periodico: salvataggio 21 righe nuove.
+2026-03-04 11:46:44,372 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:46:44,373 - logic.data_processing - ERROR - Errore nel salvataggio del file Excel 'output\20260304_114544_bike_data_log.xlsx': [Errno 13] Permission denied: 'output\\20260304_114544_bike_data_log.xlsx'
+2026-03-04 11:47:14,383 - logic.data_processing - INFO - Flush periodico: salvataggio 60 righe nuove.
+2026-03-04 11:47:44,401 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:48:14,434 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:48:44,464 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:49:14,493 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:49:44,535 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:50:14,575 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:50:44,612 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:51:14,653 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:51:44,700 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:52:14,759 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:52:44,819 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:53:14,920 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:53:44,974 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:54:15,033 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:54:45,103 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:55:15,177 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:55:45,249 - logic.data_processing - INFO - Flush periodico: salvataggio 31 righe nuove.
+2026-03-04 11:56:15,327 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:56:45,416 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:57:15,504 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:57:45,592 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:58:15,696 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:58:45,795 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:59:15,891 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 11:59:45,993 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 12:00:16,100 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 12:00:46,218 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 12:01:16,336 - logic.data_processing - INFO - Flush periodico: salvataggio 31 righe nuove.
+2026-03-04 12:02:03,106 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:02:03,107 - root - INFO - Avvio del programma...
+2026-03-04 12:02:03,326 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_120203_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:02:03,327 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:03,337 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:03,337 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:02:03,511 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:02:24,677 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:02:24,677 - root - INFO - Avvio del programma...
+2026-03-04 12:02:24,842 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_120224_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:02:24,842 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:24,845 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:24,845 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:02:24,958 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:02:28,032 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:02:28,033 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:02:28,033 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 12:02:28,044 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_120224_bike_data_log.xlsx
+2026-03-04 12:02:28,045 - root - INFO - Dati salvati.
+2026-03-04 12:02:28,134 - root - INFO - Arresto dei worker...
+2026-03-04 12:02:28,134 - root - INFO - Spegnimento completato.
+2026-03-04 12:02:32,474 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:02:32,475 - root - INFO - Avvio del programma...
+2026-03-04 12:02:32,753 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_120232_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:02:32,754 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:32,756 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:32,757 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:02:32,910 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:02:35,281 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:02:35,281 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:02:35,282 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 12:02:35,291 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_120232_bike_data_log.xlsx
+2026-03-04 12:02:35,291 - root - INFO - Dati salvati.
+2026-03-04 12:02:35,387 - root - INFO - Arresto dei worker...
+2026-03-04 12:02:35,387 - root - INFO - Spegnimento completato.
+2026-03-04 12:02:44,788 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:02:44,788 - root - INFO - Avvio del programma...
+2026-03-04 12:02:44,931 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_120244_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:02:44,931 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:44,933 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:02:44,933 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:02:45,021 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:03:06,416 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:03:06,416 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:03:06,417 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 12:03:06,424 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_120244_bike_data_log.xlsx
+2026-03-04 12:03:06,424 - root - INFO - Dati salvati.
+2026-03-04 12:03:06,517 - root - INFO - Arresto dei worker...
+2026-03-04 12:03:06,517 - root - INFO - Spegnimento completato.
+2026-03-04 12:03:15,519 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:03:15,519 - root - INFO - Avvio del programma...
+2026-03-04 12:03:15,605 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_120315_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:03:15,605 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:03:15,606 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:03:15,606 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:03:15,662 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:03:17,490 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 12:03:18,802 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 12:03:18,818 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 12:03:18,818 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 12:03:20,617 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 12:03:20,618 - root - INFO - Lorenz Connesso
+2026-03-04 12:03:20,769 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 12:03:20,772 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 12:03:20,772 - root - INFO - Sensore temperatura connesso
+2026-03-04 12:03:22,610 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -50)}
+2026-03-04 12:03:23,321 - root - INFO - Nessun dispositivo connesso, abilitazione FTMS non possibile
+2026-03-04 12:03:26,553 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 12:03:26,554 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 12:03:30,523 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 12:03:30,921 - root - INFO - Abilitate notifiche FTMS
+2026-03-04 12:03:31,003 - shared_lib.bluetooth_manager - INFO - Notifiche indoor bike data abilitate.
+2026-03-04 12:03:45,612 - logic.data_processing - INFO - Flush periodico: salvataggio 15 righe nuove.
+2026-03-04 12:03:52,921 - logic.data_processing - WARNING - CSV riga 2: errore di parsing (invalid literal for int() with base 10: '0x001'), saltata.
+2026-03-04 12:03:52,921 - logic.data_processing - WARNING - CSV riga 3: errore di parsing (invalid literal for int() with base 10: '0x003'), saltata.
+2026-03-04 12:03:52,921 - logic.data_processing - WARNING - CSV riga 4: errore di parsing (invalid literal for int() with base 10: '0x004'), saltata.
+2026-03-04 12:03:52,921 - logic.data_processing - WARNING - CSV riga 5: errore di parsing (invalid literal for int() with base 10: '0x006'), saltata.
+2026-03-04 12:03:52,922 - logic.data_processing - WARNING - CSV riga 6: errore di parsing (invalid literal for int() with base 10: '0x007'), saltata.
+2026-03-04 12:03:52,922 - logic.data_processing - WARNING - CSV riga 7: errore di parsing (invalid literal for int() with base 10: '0x008'), saltata.
+2026-03-04 12:03:52,922 - logic.data_processing - WARNING - CSV riga 8: errore di parsing (invalid literal for int() with base 10: '0x00A'), saltata.
+2026-03-04 12:03:52,922 - logic.data_processing - WARNING - CSV riga 9: errore di parsing (invalid literal for int() with base 10: '0x00C'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 10: errore di parsing (invalid literal for int() with base 10: '0x012'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 11: errore di parsing (invalid literal for int() with base 10: '0x013'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 12: errore di parsing (invalid literal for int() with base 10: '0x014'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 13: errore di parsing (invalid literal for int() with base 10: '0x015'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 14: errore di parsing (invalid literal for int() with base 10: '0x016'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 15: errore di parsing (invalid literal for int() with base 10: '0x017'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 16: errore di parsing (invalid literal for int() with base 10: '0x018'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 17: errore di parsing (invalid literal for int() with base 10: '0x019'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 18: errore di parsing (invalid literal for int() with base 10: '0x01A'), saltata.
+2026-03-04 12:03:52,923 - logic.data_processing - WARNING - CSV riga 19: errore di parsing (invalid literal for int() with base 10: '0x01B'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 20: errore di parsing (invalid literal for int() with base 10: '0x01C'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 21: errore di parsing (invalid literal for int() with base 10: '0x01D'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 22: errore di parsing (invalid literal for int() with base 10: '0x01E'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 23: errore di parsing (invalid literal for int() with base 10: '0x01F'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 24: errore di parsing (invalid literal for int() with base 10: '0x020'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 25: errore di parsing (invalid literal for int() with base 10: '0x021'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 26: errore di parsing (invalid literal for int() with base 10: '0x022'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 27: errore di parsing (invalid literal for int() with base 10: '0x023'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 28: errore di parsing (invalid literal for int() with base 10: '0x024'), saltata.
+2026-03-04 12:03:52,924 - logic.data_processing - WARNING - CSV riga 29: errore di parsing (invalid literal for int() with base 10: '0x025'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 30: errore di parsing (invalid literal for int() with base 10: '0x026'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 31: errore di parsing (invalid literal for int() with base 10: '0x030'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 32: errore di parsing (invalid literal for int() with base 10: '0x031'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 33: errore di parsing (invalid literal for int() with base 10: '0x032'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 34: errore di parsing (invalid literal for int() with base 10: '0x033'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 35: errore di parsing (invalid literal for int() with base 10: '0x034'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 36: errore di parsing (invalid literal for int() with base 10: '0x035'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 37: errore di parsing (invalid literal for int() with base 10: '0x036'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 38: errore di parsing (invalid literal for int() with base 10: '0x037'), saltata.
+2026-03-04 12:03:52,926 - logic.data_processing - WARNING - CSV riga 39: errore di parsing (invalid literal for int() with base 10: '0x038'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 40: errore di parsing (invalid literal for int() with base 10: '0x039'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 41: errore di parsing (invalid literal for int() with base 10: '0x03A'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 42: errore di parsing (invalid literal for int() with base 10: '0x03B'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 43: errore di parsing (invalid literal for int() with base 10: '0x03C'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 44: errore di parsing (invalid literal for int() with base 10: '0x03D'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 45: errore di parsing (invalid literal for int() with base 10: '0x03E'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 46: errore di parsing (invalid literal for int() with base 10: '0x03F'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 47: errore di parsing (invalid literal for int() with base 10: '0x040'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 48: errore di parsing (invalid literal for int() with base 10: '0x041'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 49: errore di parsing (invalid literal for int() with base 10: '0x04B'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 50: errore di parsing (invalid literal for int() with base 10: '0x04C'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 51: errore di parsing (invalid literal for int() with base 10: '0x04D'), saltata.
+2026-03-04 12:03:52,927 - logic.data_processing - WARNING - CSV riga 52: errore di parsing (invalid literal for int() with base 10: '0x04E'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 53: errore di parsing (invalid literal for int() with base 10: '0x04F'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 54: errore di parsing (invalid literal for int() with base 10: '0x050'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 55: errore di parsing (invalid literal for int() with base 10: '0x051'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 56: errore di parsing (invalid literal for int() with base 10: '0x052'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 57: errore di parsing (invalid literal for int() with base 10: '0x053'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 58: errore di parsing (invalid literal for int() with base 10: '0x054'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 59: errore di parsing (invalid literal for int() with base 10: '0x055'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 60: errore di parsing (invalid literal for int() with base 10: '0x056'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 61: errore di parsing (invalid literal for int() with base 10: '0x057'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 62: errore di parsing (invalid literal for int() with base 10: '0x058'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 63: errore di parsing (invalid literal for int() with base 10: '0x059'), saltata.
+2026-03-04 12:03:52,928 - logic.data_processing - WARNING - CSV riga 64: errore di parsing (invalid literal for int() with base 10: '0x05A'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 65: errore di parsing (invalid literal for int() with base 10: '0x05B'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 66: errore di parsing (invalid literal for int() with base 10: '0x05C'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 67: errore di parsing (invalid literal for int() with base 10: '0x066'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 68: errore di parsing (invalid literal for int() with base 10: '0x067'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 69: errore di parsing (invalid literal for int() with base 10: '0x068'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 70: errore di parsing (invalid literal for int() with base 10: '0x069'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 71: errore di parsing (invalid literal for int() with base 10: '0x06A'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 72: errore di parsing (invalid literal for int() with base 10: '0x06B'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 73: errore di parsing (invalid literal for int() with base 10: '0x06C'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 74: errore di parsing (invalid literal for int() with base 10: '0x06D'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 75: errore di parsing (invalid literal for int() with base 10: '0x06E'), saltata.
+2026-03-04 12:03:52,929 - logic.data_processing - WARNING - CSV riga 76: errore di parsing (invalid literal for int() with base 10: '0x06F'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 77: errore di parsing (invalid literal for int() with base 10: '0x070'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 78: errore di parsing (invalid literal for int() with base 10: '0x071'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 79: errore di parsing (invalid literal for int() with base 10: '0x072'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 80: errore di parsing (invalid literal for int() with base 10: '0x073'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 81: errore di parsing (invalid literal for int() with base 10: '0x074'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 82: errore di parsing (invalid literal for int() with base 10: '0x075'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 83: errore di parsing (invalid literal for int() with base 10: '0x076'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 84: errore di parsing (invalid literal for int() with base 10: '0x077'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 85: errore di parsing (invalid literal for int() with base 10: '0x081'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 86: errore di parsing (invalid literal for int() with base 10: '0x082'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 87: errore di parsing (invalid literal for int() with base 10: '0x083'), saltata.
+2026-03-04 12:03:52,930 - logic.data_processing - WARNING - CSV riga 88: errore di parsing (invalid literal for int() with base 10: '0x084'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 89: errore di parsing (invalid literal for int() with base 10: '0x085'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 90: errore di parsing (invalid literal for int() with base 10: '0x086'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 91: errore di parsing (invalid literal for int() with base 10: '0x087'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 92: errore di parsing (invalid literal for int() with base 10: '0x088'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 93: errore di parsing (invalid literal for int() with base 10: '0x089'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 94: errore di parsing (invalid literal for int() with base 10: '0x08A'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 95: errore di parsing (invalid literal for int() with base 10: '0x08B'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 96: errore di parsing (invalid literal for int() with base 10: '0x08C'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 97: errore di parsing (invalid literal for int() with base 10: '0x08D'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 98: errore di parsing (invalid literal for int() with base 10: '0x08E'), saltata.
+2026-03-04 12:03:52,931 - logic.data_processing - WARNING - CSV riga 99: errore di parsing (invalid literal for int() with base 10: '0x08F'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 100: errore di parsing (invalid literal for int() with base 10: '0x090'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 101: errore di parsing (invalid literal for int() with base 10: '0x091'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 102: errore di parsing (invalid literal for int() with base 10: '0x092'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 103: errore di parsing (invalid literal for int() with base 10: '0x09C'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 104: errore di parsing (invalid literal for int() with base 10: '0x09D'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 105: errore di parsing (invalid literal for int() with base 10: '0x09E'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 106: errore di parsing (invalid literal for int() with base 10: '0x09F'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 107: errore di parsing (invalid literal for int() with base 10: '0x0BE'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 108: errore di parsing (invalid literal for int() with base 10: '0x0BF'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 109: errore di parsing (invalid literal for int() with base 10: '0x0C0'), saltata.
+2026-03-04 12:03:52,932 - logic.data_processing - WARNING - CSV riga 110: errore di parsing (invalid literal for int() with base 10: '0x0C2'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 111: errore di parsing (invalid literal for int() with base 10: '0x0C4'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 112: errore di parsing (invalid literal for int() with base 10: '0x0C5'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 113: errore di parsing (invalid literal for int() with base 10: '0x0C6'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 114: errore di parsing (invalid literal for int() with base 10: '0x0C7'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 115: errore di parsing (invalid literal for int() with base 10: '0x0C8'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 116: errore di parsing (invalid literal for int() with base 10: '0x0C9'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 117: errore di parsing (invalid literal for int() with base 10: '0x0CA'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 118: errore di parsing (invalid literal for int() with base 10: '0x0CB'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 119: errore di parsing (invalid literal for int() with base 10: '0x0CC'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 120: errore di parsing (invalid literal for int() with base 10: '0x0CD'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 121: errore di parsing (invalid literal for int() with base 10: '0x0CE'), saltata.
+2026-03-04 12:03:52,933 - logic.data_processing - WARNING - CSV riga 122: errore di parsing (invalid literal for int() with base 10: '0x0CF'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 123: errore di parsing (invalid literal for int() with base 10: '0x0D0'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 124: errore di parsing (invalid literal for int() with base 10: '0x0D0'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 125: errore di parsing (invalid literal for int() with base 10: '0x0D1'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 126: errore di parsing (invalid literal for int() with base 10: '0x0D2'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 127: errore di parsing (invalid literal for int() with base 10: '0x0D3'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 128: errore di parsing (invalid literal for int() with base 10: '0x0D4'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 129: errore di parsing (invalid literal for int() with base 10: '0x0D5'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 130: errore di parsing (invalid literal for int() with base 10: '0x0D6'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 131: errore di parsing (invalid literal for int() with base 10: '0x0D7'), saltata.
+2026-03-04 12:03:52,934 - logic.data_processing - WARNING - CSV riga 132: errore di parsing (invalid literal for int() with base 10: '0x0D8'), saltata.
+2026-03-04 12:03:52,935 - logic.data_processing - INFO - Letti 0 comandi da 'C:/Users/fossato/PycharmProjects/checker/config - Square.csv'
+2026-03-04 12:03:52,935 - root - WARNING - File CSV vuoto o non valido.
+2026-03-04 12:04:15,626 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 12:04:16,175 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-04 12:04:29,913 - root - INFO - Connessione sensore chiusa
+2026-03-04 12:04:45,638 - logic.data_processing - INFO - Flush periodico: salvataggio 30 righe nuove.
+2026-03-04 12:04:50,575 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:04:50,575 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:04:50,575 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 12:04:50,590 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_120315_bike_data_log.xlsx
+2026-03-04 12:04:50,590 - root - INFO - Dati salvati.
+2026-03-04 12:04:50,590 - root - INFO - Chiusura connessione Lorenz...
+2026-03-04 12:04:50,590 - shared_lib.LorenzLib - INFO - Lorenz close port.
+2026-03-04 12:04:50,596 - shared_lib.LorenzLib - INFO - Unloaded LorenzProtokollDLL_x64.dll
+2026-03-04 12:04:50,596 - root - INFO - Connessione Lorenz chiusa.
+2026-03-04 12:04:50,596 - root - INFO - Chiusura connessione BLE...
+2026-03-04 12:04:50,715 - shared_lib.bluetooth_manager - INFO - Disconnessione completata.
+2026-03-04 12:04:50,715 - root - INFO - Connessione BLE chiusa.
+2026-03-04 12:04:50,793 - root - INFO - Arresto dei worker...
+2026-03-04 12:04:50,793 - root - INFO - Spegnimento completato.
+2026-03-04 12:20:16,212 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:20:16,213 - root - INFO - Avvio del programma...
+2026-03-04 12:20:16,367 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_122016_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:20:16,367 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:20:16,370 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:20:16,370 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:20:16,452 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:20:20,146 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 12:20:24,281 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 12:20:24,312 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 12:20:24,312 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 12:20:25,287 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -38)}
+2026-03-04 12:20:25,287 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -38
+2026-03-04 12:20:26,115 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 12:20:26,116 - root - INFO - Lorenz Connesso
+2026-03-04 12:20:33,081 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:20:33,081 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:20:33,081 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 12:20:33,086 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_122016_bike_data_log.xlsx
+2026-03-04 12:20:33,086 - root - INFO - Dati salvati.
+2026-03-04 12:20:33,086 - root - INFO - Chiusura connessione Lorenz...
+2026-03-04 12:20:33,087 - shared_lib.LorenzLib - INFO - Lorenz close port.
+2026-03-04 12:20:33,134 - shared_lib.LorenzLib - INFO - Unloaded LorenzProtokollDLL_x64.dll
+2026-03-04 12:20:33,134 - root - INFO - Connessione Lorenz chiusa.
+2026-03-04 12:20:33,181 - root - INFO - Arresto dei worker...
+2026-03-04 12:20:33,181 - root - INFO - Spegnimento completato.
+2026-03-04 12:20:35,044 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:20:35,045 - root - INFO - Avvio del programma...
+2026-03-04 12:20:35,140 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_122035_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:20:35,140 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:20:35,141 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:20:35,141 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:20:35,214 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:20:49,377 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 12:20:49,380 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 12:20:49,380 - root - INFO - Sensore temperatura connesso
+2026-03-04 12:20:50,233 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 12:20:50,245 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 12:20:50,246 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 12:20:52,044 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 12:20:52,044 - root - INFO - Lorenz Connesso
+2026-03-04 12:20:53,707 - shared_lib.LorenzLib - ERROR - Connection Lost...
+2026-03-04 12:20:59,241 - root - INFO - Richiesta disconnessione Lorenz...
+2026-03-04 12:21:01,689 - root - INFO - Richiesta disconnessione Lorenz...
+2026-03-04 12:21:02,033 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 12:21:02,041 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 12:21:02,042 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 12:21:02,521 - root - INFO - Richiesta disconnessione Lorenz...
+2026-03-04 12:21:03,819 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 12:21:03,819 - root - INFO - Lorenz Connesso
+2026-03-04 12:21:06,073 - root - INFO - Richiesta disconnessione Lorenz...
+2026-03-04 12:21:06,073 - shared_lib.LorenzLib - INFO - Lorenz close port.
+2026-03-04 12:21:06,099 - shared_lib.LorenzLib - INFO - Unloaded LorenzProtokollDLL_x64.dll
+2026-03-04 12:21:06,100 - root - INFO - Lorenz disconnesso.
+2026-03-04 12:21:10,234 - root - INFO - Connessione sensore chiusa
+2026-03-04 12:25:27,765 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:25:27,765 - root - INFO - Avvio del programma...
+2026-03-04 12:25:28,199 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_122528_bike_data_log.xlsx — flush ogni 30s
+2026-03-04 12:25:28,200 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:25:28,212 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:25:28,212 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:25:28,439 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:27:29,442 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:27:29,443 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:27:29,443 - logic.data_processing - INFO - Flush finale: salvataggio dati prima della chiusura.
+2026-03-04 12:27:29,450 - logic.data_processing - INFO - DataProcessor chiuso. File salvato: output\20260304_122528_bike_data_log.xlsx
+2026-03-04 12:27:29,450 - root - INFO - Dati salvati.
+2026-03-04 12:27:29,553 - root - INFO - Arresto dei worker...
+2026-03-04 12:27:29,553 - root - INFO - Spegnimento completato.
+2026-03-04 12:30:02,370 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:30:02,370 - root - INFO - Avvio del programma...
+2026-03-04 12:30:02,470 - logic.data_processing - INFO - File inizializzato: output\20260304_123002_bike_data_log.xlsx
+2026-03-04 12:30:02,471 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_123002_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 12:30:02,471 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:30:02,473 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:30:02,473 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:30:02,538 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:30:05,789 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:30:05,789 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:30:05,790 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_123002_bike_data_log.xlsx
+2026-03-04 12:30:05,790 - root - INFO - Dati salvati.
+2026-03-04 12:30:05,890 - root - INFO - Arresto dei worker...
+2026-03-04 12:30:05,890 - root - INFO - Spegnimento completato.
+2026-03-04 12:30:45,490 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 12:30:45,490 - root - INFO - Avvio del programma...
+2026-03-04 12:30:45,583 - logic.data_processing - INFO - File inizializzato: output\20260304_123045_bike_data_log.xlsx
+2026-03-04 12:30:45,584 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_123045_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 12:30:45,585 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:30:45,586 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 12:30:45,586 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 12:30:45,649 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 12:30:52,578 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 12:30:52,578 - root - INFO - Flush finale dati su disco...
+2026-03-04 12:30:52,578 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_123045_bike_data_log.xlsx
+2026-03-04 12:30:52,579 - root - INFO - Dati salvati.
+2026-03-04 12:30:52,685 - root - INFO - Arresto dei worker...
+2026-03-04 12:30:52,685 - root - INFO - Spegnimento completato.
+2026-03-04 13:39:56,748 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 13:39:56,750 - root - INFO - Avvio del programma...
+2026-03-04 13:39:56,902 - logic.data_processing - INFO - File inizializzato: output\20260304_133956_bike_data_log.xlsx
+2026-03-04 13:39:56,902 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_133956_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 13:39:56,902 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:39:56,906 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:39:56,906 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 13:39:56,986 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 13:40:07,793 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 13:40:07,793 - root - INFO - Flush finale dati su disco...
+2026-03-04 13:40:07,793 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_133956_bike_data_log.xlsx
+2026-03-04 13:40:07,793 - root - INFO - Dati salvati.
+2026-03-04 13:40:07,898 - root - INFO - Arresto dei worker...
+2026-03-04 13:40:07,898 - root - INFO - Spegnimento completato.
+2026-03-04 13:47:19,891 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 13:47:19,891 - root - INFO - Avvio del programma...
+2026-03-04 13:47:19,978 - logic.data_processing - INFO - File inizializzato: output\20260304_134719_bike_data_log.xlsx
+2026-03-04 13:47:19,979 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_134719_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 13:47:19,980 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:47:19,981 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:47:19,981 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 13:47:20,041 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 13:47:21,944 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 13:47:21,944 - root - INFO - Flush finale dati su disco...
+2026-03-04 13:47:21,944 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_134719_bike_data_log.xlsx
+2026-03-04 13:47:21,944 - root - INFO - Dati salvati.
+2026-03-04 13:47:22,046 - root - INFO - Arresto dei worker...
+2026-03-04 13:47:22,047 - root - INFO - Spegnimento completato.
+2026-03-04 13:47:34,690 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 13:47:34,691 - root - INFO - Avvio del programma...
+2026-03-04 13:47:34,852 - logic.data_processing - INFO - File inizializzato: output\20260304_134734_bike_data_log.xlsx
+2026-03-04 13:47:34,854 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_134734_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 13:47:34,854 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:47:34,857 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:47:34,857 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 13:47:34,967 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 13:47:46,784 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 13:47:46,784 - root - INFO - Flush finale dati su disco...
+2026-03-04 13:47:46,785 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_134734_bike_data_log.xlsx
+2026-03-04 13:47:46,785 - root - INFO - Dati salvati.
+2026-03-04 13:47:46,887 - root - INFO - Arresto dei worker...
+2026-03-04 13:47:46,887 - root - INFO - Spegnimento completato.
+2026-03-04 13:48:19,191 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 13:48:19,191 - root - INFO - Avvio del programma...
+2026-03-04 13:48:19,394 - logic.data_processing - INFO - File inizializzato: output\20260304_134819_bike_data_log.xlsx
+2026-03-04 13:48:19,395 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_134819_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 13:48:19,395 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:48:19,400 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:48:19,400 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 13:48:19,511 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 13:48:21,520 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 13:48:21,521 - root - INFO - Flush finale dati su disco...
+2026-03-04 13:48:21,521 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_134819_bike_data_log.xlsx
+2026-03-04 13:48:21,521 - root - INFO - Dati salvati.
+2026-03-04 13:48:21,623 - root - INFO - Arresto dei worker...
+2026-03-04 13:48:21,623 - root - INFO - Spegnimento completato.
+2026-03-04 13:48:46,201 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 13:48:46,201 - root - INFO - Avvio del programma...
+2026-03-04 13:48:46,295 - logic.data_processing - INFO - File inizializzato: output\20260304_134846_bike_data_log.xlsx
+2026-03-04 13:48:46,296 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_134846_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 13:48:46,296 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:48:46,298 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 13:48:46,298 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 13:48:46,362 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 14:00:59,387 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 14:00:59,387 - root - INFO - Avvio del programma...
+2026-03-04 14:00:59,481 - logic.data_processing - INFO - File inizializzato: output\20260304_140059_bike_data_log.xlsx
+2026-03-04 14:00:59,482 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_140059_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 14:00:59,482 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:00:59,483 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:00:59,483 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 14:00:59,685 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 14:01:10,652 - root - INFO - Invio comando velocità banco: 0 km/h
+2026-03-04 14:01:10,652 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-04 14:01:10,653 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-04 14:01:10,653 - root - WARNING - *** EMERGENCY STOP ATTIVATO: speed=0, auto-cmd OFF ***
+2026-03-04 14:03:25,819 - root - INFO - Invio comando velocità banco: 0 km/h
+2026-03-04 14:03:25,819 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-04 14:03:25,819 - root - WARNING - *** EMERGENCY STOP ATTIVATO: speed=0, auto-cmd OFF ***
+2026-03-04 14:03:25,819 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-04 14:03:29,304 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 14:03:29,304 - root - INFO - Flush finale dati su disco...
+2026-03-04 14:03:29,304 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_140059_bike_data_log.xlsx
+2026-03-04 14:03:29,305 - root - INFO - Dati salvati.
+2026-03-04 14:03:29,409 - root - INFO - Arresto dei worker...
+2026-03-04 14:03:29,409 - root - INFO - Spegnimento completato.
+2026-03-04 14:04:17,965 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 14:04:17,965 - root - INFO - Avvio del programma...
+2026-03-04 14:04:18,065 - logic.data_processing - INFO - File inizializzato: output\20260304_140418_bike_data_log.xlsx
+2026-03-04 14:04:18,066 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_140418_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 14:04:18,066 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:04:18,067 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:04:18,068 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 14:04:18,157 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 14:04:20,652 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 14:04:20,652 - root - INFO - Flush finale dati su disco...
+2026-03-04 14:04:20,653 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_140418_bike_data_log.xlsx
+2026-03-04 14:04:20,653 - root - INFO - Dati salvati.
+2026-03-04 14:04:20,753 - root - INFO - Arresto dei worker...
+2026-03-04 14:04:20,753 - root - INFO - Spegnimento completato.
+2026-03-04 14:06:40,100 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 14:06:40,100 - root - INFO - Avvio del programma...
+2026-03-04 14:06:40,199 - logic.data_processing - INFO - File inizializzato: output\20260304_140640_bike_data_log.xlsx
+2026-03-04 14:06:40,200 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_140640_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 14:06:40,201 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:06:40,202 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:06:40,202 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 14:06:40,367 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 14:06:44,568 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 14:06:44,568 - root - INFO - Flush finale dati su disco...
+2026-03-04 14:06:44,569 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_140640_bike_data_log.xlsx
+2026-03-04 14:06:44,569 - root - INFO - Dati salvati.
+2026-03-04 14:06:44,670 - root - INFO - Arresto dei worker...
+2026-03-04 14:06:44,670 - root - INFO - Spegnimento completato.
+2026-03-04 14:06:46,716 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 14:06:46,717 - root - INFO - Avvio del programma...
+2026-03-04 14:06:46,890 - logic.data_processing - INFO - File inizializzato: output\20260304_140646_bike_data_log.xlsx
+2026-03-04 14:06:46,891 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_140646_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 14:06:46,892 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:06:46,893 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 14:06:46,894 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 14:06:47,050 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 14:06:54,557 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 14:06:54,558 - root - INFO - Flush finale dati su disco...
+2026-03-04 14:06:54,558 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_140646_bike_data_log.xlsx
+2026-03-04 14:06:54,558 - root - INFO - Dati salvati.
+2026-03-04 14:06:54,660 - root - INFO - Arresto dei worker...
+2026-03-04 14:06:54,660 - root - INFO - Spegnimento completato.
+2026-03-04 15:34:50,925 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 15:34:50,926 - root - INFO - Avvio del programma...
+2026-03-04 15:34:51,067 - logic.data_processing - INFO - File inizializzato: output\20260304_153451_bike_data_log.xlsx
+2026-03-04 15:34:51,068 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_153451_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 15:34:51,068 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 15:34:51,070 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 15:34:51,070 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 15:34:51,264 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 15:34:55,814 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 15:34:55,814 - root - INFO - Flush finale dati su disco...
+2026-03-04 15:34:55,814 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_153451_bike_data_log.xlsx
+2026-03-04 15:34:55,814 - root - INFO - Dati salvati.
+2026-03-04 15:34:55,927 - root - INFO - Arresto dei worker...
+2026-03-04 15:34:55,927 - root - INFO - Spegnimento completato.
+2026-03-04 16:21:16,776 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:21:16,777 - root - INFO - Avvio del programma...
+2026-03-04 16:21:17,035 - logic.data_processing - INFO - File inizializzato: output\20260304_162117_bike_data_log.xlsx
+2026-03-04 16:21:17,037 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_162117_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:21:17,037 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:21:17,042 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:21:17,042 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:21:17,579 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:21:19,473 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 16:21:22,818 - root - INFO - Nessun dispositivo connesso, abilitazione FTMS non possibile
+2026-03-04 16:21:24,576 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -36)}
+2026-03-04 16:21:24,577 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -36
+2026-03-04 16:21:26,553 - root - WARNING - Seleziona una COM port prima di connettere.
+2026-03-04 16:21:34,401 - root - INFO - Richiesta disconnessione Lorenz...
+2026-03-04 16:21:42,721 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 16:21:42,721 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 16:21:43,418 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 16:21:49,969 - root - INFO - Invio comando velocità banco: 0 km/h
+2026-03-04 16:21:49,969 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-04 16:21:49,969 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-04 16:21:49,969 - root - WARNING - *** EMERGENCY STOP ATTIVATO: speed=0, auto-cmd OFF ***
+2026-03-04 16:25:42,555 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:25:42,556 - root - INFO - Avvio del programma...
+2026-03-04 16:25:42,884 - logic.data_processing - INFO - File inizializzato: output\20260304_162542_bike_data_log.xlsx
+2026-03-04 16:25:42,886 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_162542_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:25:42,887 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:25:42,895 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:25:42,895 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:25:43,400 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:25:44,530 - root - INFO - Invio comando velocità banco: 0 km/h
+2026-03-04 16:25:44,531 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-04 16:25:44,531 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-04 16:25:44,532 - root - WARNING - *** EMERGENCY STOP ATTIVATO: speed=0, auto-cmd OFF ***
+2026-03-04 16:25:55,592 - root - INFO - Nessun dispositivo connesso, abilitazione FTMS non possibile
+2026-03-04 16:26:05,912 - root - WARNING - Seleziona una COM port prima di connettere.
+2026-03-04 16:26:11,672 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:26:11,672 - root - ERROR - Errore connessione sensore: could not open port 'COM3': PermissionError(13, 'Accesso negato.', None, 5)
+2026-03-04 16:26:11,673 - root - WARNING - Sensore temperatura non connesso o connessione fallita.
+2026-03-04 16:26:15,504 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:26:15,504 - root - ERROR - Errore connessione sensore: could not open port 'COM3': PermissionError(13, 'Accesso negato.', None, 5)
+2026-03-04 16:26:15,505 - root - WARNING - Sensore temperatura non connesso o connessione fallita.
+2026-03-04 16:26:18,176 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:26:18,176 - root - ERROR - Errore connessione sensore: could not open port 'COM3': PermissionError(13, 'Accesso negato.', None, 5)
+2026-03-04 16:26:18,177 - root - WARNING - Sensore temperatura non connesso o connessione fallita.
+2026-03-04 16:26:20,663 - root - INFO - Richiesta connessione sensore temperatura su COM1...
+2026-03-04 16:26:20,665 - root - INFO - Connesso al sensore di su COM1
+2026-03-04 16:26:20,666 - root - INFO - Sensore temperatura connesso
+2026-03-04 16:26:22,742 - root - INFO - Connessione sensore chiusa
+2026-03-04 16:26:24,959 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:26:24,959 - root - ERROR - Errore connessione sensore: could not open port 'COM3': PermissionError(13, 'Accesso negato.', None, 5)
+2026-03-04 16:26:24,959 - root - WARNING - Sensore temperatura non connesso o connessione fallita.
+2026-03-04 16:26:26,682 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:26:26,682 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:26:26,682 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_162542_bike_data_log.xlsx
+2026-03-04 16:26:26,683 - root - INFO - Dati salvati.
+2026-03-04 16:26:26,783 - root - INFO - Arresto dei worker...
+2026-03-04 16:26:26,783 - root - INFO - Spegnimento completato.
+2026-03-04 16:26:32,247 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:26:32,247 - root - INFO - Avvio del programma...
+2026-03-04 16:26:32,475 - logic.data_processing - INFO - File inizializzato: output\20260304_162632_bike_data_log.xlsx
+2026-03-04 16:26:32,485 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_162632_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:26:32,485 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:26:32,499 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:26:32,500 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:26:32,821 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:26:35,239 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:26:35,242 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 16:26:35,243 - root - INFO - Sensore temperatura connesso
+2026-03-04 16:26:37,719 - root - INFO - Richiesta ricerca dispositivi
+2026-03-04 16:26:40,071 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 16:26:40,084 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 16:26:40,084 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 16:26:41,904 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 16:26:41,905 - root - INFO - Lorenz Connesso
+2026-03-04 16:26:42,831 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -30)}
+2026-03-04 16:26:42,832 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -30
+2026-03-04 16:26:44,023 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-04 16:26:44,023 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-04 16:26:46,822 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-04 16:26:47,655 - root - INFO - Invio comando livello: 0/200
+2026-03-04 16:26:47,708 - shared_lib.bluetooth_manager - INFO - Notifiche control point abilitate.
+2026-03-04 16:26:47,708 - shared_lib.bluetooth_manager - INFO - Invio comando resistenza a 0/200
+2026-03-04 16:26:47,796 - shared_lib.bluetooth_manager - INFO - Comando resistenza ricevuto correttamente
+2026-03-04 16:27:02,008 - root - WARNING - =======================================================
+2026-03-04 16:27:02,008 - root - WARNING - *** DISCONNESSIONE BLE - connessione persa ***
+2026-03-04 16:27:02,009 - root - WARNING -     Dispositivo: RIVO  [F0:F5:BD:31:FE:42]
+2026-03-04 16:27:02,009 - root - WARNING - =======================================================
+2026-03-04 16:27:02,009 - shared_lib.bluetooth_manager - INFO - Stato connessione BLE resettato (disconnessione inattesa)
+2026-03-04 16:27:28,080 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-04 16:27:28,097 - shared_lib.LorenzLib - ERROR - Connection Lost...
+2026-03-04 16:27:36,275 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:27:36,275 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:27:36,275 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_162632_bike_data_log.xlsx
+2026-03-04 16:27:36,276 - root - INFO - Dati salvati.
+2026-03-04 16:27:36,276 - root - INFO - Chiusura connessione sensore temperatura...
+2026-03-04 16:27:36,276 - root - INFO - Connessione sensore chiusa
+2026-03-04 16:27:36,276 - root - INFO - Connessione sensore temperatura chiusa.
+2026-03-04 16:27:36,381 - root - INFO - Arresto dei worker...
+2026-03-04 16:27:36,381 - root - INFO - Spegnimento completato.
+2026-03-04 16:32:47,956 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:32:47,956 - root - INFO - Avvio del programma...
+2026-03-04 16:32:48,050 - logic.data_processing - INFO - File inizializzato: output\20260304_163248_bike_data_log.xlsx
+2026-03-04 16:32:48,051 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_163248_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:32:48,051 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:32:48,052 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:32:48,053 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:32:48,218 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:32:53,802 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:32:53,802 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:32:53,802 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_163248_bike_data_log.xlsx
+2026-03-04 16:32:53,802 - root - INFO - Dati salvati.
+2026-03-04 16:32:53,904 - root - INFO - Arresto dei worker...
+2026-03-04 16:32:53,904 - root - INFO - Spegnimento completato.
+2026-03-04 16:32:55,172 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:32:55,172 - root - INFO - Avvio del programma...
+2026-03-04 16:32:55,354 - logic.data_processing - INFO - File inizializzato: output\20260304_163255_bike_data_log.xlsx
+2026-03-04 16:32:55,356 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_163255_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:32:55,357 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:32:55,368 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:32:55,368 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:32:55,534 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:32:58,406 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:32:58,410 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 16:32:58,410 - root - INFO - Sensore temperatura connesso
+2026-03-04 16:33:00,885 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-04 16:33:08,567 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-04 16:33:08,585 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-04 16:33:08,585 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-04 16:33:10,398 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-04 16:33:10,401 - root - INFO - Lorenz Connesso
+2026-03-04 16:33:12,673 - shared_lib.LorenzLib - ERROR - Connection Lost...
+2026-03-04 16:33:13,679 - root - WARNING - =======================================================
+2026-03-04 16:33:13,679 - root - WARNING - *** DISCONNESSIONE LORENZ - connessione persa ***
+2026-03-04 16:33:13,679 - root - WARNING - =======================================================
+2026-03-04 16:33:30,469 - root - INFO - Richiesta disconnessione sensore seriale...
+2026-03-04 16:33:30,470 - root - INFO - Connessione sensore chiusa
+2026-03-04 16:33:30,475 - root - INFO - Sensore seriale disconnesso.
+2026-03-04 16:33:31,341 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:33:31,344 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 16:33:31,344 - root - INFO - Sensore temperatura connesso
+2026-03-04 16:33:46,168 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:33:46,168 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:33:46,169 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_163255_bike_data_log.xlsx
+2026-03-04 16:33:46,169 - root - INFO - Dati salvati.
+2026-03-04 16:33:46,169 - root - INFO - Chiusura connessione sensore temperatura...
+2026-03-04 16:33:46,169 - root - INFO - Connessione sensore chiusa
+2026-03-04 16:33:46,169 - root - INFO - Connessione sensore temperatura chiusa.
+2026-03-04 16:33:46,269 - root - INFO - Arresto dei worker...
+2026-03-04 16:33:46,270 - root - INFO - Spegnimento completato.
+2026-03-04 16:34:02,348 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:34:02,348 - root - INFO - Avvio del programma...
+2026-03-04 16:34:02,442 - logic.data_processing - INFO - File inizializzato: output\20260304_163402_bike_data_log.xlsx
+2026-03-04 16:34:02,443 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_163402_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:34:02,443 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:34:02,445 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:34:02,445 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:34:02,605 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:34:04,700 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-04 16:34:04,704 - root - INFO - Connesso al sensore di su COM3
+2026-03-04 16:34:04,704 - root - INFO - Sensore temperatura connesso
+2026-03-04 16:34:08,759 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-04 16:36:10,197 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:36:10,197 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:36:10,198 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_163402_bike_data_log.xlsx
+2026-03-04 16:36:10,198 - root - INFO - Dati salvati.
+2026-03-04 16:36:10,198 - root - INFO - Chiusura connessione sensore temperatura...
+2026-03-04 16:36:10,198 - root - INFO - Connessione sensore chiusa
+2026-03-04 16:36:10,198 - root - INFO - Connessione sensore temperatura chiusa.
+2026-03-04 16:36:10,298 - root - INFO - Arresto dei worker...
+2026-03-04 16:36:10,298 - root - INFO - Spegnimento completato.
+2026-03-04 16:42:15,427 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:42:15,428 - root - INFO - Avvio del programma...
+2026-03-04 16:42:15,523 - logic.data_processing - INFO - File inizializzato: output\20260304_164215_bike_data_log.xlsx
+2026-03-04 16:42:15,524 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_164215_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:42:15,524 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:42:15,526 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:42:15,526 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:42:15,694 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:53:18,795 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:53:18,892 - logic.data_processing - INFO - File inizializzato: output\20260304_165318_bike_data_log.xlsx
+2026-03-04 16:53:18,893 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_165318_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:53:18,893 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:53:18,895 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:53:18,895 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:53:19,057 - root - INFO - Avvio del programma...
+2026-03-04 16:53:19,058 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:53:22,256 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:53:22,256 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:53:22,256 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_165318_bike_data_log.xlsx
+2026-03-04 16:53:22,256 - root - INFO - Dati salvati.
+2026-03-04 16:53:22,358 - root - INFO - Arresto dei worker...
+2026-03-04 16:53:22,358 - root - INFO - Spegnimento completato.
+2026-03-04 16:53:27,399 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:53:27,489 - logic.data_processing - INFO - File inizializzato: output\20260304_165327_bike_data_log.xlsx
+2026-03-04 16:53:27,490 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_165327_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:53:27,490 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:53:27,492 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:53:27,492 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:53:27,568 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:53:27,568 - root - INFO - Avvio del programma...
+2026-03-04 16:53:35,472 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:53:35,472 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:53:35,472 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_165327_bike_data_log.xlsx
+2026-03-04 16:53:35,473 - root - INFO - Dati salvati.
+2026-03-04 16:53:35,581 - root - INFO - Arresto dei worker...
+2026-03-04 16:53:35,581 - root - INFO - Spegnimento completato.
+2026-03-04 16:53:45,906 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:53:45,907 - root - INFO - Avvio del programma...
+2026-03-04 16:53:45,995 - logic.data_processing - INFO - File inizializzato: output\20260304_165345_bike_data_log.xlsx
+2026-03-04 16:53:45,996 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_165345_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:53:45,996 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:53:45,997 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:53:45,997 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:53:46,122 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:59:30,150 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:59:30,150 - root - INFO - Avvio del programma...
+2026-03-04 16:59:30,240 - logic.data_processing - INFO - File inizializzato: output\20260304_165930_bike_data_log.xlsx
+2026-03-04 16:59:30,241 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_165930_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:59:30,241 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:59:30,243 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:59:30,243 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:59:30,322 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:59:30,322 - root - INFO - Programma avviato
+2026-03-04 16:59:35,269 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:59:35,269 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:59:35,269 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_165930_bike_data_log.xlsx
+2026-03-04 16:59:35,270 - root - INFO - Dati salvati.
+2026-03-04 16:59:35,380 - root - INFO - Arresto dei worker...
+2026-03-04 16:59:35,380 - root - INFO - Spegnimento completato.
+2026-03-04 16:59:48,702 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:59:48,702 - root - INFO - Avvio del programma...
+2026-03-04 16:59:48,791 - logic.data_processing - INFO - File inizializzato: output\20260304_165948_bike_data_log.xlsx
+2026-03-04 16:59:48,792 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_165948_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:59:48,792 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:59:48,793 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:59:48,793 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:59:48,869 - root - INFO - Handler della GUI (via coda) aggiunto al logger.
+2026-03-04 16:59:48,869 - root - INFO - Programma avviato
+2026-03-04 16:59:50,834 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 16:59:50,834 - root - INFO - Flush finale dati su disco...
+2026-03-04 16:59:50,834 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_165948_bike_data_log.xlsx
+2026-03-04 16:59:50,834 - root - INFO - Dati salvati.
+2026-03-04 16:59:50,937 - root - INFO - Arresto dei worker...
+2026-03-04 16:59:50,937 - root - INFO - Spegnimento completato.
+2026-03-04 16:59:54,204 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 16:59:54,204 - root - INFO - Avvio del programma...
+2026-03-04 16:59:54,290 - logic.data_processing - INFO - File inizializzato: output\20260304_165954_bike_data_log.xlsx
+2026-03-04 16:59:54,291 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_165954_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 16:59:54,292 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:59:54,293 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 16:59:54,293 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 16:59:54,370 - root - INFO - Programma avviato
+2026-03-04 17:00:00,140 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 17:00:00,141 - root - INFO - Flush finale dati su disco...
+2026-03-04 17:00:00,141 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_165954_bike_data_log.xlsx
+2026-03-04 17:00:00,141 - root - INFO - Dati salvati.
+2026-03-04 17:00:00,251 - root - INFO - Arresto dei worker...
+2026-03-04 17:00:00,251 - root - INFO - Spegnimento completato.
+2026-03-04 17:01:19,737 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 17:01:19,737 - root - INFO - Avvio del programma...
+2026-03-04 17:01:19,849 - logic.data_processing - INFO - File inizializzato: output\20260304_170119_bike_data_log.xlsx
+2026-03-04 17:01:19,849 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_170119_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 17:01:19,850 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 17:01:19,851 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 17:01:19,851 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 17:01:19,933 - root - INFO - Programma avviato
+2026-03-04 17:01:21,371 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 17:01:21,371 - root - INFO - Flush finale dati su disco...
+2026-03-04 17:01:21,371 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_170119_bike_data_log.xlsx
+2026-03-04 17:01:21,371 - root - INFO - Dati salvati.
+2026-03-04 17:01:21,474 - root - INFO - Arresto dei worker...
+2026-03-04 17:01:21,474 - root - INFO - Spegnimento completato.
+2026-03-04 17:01:49,604 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-04 17:01:49,604 - root - INFO - Avvio del programma...
+2026-03-04 17:01:49,692 - logic.data_processing - INFO - File inizializzato: output\20260304_170149_bike_data_log.xlsx
+2026-03-04 17:01:49,693 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260304_170149_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-04 17:01:49,693 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 17:01:49,694 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-04 17:01:49,694 - root - INFO - Impostazioni caricate da settings.json
+2026-03-04 17:01:49,770 - root - INFO - Programma avviato
+2026-03-04 17:01:51,234 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-04 17:01:51,235 - root - INFO - Flush finale dati su disco...
+2026-03-04 17:01:51,235 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260304_170149_bike_data_log.xlsx
+2026-03-04 17:01:51,235 - root - INFO - Dati salvati.
+2026-03-04 17:01:51,338 - root - INFO - Arresto dei worker...
+2026-03-04 17:01:51,338 - root - INFO - Spegnimento completato.
+2026-03-05 08:15:08,394 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 08:15:08,394 - root - INFO - Avvio del programma...
+2026-03-05 08:15:08,698 - logic.data_processing - INFO - File inizializzato: output\20260305_081508_bike_data_log.xlsx
+2026-03-05 08:15:08,699 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_081508_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 08:15:08,701 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 08:15:08,705 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 08:15:08,711 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 08:15:09,193 - root - INFO - Programma avviato
+2026-03-05 08:16:08,213 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 08:16:08,213 - root - INFO - Flush finale dati su disco...
+2026-03-05 08:16:08,214 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_081508_bike_data_log.xlsx
+2026-03-05 08:16:08,214 - root - INFO - Dati salvati.
+2026-03-05 08:16:08,325 - root - INFO - Arresto dei worker...
+2026-03-05 08:16:08,325 - root - INFO - Spegnimento completato.
+2026-03-05 09:07:17,029 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 09:07:17,029 - root - INFO - Avvio del programma...
+2026-03-05 09:07:17,123 - logic.data_processing - INFO - File inizializzato: output\20260305_090717_bike_data_log.xlsx
+2026-03-05 09:07:17,125 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_090717_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 09:07:17,125 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 09:07:17,129 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 09:07:17,129 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 09:07:17,244 - root - INFO - Programma avviato
+2026-03-05 09:53:48,563 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 09:53:48,563 - root - INFO - Flush finale dati su disco...
+2026-03-05 09:53:48,564 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_090717_bike_data_log.xlsx
+2026-03-05 09:53:48,564 - root - INFO - Dati salvati.
+2026-03-05 09:53:48,664 - root - INFO - Arresto dei worker...
+2026-03-05 09:53:48,665 - root - INFO - Spegnimento completato.
+2026-03-05 09:54:04,975 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 09:54:04,975 - root - INFO - Avvio del programma...
+2026-03-05 09:54:05,087 - logic.data_processing - INFO - File inizializzato: output\20260305_095405_bike_data_log.xlsx
+2026-03-05 09:54:05,088 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_095405_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 09:54:05,088 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 09:54:05,089 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 09:54:05,089 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 09:54:05,625 - root - INFO - Programma avviato
+2026-03-05 09:54:10,834 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21']
+2026-03-05 09:54:13,371 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21']
+2026-03-05 09:54:29,971 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21', 'COM3']
+2026-03-05 09:54:32,913 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-05 09:54:32,918 - root - INFO - Connesso al sensore di su COM3
+2026-03-05 09:54:32,919 - root - INFO - Sensore temperatura connesso
+2026-03-05 09:54:33,833 - root - INFO - Richiesta disconnessione sensore seriale...
+2026-03-05 09:54:33,834 - root - INFO - Connessione sensore chiusa
+2026-03-05 09:54:33,836 - root - INFO - Sensore seriale disconnesso.
+2026-03-05 09:54:34,846 - root - WARNING - =======================================================
+2026-03-05 09:54:34,847 - root - WARNING - *** DISCONNESSIONE SENSORE SERIALE - connessione persa ***
+2026-03-05 09:54:34,848 - root - WARNING - =======================================================
+2026-03-05 09:54:46,209 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-05 09:54:46,212 - root - INFO - Connesso al sensore di su COM3
+2026-03-05 09:54:46,213 - root - INFO - Sensore temperatura connesso
+2026-03-05 09:54:47,955 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-05 09:54:56,562 - root - INFO - Richiesta disconnessione sensore seriale...
+2026-03-05 09:54:56,563 - root - INFO - Connessione sensore chiusa
+2026-03-05 09:54:56,564 - root - INFO - Sensore seriale disconnesso.
+2026-03-05 09:55:01,146 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-05 09:55:01,148 - root - INFO - Connesso al sensore di su COM3
+2026-03-05 09:55:01,149 - root - INFO - Sensore temperatura connesso
+2026-03-05 09:55:04,720 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-05 09:55:10,978 - root - INFO - Richiesta disconnessione sensore seriale...
+2026-03-05 09:55:10,978 - root - INFO - Connessione sensore chiusa
+2026-03-05 09:55:10,980 - root - INFO - Sensore seriale disconnesso.
+2026-03-05 09:55:12,060 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 09:55:12,061 - root - INFO - Flush finale dati su disco...
+2026-03-05 09:55:12,061 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_095405_bike_data_log.xlsx
+2026-03-05 09:55:12,061 - root - INFO - Dati salvati.
+2026-03-05 09:55:12,161 - root - INFO - Arresto dei worker...
+2026-03-05 09:55:12,162 - root - INFO - Spegnimento completato.
+2026-03-05 09:55:15,934 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 09:55:15,934 - root - INFO - Avvio del programma...
+2026-03-05 09:55:16,043 - logic.data_processing - INFO - File inizializzato: output\20260305_095516_bike_data_log.xlsx
+2026-03-05 09:55:16,043 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_095516_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 09:55:16,044 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 09:55:16,045 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 09:55:16,045 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 09:55:16,477 - root - INFO - Programma avviato
+2026-03-05 09:55:17,345 - root - WARNING - Seleziona una COM port prima di connettere.
+2026-03-05 09:55:20,457 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-05 09:55:20,460 - root - INFO - Connesso al sensore di su COM3
+2026-03-05 09:55:20,461 - root - INFO - Sensore temperatura connesso
+2026-03-05 09:55:22,782 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-05 09:55:27,642 - root - INFO - Richiesta disconnessione sensore seriale...
+2026-03-05 09:55:27,642 - root - INFO - Connessione sensore chiusa
+2026-03-05 09:55:27,643 - root - INFO - Sensore seriale disconnesso.
+2026-03-05 09:55:28,730 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-05 09:55:28,769 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-05 09:55:28,769 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-05 09:55:30,573 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-05 09:55:30,575 - root - INFO - Lorenz Connesso
+2026-03-05 09:55:32,231 - shared_lib.LorenzLib - ERROR - Connection Lost...
+2026-03-05 09:55:32,542 - root - WARNING - =======================================================
+2026-03-05 09:55:32,542 - root - WARNING - *** DISCONNESSIONE LORENZ - connessione persa ***
+2026-03-05 09:55:32,542 - root - WARNING - =======================================================
+2026-03-05 09:56:22,678 - logic.data_processing - WARNING - CSV riga 22: nessun comando valido, saltata.
+2026-03-05 09:56:22,678 - logic.data_processing - WARNING - CSV riga 23: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 24: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 25: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 26: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 27: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 28: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 29: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 30: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 31: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 32: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 33: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 34: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 35: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 36: nessun comando valido, saltata.
+2026-03-05 09:56:22,679 - logic.data_processing - WARNING - CSV riga 37: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 38: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 39: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 40: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 41: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 42: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 43: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 44: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 45: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 46: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 47: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 48: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 49: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 50: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 51: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 52: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 53: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 54: nessun comando valido, saltata.
+2026-03-05 09:56:22,680 - logic.data_processing - WARNING - CSV riga 55: nessun comando valido, saltata.
+2026-03-05 09:56:22,681 - logic.data_processing - WARNING - CSV riga 56: nessun comando valido, saltata.
+2026-03-05 09:56:22,681 - logic.data_processing - INFO - Letti 20 comandi da 'C:/Users/fossato/PycharmProjects/TotalCommander/Crescendo al Minuto in ERG Lungo - CQ.csv'
+2026-03-05 09:56:22,681 - root - INFO - Caricati 20 comandi. Durata 1 ciclo: 00:36:20
+2026-03-05 09:56:55,355 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21']
+2026-03-05 09:57:44,944 - logic.data_processing - WARNING - CSV riga 22: nessun comando valido, saltata.
+2026-03-05 09:57:44,944 - logic.data_processing - WARNING - CSV riga 23: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 24: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 25: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 26: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 27: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 28: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 29: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 30: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 31: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 32: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 33: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 34: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 35: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 36: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 37: nessun comando valido, saltata.
+2026-03-05 09:57:44,945 - logic.data_processing - WARNING - CSV riga 38: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 39: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 40: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 41: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 42: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 43: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 44: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 45: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 46: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 47: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 48: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 49: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 50: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 51: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 52: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 53: nessun comando valido, saltata.
+2026-03-05 09:57:44,946 - logic.data_processing - WARNING - CSV riga 54: nessun comando valido, saltata.
+2026-03-05 09:57:44,947 - logic.data_processing - WARNING - CSV riga 55: nessun comando valido, saltata.
+2026-03-05 09:57:44,947 - logic.data_processing - WARNING - CSV riga 56: nessun comando valido, saltata.
+2026-03-05 09:57:44,947 - logic.data_processing - INFO - Letti 20 comandi da 'C:/Users/fossato/PycharmProjects/TotalCommander/Crescendo al Minuto in ERG Lungo - CQ.csv'
+2026-03-05 09:57:44,947 - root - INFO - Caricati 20 comandi. Durata 1 ciclo: 00:36:20
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 22: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 23: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 24: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 25: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 26: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 27: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 28: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 29: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 30: nessun comando valido, saltata.
+2026-03-05 09:57:54,553 - logic.data_processing - WARNING - CSV riga 31: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 32: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 33: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 34: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 35: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 36: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 37: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 38: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 39: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 40: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 41: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 42: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 43: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 44: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 45: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 46: nessun comando valido, saltata.
+2026-03-05 09:57:54,554 - logic.data_processing - WARNING - CSV riga 47: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 48: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 49: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 50: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 51: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 52: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 53: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 54: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 55: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - WARNING - CSV riga 56: nessun comando valido, saltata.
+2026-03-05 09:57:54,555 - logic.data_processing - INFO - Letti 20 comandi da 'C:/Users/fossato/PycharmProjects/TotalCommander/Crescendo al Minuto in ERG Lungo - CQ.csv'
+2026-03-05 09:57:54,555 - root - INFO - Caricati 20 comandi. Durata 1 ciclo: 00:36:20
+2026-03-05 09:57:59,096 - root - INFO - Non ci sono comandi automatici attivi
+2026-03-05 09:58:01,273 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 09:58:01,274 - root - INFO - Invio comando livello: 0/200
+2026-03-05 09:58:01,274 - shared_lib.bluetooth_manager - WARNING - Dispositivo non connesso.
+2026-03-05 09:58:01,274 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 09:58:01,275 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 09:58:07,368 - root - INFO - Comandi automatici interrotti
+2026-03-05 09:58:09,193 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 09:58:09,193 - root - INFO - Invio comando livello: 0/200
+2026-03-05 09:58:09,193 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 09:58:09,193 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 09:58:09,194 - shared_lib.bluetooth_manager - WARNING - Dispositivo non connesso.
+2026-03-05 09:58:11,832 - root - INFO - Comandi automatici interrotti
+2026-03-05 09:58:12,360 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 09:58:12,361 - root - INFO - Invio comando livello: 0/200
+2026-03-05 09:58:12,361 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 09:58:12,361 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 09:58:12,361 - shared_lib.bluetooth_manager - WARNING - Dispositivo non connesso.
+2026-03-05 09:58:14,880 - root - INFO - Comandi automatici interrotti
+2026-03-05 09:58:37,528 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 09:58:37,528 - root - INFO - Invio comando livello: 0/200
+2026-03-05 09:58:37,529 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 09:58:37,529 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 09:58:37,529 - shared_lib.bluetooth_manager - WARNING - Dispositivo non connesso.
+2026-03-05 09:58:38,736 - root - INFO - Comandi automatici interrotti
+2026-03-05 09:59:20,387 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21', 'COM3']
+2026-03-05 09:59:22,383 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-05 09:59:22,387 - root - INFO - Connesso al sensore di su COM3
+2026-03-05 09:59:22,387 - root - INFO - Sensore temperatura connesso
+2026-03-05 09:59:26,942 - root - ERROR - Errore lettura sensore: ClearCommError failed (OSError(22, "Operazione di I/O terminata a causa dell'uscita dal thread oppure della richiesta di un'applicazione.", None, 995))
+2026-03-05 10:16:54,307 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:16:54,307 - root - INFO - Avvio del programma...
+2026-03-05 10:16:54,450 - logic.data_processing - INFO - File inizializzato: output\20260305_101654_bike_data_log.xlsx
+2026-03-05 10:16:54,451 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_101654_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:16:54,451 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:16:54,453 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:16:54,453 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:16:54,911 - root - INFO - Programma avviato
+2026-03-05 10:17:07,122 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:17:07,122 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:17:07,122 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_101654_bike_data_log.xlsx
+2026-03-05 10:17:07,122 - root - INFO - Dati salvati.
+2026-03-05 10:17:07,227 - root - INFO - Arresto dei worker...
+2026-03-05 10:17:07,227 - root - INFO - Spegnimento completato.
+2026-03-05 10:17:24,278 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:17:24,278 - root - INFO - Avvio del programma...
+2026-03-05 10:17:24,383 - logic.data_processing - INFO - File inizializzato: output\20260305_101724_bike_data_log.xlsx
+2026-03-05 10:17:24,385 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_101724_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:17:24,385 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:17:24,386 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:17:24,386 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:17:24,751 - root - INFO - Programma avviato
+2026-03-05 10:17:50,843 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:17:50,843 - root - INFO - Avvio del programma...
+2026-03-05 10:17:50,945 - logic.data_processing - INFO - File inizializzato: output\20260305_101750_bike_data_log.xlsx
+2026-03-05 10:17:50,946 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_101750_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:17:50,946 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:17:50,948 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:17:50,948 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:17:51,307 - root - INFO - Programma avviato
+2026-03-05 10:17:52,859 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:17:52,859 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:17:52,859 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_101750_bike_data_log.xlsx
+2026-03-05 10:17:52,859 - root - INFO - Dati salvati.
+2026-03-05 10:17:52,960 - root - INFO - Arresto dei worker...
+2026-03-05 10:17:52,960 - root - INFO - Spegnimento completato.
+2026-03-05 10:17:58,184 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:17:58,184 - root - INFO - Avvio del programma...
+2026-03-05 10:17:58,285 - logic.data_processing - INFO - File inizializzato: output\20260305_101758_bike_data_log.xlsx
+2026-03-05 10:17:58,286 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_101758_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:17:58,286 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:17:58,288 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:17:58,288 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:17:58,647 - root - INFO - Programma avviato
+2026-03-05 10:18:00,058 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:18:00,058 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:18:00,058 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_101758_bike_data_log.xlsx
+2026-03-05 10:18:00,058 - root - INFO - Dati salvati.
+2026-03-05 10:18:00,164 - root - INFO - Arresto dei worker...
+2026-03-05 10:18:00,165 - root - INFO - Spegnimento completato.
+2026-03-05 10:18:02,986 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:18:02,986 - root - INFO - Avvio del programma...
+2026-03-05 10:18:03,199 - logic.data_processing - INFO - File inizializzato: output\20260305_101803_bike_data_log.xlsx
+2026-03-05 10:18:03,200 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_101803_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:18:03,201 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:18:03,203 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:18:03,204 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:18:04,039 - root - INFO - Programma avviato
+2026-03-05 10:30:51,639 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:30:51,640 - root - INFO - Avvio del programma...
+2026-03-05 10:30:51,842 - logic.data_processing - INFO - File inizializzato: output\20260305_103051_bike_data_log.xlsx
+2026-03-05 10:30:51,845 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_103051_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:30:51,845 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:30:51,849 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:30:51,849 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:30:52,573 - root - INFO - Programma avviato
+2026-03-05 10:31:23,435 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:31:23,435 - root - INFO - Avvio del programma...
+2026-03-05 10:31:23,541 - logic.data_processing - INFO - File inizializzato: output\20260305_103123_bike_data_log.xlsx
+2026-03-05 10:31:23,542 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_103123_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:31:23,542 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:31:23,544 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:31:23,544 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:31:23,916 - root - INFO - Programma avviato
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 22: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 23: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 24: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 25: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 26: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 27: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 28: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 29: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 30: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 31: nessun comando valido, saltata.
+2026-03-05 10:31:29,946 - logic.data_processing - WARNING - CSV riga 32: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 33: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 34: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 35: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 36: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 37: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 38: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 39: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 40: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 41: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 42: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 43: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 44: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 45: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 46: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 47: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 48: nessun comando valido, saltata.
+2026-03-05 10:31:29,947 - logic.data_processing - WARNING - CSV riga 49: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 50: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 51: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 52: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 53: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 54: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 55: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - WARNING - CSV riga 56: nessun comando valido, saltata.
+2026-03-05 10:31:29,948 - logic.data_processing - INFO - Letti 20 comandi da 'C:/Users/fossato/PycharmProjects/TotalCommander/Crescendo al Minuto in ERG Lungo - CQ.csv'
+2026-03-05 10:31:29,948 - root - INFO - Caricati 20 comandi. Durata 1 ciclo: 00:36:20
+2026-03-05 10:31:33,644 - root - INFO - Invio comando livello: 0/200
+2026-03-05 10:31:33,644 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 10:31:33,645 - shared_lib.bluetooth_manager - WARNING - Dispositivo non connesso.
+2026-03-05 10:31:33,645 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 10:31:33,645 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 10:31:36,483 - root - INFO - Comandi automatici interrotti
+2026-03-05 10:31:43,361 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:31:43,361 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:31:43,361 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_103123_bike_data_log.xlsx
+2026-03-05 10:31:43,361 - root - INFO - Dati salvati.
+2026-03-05 10:31:43,470 - root - INFO - Arresto dei worker...
+2026-03-05 10:31:43,470 - root - INFO - Spegnimento completato.
+2026-03-05 10:38:33,961 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:38:33,961 - root - INFO - Avvio del programma...
+2026-03-05 10:38:34,063 - logic.data_processing - INFO - File inizializzato: output\20260305_103834_bike_data_log.xlsx
+2026-03-05 10:38:34,064 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_103834_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:38:34,064 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:38:34,065 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:38:34,065 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:38:34,449 - root - INFO - Programma avviato
+2026-03-05 10:38:36,664 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21']
+2026-03-05 10:38:43,095 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21', 'COM3']
+2026-03-05 10:38:45,479 - root - INFO - Richiesta connessione sensore temperatura su COM3...
+2026-03-05 10:38:45,482 - root - INFO - Connesso al sensore di su COM3
+2026-03-05 10:38:45,482 - root - INFO - Sensore temperatura connesso
+2026-03-05 10:38:53,942 - logic.data_processing - WARNING - CSV riga 22: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 23: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 24: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 25: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 26: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 27: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 28: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 29: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 30: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 31: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 32: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 33: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 34: nessun comando valido, saltata.
+2026-03-05 10:38:53,943 - logic.data_processing - WARNING - CSV riga 35: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 36: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 37: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 38: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 39: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 40: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 41: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 42: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 43: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 44: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 45: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 46: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 47: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 48: nessun comando valido, saltata.
+2026-03-05 10:38:53,944 - logic.data_processing - WARNING - CSV riga 49: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 50: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 51: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 52: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 53: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 54: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 55: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - WARNING - CSV riga 56: nessun comando valido, saltata.
+2026-03-05 10:38:53,945 - logic.data_processing - INFO - Letti 20 comandi da 'C:/Users/fossato/PycharmProjects/TotalCommander/Crescendo al Minuto in ERG Lungo - CQ.csv'
+2026-03-05 10:38:53,946 - root - INFO - Caricati 20 comandi. Durata 1 ciclo: 00:36:20
+2026-03-05 10:38:57,046 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 10:38:57,047 - root - INFO - Invio comando livello: 0/200
+2026-03-05 10:38:57,048 - shared_lib.bluetooth_manager - WARNING - Dispositivo non connesso.
+2026-03-05 10:38:57,048 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 10:38:57,048 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 10:38:58,287 - root - INFO - Comandi automatici interrotti
+2026-03-05 10:39:03,447 - root - INFO - Richiesta connessione a Lorenz...
+2026-03-05 10:39:03,458 - shared_lib.LorenzLib - INFO - Loaded LorenzProtokollDLL_x64.dll ver 2.01
+2026-03-05 10:39:03,459 - shared_lib.LorenzLib - INFO - Open Lorenz port 21
+2026-03-05 10:39:05,190 - root - INFO - Richiesta ricerca dispositivi
+2026-03-05 10:39:05,246 - shared_lib.LorenzLib - INFO - OpenPort Done !!
+2026-03-05 10:39:05,247 - root - INFO - Lorenz Connesso
+2026-03-05 10:39:10,302 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'EB:CD:B6:3A:1C:F6': ('SUITO', -78), 'FB:AA:CA:A1:61:E4': ('SUITO', -82)}
+2026-03-05 10:39:12,462 - root - INFO - Richiesta ricerca dispositivi
+2026-03-05 10:39:17,483 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'FB:AA:CA:A1:61:E4': ('SUITO', -78), 'EB:CD:B6:3A:1C:F6': ('SUITO', -88)}
+2026-03-05 10:39:21,846 - root - INFO - Tentativo connessione a FB:AA:CA:A1:61:E4
+2026-03-05 10:39:21,846 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a FB:AA:CA:A1:61:E4 (timeout: 15.0s)...
+2026-03-05 10:39:23,006 - root - INFO - Richiesta Disconnessione
+2026-03-05 10:39:23,006 - shared_lib.bluetooth_manager - INFO - Dispositivo già disconnesso.
+2026-03-05 10:39:26,937 - shared_lib.bluetooth_manager - INFO - Connesso con successo a FB:AA:CA:A1:61:E4
+2026-03-05 10:39:27,629 - root - INFO - Richiesta Disconnessione
+2026-03-05 10:39:27,734 - shared_lib.bluetooth_manager - INFO - Disconnessione completata.
+2026-03-05 10:39:28,997 - root - INFO - Richiesta ricerca dispositivi
+2026-03-05 10:39:34,017 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -34), 'EB:CD:B6:3A:1C:F6': ('SUITO', -78), 'FB:AA:CA:A1:61:E4': ('SUITO', -82)}
+2026-03-05 10:39:34,018 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -34
+2026-03-05 10:39:44,061 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-05 10:39:44,062 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-05 10:39:47,680 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-05 10:39:58,542 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 10:39:58,542 - root - INFO - Invio comando livello: 0/200
+2026-03-05 10:39:58,542 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 10:39:58,542 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 10:39:58,630 - shared_lib.bluetooth_manager - INFO - Notifiche control point abilitate.
+2026-03-05 10:39:58,630 - shared_lib.bluetooth_manager - INFO - Invio comando resistenza a 0/200
+2026-03-05 10:39:58,689 - shared_lib.bluetooth_manager - INFO - Comando resistenza ricevuto correttamente
+2026-03-05 10:40:07,213 - root - INFO - Comandi automatici interrotti
+2026-03-05 10:45:44,423 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:45:44,423 - root - INFO - Avvio del programma...
+2026-03-05 10:45:44,526 - logic.data_processing - INFO - File inizializzato: output\20260305_104544_bike_data_log.xlsx
+2026-03-05 10:45:44,527 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104544_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:45:44,527 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:45:44,528 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:45:44,528 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:45:44,921 - root - INFO - Programma avviato
+2026-03-05 10:46:48,180 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:46:48,180 - root - INFO - Avvio del programma...
+2026-03-05 10:46:48,400 - logic.data_processing - INFO - File inizializzato: output\20260305_104648_bike_data_log.xlsx
+2026-03-05 10:46:48,401 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104648_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:46:48,402 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:46:48,405 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:46:48,405 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:46:49,239 - root - INFO - Programma avviato
+2026-03-05 10:46:52,405 - logic.data_processing - WARNING - CSV riga 22: nessun comando valido, saltata.
+2026-03-05 10:46:52,405 - logic.data_processing - WARNING - CSV riga 23: nessun comando valido, saltata.
+2026-03-05 10:46:52,405 - logic.data_processing - WARNING - CSV riga 24: nessun comando valido, saltata.
+2026-03-05 10:46:52,405 - logic.data_processing - WARNING - CSV riga 25: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 26: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 27: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 28: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 29: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 30: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 31: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 32: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 33: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 34: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 35: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 36: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 37: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 38: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 39: nessun comando valido, saltata.
+2026-03-05 10:46:52,406 - logic.data_processing - WARNING - CSV riga 40: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 41: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 42: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 43: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 44: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 45: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 46: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 47: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 48: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 49: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 50: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 51: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 52: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 53: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 54: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 55: nessun comando valido, saltata.
+2026-03-05 10:46:52,407 - logic.data_processing - WARNING - CSV riga 56: nessun comando valido, saltata.
+2026-03-05 10:46:52,408 - logic.data_processing - INFO - Letti 20 comandi da 'C:/Users/fossato/PycharmProjects/TotalCommander/Crescendo al Minuto in ERG Lungo - CQ.csv'
+2026-03-05 10:46:52,408 - root - INFO - Caricati 20 comandi. Durata 1 ciclo: 00:36:20
+2026-03-05 10:46:54,127 - root - INFO - Richiesta ricerca dispositivi
+2026-03-05 10:46:59,207 - shared_lib.bluetooth_manager - INFO - Dispositivi trovati: {'F0:F5:BD:31:FE:42': ('RIVO', -42), 'EB:CD:B6:3A:1C:F6': ('SUITO', -78)}
+2026-03-05 10:46:59,208 - root - INFO - Dispositivo trovato: RIVO - F0:F5:BD:31:FE:42 - RSSI: -42
+2026-03-05 10:47:00,680 - root - INFO - Tentativo connessione a F0:F5:BD:31:FE:42
+2026-03-05 10:47:00,680 - shared_lib.bluetooth_manager - INFO - Tentativo di connessione a F0:F5:BD:31:FE:42 (timeout: 15.0s)...
+2026-03-05 10:47:03,571 - shared_lib.bluetooth_manager - INFO - Connesso con successo a F0:F5:BD:31:FE:42
+2026-03-05 10:47:04,080 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 10:47:04,080 - root - INFO - Invio comando livello: 0/200
+2026-03-05 10:47:04,081 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 10:47:04,081 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 10:47:04,140 - shared_lib.bluetooth_manager - INFO - Notifiche control point abilitate.
+2026-03-05 10:47:04,141 - shared_lib.bluetooth_manager - INFO - Invio comando resistenza a 0/200
+2026-03-05 10:47:04,202 - shared_lib.bluetooth_manager - INFO - Comando resistenza ricevuto correttamente
+2026-03-05 10:47:06,175 - root - INFO - Comandi automatici interrotti
+2026-03-05 10:47:06,953 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 10:47:06,953 - root - INFO - Invio comando livello: 0/200
+2026-03-05 10:47:06,954 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 10:47:06,954 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 10:47:06,954 - shared_lib.bluetooth_manager - INFO - Invio comando resistenza a 0/200
+2026-03-05 10:47:06,989 - shared_lib.bluetooth_manager - INFO - Comando resistenza ricevuto correttamente
+2026-03-05 10:47:08,047 - root - INFO - Comandi automatici interrotti
+2026-03-05 10:47:08,647 - root - INFO - Invio comando velocità banco: 20.0 km/h
+2026-03-05 10:47:08,647 - root - INFO - Invio comando livello: 0/200
+2026-03-05 10:47:08,648 - shared_lib.modbus_utils - ERROR - Connessione Modbus non attiva, richiesta di cambio velocità fallita
+2026-03-05 10:47:08,648 - root - INFO - Il comando di velocità non è andato a buon fine
+2026-03-05 10:47:08,648 - shared_lib.bluetooth_manager - INFO - Invio comando resistenza a 0/200
+2026-03-05 10:47:08,699 - shared_lib.bluetooth_manager - INFO - Comando resistenza ricevuto correttamente
+2026-03-05 10:47:09,056 - root - INFO - Comandi automatici interrotti
+2026-03-05 10:47:37,067 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:47:37,068 - root - INFO - Avvio del programma...
+2026-03-05 10:47:37,400 - logic.data_processing - INFO - File inizializzato: output\20260305_104737_bike_data_log.xlsx
+2026-03-05 10:47:37,405 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104737_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:47:37,406 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:47:37,411 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:47:37,412 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:47:38,305 - root - INFO - Programma avviato
+2026-03-05 10:47:47,810 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:47:47,810 - root - INFO - Avvio del programma...
+2026-03-05 10:47:48,042 - logic.data_processing - INFO - File inizializzato: output\20260305_104748_bike_data_log.xlsx
+2026-03-05 10:47:48,044 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104748_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:47:48,045 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:47:48,048 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:47:48,048 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:47:48,887 - root - INFO - Programma avviato
+2026-03-05 10:47:57,441 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:47:57,441 - root - INFO - Avvio del programma...
+2026-03-05 10:47:57,676 - logic.data_processing - INFO - File inizializzato: output\20260305_104757_bike_data_log.xlsx
+2026-03-05 10:47:57,678 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104757_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:47:57,679 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:47:57,681 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:47:57,682 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:47:58,664 - root - INFO - Programma avviato
+2026-03-05 10:48:01,476 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:48:01,477 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:48:01,477 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_104757_bike_data_log.xlsx
+2026-03-05 10:48:01,477 - root - INFO - Dati salvati.
+2026-03-05 10:48:01,582 - root - INFO - Arresto dei worker...
+2026-03-05 10:48:01,582 - root - INFO - Spegnimento completato.
+2026-03-05 10:48:13,396 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:48:13,396 - root - INFO - Avvio del programma...
+2026-03-05 10:48:13,650 - logic.data_processing - INFO - File inizializzato: output\20260305_104813_bike_data_log.xlsx
+2026-03-05 10:48:13,651 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104813_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:48:13,652 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:48:13,656 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:48:13,656 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:48:14,674 - root - INFO - Programma avviato
+2026-03-05 10:48:18,583 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:48:18,583 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:48:18,583 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_104813_bike_data_log.xlsx
+2026-03-05 10:48:18,583 - root - INFO - Dati salvati.
+2026-03-05 10:48:18,694 - root - INFO - Arresto dei worker...
+2026-03-05 10:48:18,694 - root - INFO - Spegnimento completato.
+2026-03-05 10:48:46,563 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:48:46,563 - root - INFO - Avvio del programma...
+2026-03-05 10:48:46,737 - logic.data_processing - INFO - File inizializzato: output\20260305_104846_bike_data_log.xlsx
+2026-03-05 10:48:46,741 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104846_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:48:46,742 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:48:46,745 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:48:46,745 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:48:47,617 - root - INFO - Programma avviato
+2026-03-05 10:48:50,718 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:48:50,718 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:48:50,718 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_104846_bike_data_log.xlsx
+2026-03-05 10:48:50,719 - root - INFO - Dati salvati.
+2026-03-05 10:48:50,822 - root - INFO - Arresto dei worker...
+2026-03-05 10:48:50,822 - root - INFO - Spegnimento completato.
+2026-03-05 10:48:53,932 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:48:53,932 - root - INFO - Avvio del programma...
+2026-03-05 10:48:54,117 - logic.data_processing - INFO - File inizializzato: output\20260305_104854_bike_data_log.xlsx
+2026-03-05 10:48:54,119 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104854_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:48:54,119 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:48:54,121 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:48:54,122 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:48:54,794 - root - INFO - Programma avviato
+2026-03-05 10:48:57,139 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:48:57,140 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:48:57,140 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_104854_bike_data_log.xlsx
+2026-03-05 10:48:57,140 - root - INFO - Dati salvati.
+2026-03-05 10:48:57,247 - root - INFO - Arresto dei worker...
+2026-03-05 10:48:57,247 - root - INFO - Spegnimento completato.
+2026-03-05 10:49:14,916 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:49:14,916 - root - INFO - Avvio del programma...
+2026-03-05 10:49:15,146 - logic.data_processing - INFO - File inizializzato: output\20260305_104915_bike_data_log.xlsx
+2026-03-05 10:49:15,149 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_104915_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:49:15,149 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:49:15,150 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:49:15,151 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:49:15,877 - root - INFO - Programma avviato
+2026-03-05 10:52:39,923 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:52:39,924 - root - INFO - Avvio del programma...
+2026-03-05 10:52:40,054 - logic.data_processing - INFO - File inizializzato: output\20260305_105240_bike_data_log.xlsx
+2026-03-05 10:52:40,055 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_105240_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:52:40,056 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:52:40,057 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:52:40,057 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:52:40,582 - root - INFO - Programma avviato
+2026-03-05 10:52:48,942 - root - INFO - COM port aggiornate: ['COM17', 'COM1', 'COM21', 'COM3']
+2026-03-05 10:55:13,684 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 10:55:13,685 - root - INFO - Avvio del programma...
+2026-03-05 10:55:13,931 - logic.data_processing - INFO - File inizializzato: output\20260305_105513_bike_data_log.xlsx
+2026-03-05 10:55:13,932 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_105513_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 10:55:13,933 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:55:13,935 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 10:55:13,935 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 10:55:14,564 - root - INFO - Programma avviato
+2026-03-05 10:59:16,232 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 10:59:16,232 - root - INFO - Flush finale dati su disco...
+2026-03-05 10:59:16,232 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_105513_bike_data_log.xlsx
+2026-03-05 10:59:16,232 - root - INFO - Dati salvati.
+2026-03-05 10:59:16,334 - root - INFO - Arresto dei worker...
+2026-03-05 10:59:16,334 - root - INFO - Spegnimento completato.
+2026-03-05 11:01:16,110 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 11:01:16,110 - root - INFO - Avvio del programma...
+2026-03-05 11:01:16,223 - logic.data_processing - INFO - File inizializzato: output\20260305_110116_bike_data_log.xlsx
+2026-03-05 11:01:16,223 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_110116_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 11:01:16,224 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 11:01:16,225 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 11:01:16,225 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 11:01:16,613 - root - INFO - Programma avviato
+2026-03-05 11:01:18,621 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 11:01:18,621 - root - INFO - Flush finale dati su disco...
+2026-03-05 11:01:18,622 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_110116_bike_data_log.xlsx
+2026-03-05 11:01:18,622 - root - INFO - Dati salvati.
+2026-03-05 11:01:18,724 - root - INFO - Arresto dei worker...
+2026-03-05 11:01:18,725 - root - INFO - Spegnimento completato.
+2026-03-05 11:01:29,619 - root - INFO - Logging iniziale configurato (file e console).
+2026-03-05 11:01:29,619 - root - INFO - Avvio del programma...
+2026-03-05 11:01:29,723 - logic.data_processing - INFO - File inizializzato: output\20260305_110129_bike_data_log.xlsx
+2026-03-05 11:01:29,724 - logic.data_processing - INFO - DataProcessor avviato. File: output\20260305_110129_bike_data_log.xlsx -- flush ogni 30s -- rotazione a 100 MB
+2026-03-05 11:01:29,724 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 11:01:29,726 - shared_lib.LorenzLib - INFO - Dimensione media e array di campionamento impostati a 20
+2026-03-05 11:01:29,726 - root - INFO - Impostazioni caricate da settings.json
+2026-03-05 11:01:30,091 - root - INFO - Programma avviato
+2026-03-05 11:01:40,771 - root - INFO - Avvio procedura di spegnimento controllato...
+2026-03-05 11:01:40,771 - root - INFO - Flush finale dati su disco...
+2026-03-05 11:01:40,772 - logic.data_processing - INFO - DataProcessor chiuso. Ultimo file: output\20260305_110129_bike_data_log.xlsx
+2026-03-05 11:01:40,772 - root - INFO - Dati salvati.
+2026-03-05 11:01:40,871 - root - INFO - Arresto dei worker...
+2026-03-05 11:01:40,871 - root - INFO - Spegnimento completato.
