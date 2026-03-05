@@ -33,7 +33,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("1375x820")
+        self.geometry("1340x829")
 
         self.style = ttk.Style(self)
 
@@ -779,13 +779,11 @@ class MainWindow(tk.Tk):
     def _check_and_update_modbus_status(self):
         is_connected = self.modbus.is_connesso()
         if is_connected:
-            self.btn_connect_banco.config(text="Disconnetti")
             self.banco_status.config(text="Connesso", fg="green")
             self._modbus_was_connected = True
         else:
             if self._modbus_was_connected:
                 self._on_modbus_unexpected_disconnect()
-            self.btn_connect_banco.config(text="Connetti")
             self.banco_status.config(text="Non Connesso", fg="red")
             self._modbus_was_connected = False
 
@@ -1361,14 +1359,17 @@ class MainWindow(tk.Tk):
         self.entry_ip.grid(row=0, column=1, padx=5, pady=5)
 
         self.btn_connect_banco = ttk.Button(self.banco_controls, text="Connetti",
-                                            command=self.toggle_modbus_connection)
+                                            command=self.connect_modbus)
         self.btn_connect_banco.grid(row=1, column=0, padx=5, pady=5)
+        self.btn_disconnect_banco = ttk.Button(self.banco_controls, text="Disconnetti",
+                                               command=self.disconnect_modbus)
+        self.btn_disconnect_banco.grid(row=1, column=1, padx=5, pady=5)
         self.banco_status = tk.Label(self.banco_controls, text="Non Connesso", fg="red")
-        self.banco_status.grid(row=1, column=1, padx=5, pady=5)
+        self.banco_status.grid(row=2, column=0, columnspan=2, padx=5, pady=(0, 4))
 
         self.btn_set_speed = ttk.Button(self.banco_controls, text="Set Velocità [km/h]:",
                                         command=self.clicked_button_setspeed_modbus)
-        self.btn_set_speed.grid(row=2, column=0, padx=5, pady=5)
+        self.btn_set_speed.grid(row=3, column=0, padx=5, pady=5)
 
         self.speed_banco_spin = ttk.Spinbox(
             self.banco_controls,
@@ -1379,25 +1380,22 @@ class MainWindow(tk.Tk):
             width=12
         )
         self.speed_banco_spin.set(0.0)
-        self.speed_banco_spin.grid(row=2, column=1, padx=5, pady=5)
+        self.speed_banco_spin.grid(row=3, column=1, padx=5, pady=5)
 
-        # Pulsante STOP in stile "emergency":
-        # - rosso pieno
-        # - testo grande in bianco
-        # - icona Unicode ⏹ a sinistra
-        # - cursor mano
+        # Pulsante STOP in stile "emergency" — altezza doppia
         self.btn_zero_speed = tk.Button(
             self.banco_controls,
             text="⏹  STOP BANCO",
             command=self.emergency_stop,
             font=('Helvetica', 14, 'bold'),
-            bg="#D0021B",  # rosso "stop"
+            bg="#D0021B",
             fg="white",
             activebackground="#B00000",
             activeforeground="white",
             relief='raised',
             bd=3,
             cursor='hand2',
+            height=2,
         )
         self.btn_zero_speed.grid(row=4, column=0, columnspan=2, padx=6, pady=12, sticky="ew")
 
@@ -1609,24 +1607,31 @@ class MainWindow(tk.Tk):
     # ------------------------------
     # Modbus
     # ------------------------------
-    def toggle_modbus_connection(self):
-        logging.getLogger().info("Richiesta connessione/disconnessione Modbus...")
-        self.btn_connect_banco.config(state='disabled')
-        ip_address = self.entry_ip.get()  # lettura widget nel GUI thread
-        self.executor.submit(self._toggle_modbus_worker, ip_address)
+    def connect_modbus(self):
+        logging.getLogger().info("Richiesta connessione Modbus...")
+        ip_address = self.entry_ip.get()
+        self.executor.submit(self._connect_modbus_worker, ip_address)
 
-    def _toggle_modbus_worker(self, ip_address):
+    def _connect_modbus_worker(self, ip_address):
         try:
-            if not self.modbus.is_connesso():
-                self.modbus.connetti(ip_address, 502)
-            else:
-                self._modbus_was_connected = False  # disconnessione volontaria, non triggera l'alert
-                self.modbus.disconnetti()
+            self.modbus.connetti(ip_address, 502)
         except Exception as e:
-            logging.getLogger().error(f"Errore durante l'operazione Modbus: {e}")
+            logging.getLogger().error(f"Errore durante la connessione Modbus: {e}")
         finally:
             self.after(0, self._check_and_update_modbus_status)
-            self.after(0, lambda: self.btn_connect_banco.config(state='normal'))
+
+    def disconnect_modbus(self):
+        logging.getLogger().info("Richiesta disconnessione Modbus...")
+        self.executor.submit(self._disconnect_modbus_worker)
+
+    def _disconnect_modbus_worker(self):
+        try:
+            self._modbus_was_connected = False  # disconnessione volontaria, non triggera l'alert
+            self.modbus.disconnetti()
+        except Exception as e:
+            logging.getLogger().error(f"Errore durante la disconnessione Modbus: {e}")
+        finally:
+            self.after(0, self._check_and_update_modbus_status)
 
     def clicked_button_setspeed_modbus(self):
         try:
