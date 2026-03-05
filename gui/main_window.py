@@ -33,7 +33,7 @@ class MainWindow(tk.Tk):
         self._shutdown_future = None
         self._shutdown_win = None
 
-        self.title("Total Commander")
+        self.title("Total Commander IV")
         self.geometry("1100x850")
 
         self.style = ttk.Style(self)
@@ -337,7 +337,7 @@ class MainWindow(tk.Tk):
         ], start=2):
             g = tk.Frame(bar, bg='#1e1e2e')
             g.grid(row=0, column=col, padx=10)
-            led = tk.Label(g, text=u'●', bg='#1e1e2e', fg='#555555', font=('Helvetica', 14))
+            led = tk.Label(g, text=u'●', bg='#1e1e2e', fg='#555555', font=('Helvetica', 25))
             led.grid(row=0, column=0, padx=(0, 3))
             tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
                      font=('Helvetica', 8)).grid(row=0, column=1)
@@ -351,7 +351,7 @@ class MainWindow(tk.Tk):
                 self.lbl_connected_device.grid(row=0, column=2, padx=(6, 0))
                 self.lbl_connected_address = tk.Label(
                     g, text=u'', bg='#1e1e2e', fg='#555577',
-                    font=('Helvetica', 7), anchor='w'
+                    font=('Helvetica', 8), anchor='w'
                 )
                 self.lbl_connected_address.grid(row=1, column=1, columnspan=2,
                                                 padx=(3, 0), pady=(0, 1))
@@ -362,7 +362,7 @@ class MainWindow(tk.Tk):
         g_hb = tk.Frame(bar, bg='#1e1e2e')
         g_hb.grid(row=0, column=7, padx=10)
         self.led_heartbeat = tk.Label(g_hb, text=u'●', bg='#1e1e2e', fg='#555555',
-                                      font=('Helvetica', 14))
+                                      font=('Helvetica', 25))
         self.led_heartbeat.grid(row=0, column=0, padx=(0, 3))
         self.lbl_hz = tk.Label(g_hb, text='-- Hz', bg='#1e1e2e', fg='#aaaacc',
                                font=('Helvetica', 8))
@@ -373,7 +373,7 @@ class MainWindow(tk.Tk):
         g_auto = tk.Frame(bar, bg='#1e1e2e')
         g_auto.grid(row=0, column=9, padx=10)
         self.led_auto = tk.Label(g_auto, text=u'●', bg='#1e1e2e', fg='#555555',
-                                 font=('Helvetica', 14))
+                                 font=('Helvetica', 25))
         self.led_auto.grid(row=0, column=0, padx=(0, 3))
         self.lbl_auto_status = tk.Label(g_auto, text='Auto: OFF', bg='#1e1e2e', fg='#aaaacc',
                                         font=('Helvetica', 8))
@@ -527,7 +527,7 @@ class MainWindow(tk.Tk):
             self.lbl_connected_device.config(
                 text=self._connected_device_name or u'Sconosciuto', fg='#88ffaa')
             self.lbl_connected_address.config(
-                text=self._connected_device_address or u'', fg='#7799bb')
+                text=self._connected_device_address or u'', fg='#88ffaa')
         else:
             self.lbl_connected_device.config(text=u'—', fg='#666688')
             self.lbl_connected_address.config(text=u'')
