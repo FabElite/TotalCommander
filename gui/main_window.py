@@ -34,7 +34,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win = None
 
         self.title("Total Commander")
-        self.geometry("900x870")
+        self.geometry("1100x850")
 
         self.style = ttk.Style(self)
 
@@ -196,10 +196,49 @@ class MainWindow(tk.Tk):
                                                       font=('Helvetica', 9, 'bold'))
         self.lbl_remaining_duration_value.grid(row=0, column=3, sticky='w')
 
+        # Riga inferiore: Comandi manuali BLE + Controllo Banco affiancati
+        bottom_row = ttk.Frame(left)
+        bottom_row.grid(row=2, column=0, sticky="ew", pady=(0, 4))
+        bottom_row.grid_columnconfigure(0, weight=1)
+        bottom_row.grid_columnconfigure(1, weight=1)
+
         # Comandi manuali BLE
-        self.frame_commands = ttk.LabelFrame(left, text="Comandi manuali BLE")
-        self.frame_commands.grid(row=2, column=0, sticky="ew", pady=(0, 4))
+        self.frame_commands = ttk.LabelFrame(bottom_row, text="Comandi manuali BLE")
+        self.frame_commands.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         self.create_command_controls()
+
+        # Controllo Banco
+        frame_banco_ctrl = ttk.LabelFrame(bottom_row, text="Controllo Banco")
+        frame_banco_ctrl.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+        frame_banco_ctrl.grid_columnconfigure(0, weight=1)
+
+        _vel = ttk.Frame(frame_banco_ctrl)
+        _vel.grid(row=0, column=0, sticky="ew", padx=6, pady=(8, 4))
+        ttk.Label(_vel, text="Vel [km/h]:").grid(row=0, column=0, sticky="e", padx=(0, 4))
+        self.speed_banco_spin = ttk.Spinbox(
+            _vel, from_=0.0, to=100.0, increment=0.1, format="%.1f", width=8
+        )
+        self.speed_banco_spin.set(0.0)
+        self.speed_banco_spin.grid(row=0, column=1, padx=(0, 4))
+        self.btn_set_speed = ttk.Button(_vel, text="Set",
+                                        command=self.clicked_button_setspeed_modbus)
+        self.btn_set_speed.grid(row=0, column=2)
+
+        self.btn_zero_speed = tk.Button(
+            frame_banco_ctrl, text=u"⏹  STOP BANCO",
+            command=self.emergency_stop,
+            font=('Helvetica', 12, 'bold'),
+            bg="#D0021B", fg="white",
+            activebackground="#B00000", activeforeground="white",
+            relief='raised', bd=3, cursor='hand2', height=2,
+        )
+        self.btn_zero_speed.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 8))
+        try:
+            self.btn_zero_speed.config(highlightthickness=2,
+                                       highlightbackground="#660000",
+                                       highlightcolor="#FFFFFF")
+        except Exception:
+            pass
 
         # ── COLONNA DESTRA: Confronto + Dati live ──────────────────────
         right = ttk.Frame(content)
@@ -228,10 +267,10 @@ class MainWindow(tk.Tk):
         frame_lorenz_data = ttk.LabelFrame(live, text="Dati Lorenz")
         frame_lorenz_data.grid(row=0, column=1, sticky="nsew", padx=4)
         frame_lorenz_data.grid_columnconfigure(1, weight=1)
-        self.offset_label        = self._make_live_entry(frame_lorenz_data, "Offset",    0)
+        self.power_lorenz_label  = self._make_live_entry(frame_lorenz_data, "Power",     0)
         self.speed_avg_label     = self._make_live_entry(frame_lorenz_data, "Speed Avg", 1)
         self.torque_lorenz_label = self._make_live_entry(frame_lorenz_data, "Torque",    2)
-        self.power_lorenz_label  = self._make_live_entry(frame_lorenz_data, "Power",     3)
+        self.offset_label        = self._make_live_entry(frame_lorenz_data, "Offset",    3)
 
         frame_com_data = ttk.LabelFrame(live, text="Dati COM")
         frame_com_data.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
@@ -304,6 +343,13 @@ class MainWindow(tk.Tk):
             tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
                      font=('Helvetica', 8)).grid(row=0, column=1)
             setattr(self, attr, led)
+            # Label nome dispositivo solo per BLE
+            if attr == 'led_ble':
+                self.lbl_connected_device = tk.Label(
+                    g, text=u'—', bg='#1e1e2e', fg='#666688',
+                    font=('Helvetica', 8), anchor='w'
+                )
+                self.lbl_connected_device.grid(row=0, column=2, padx=(6, 0))
 
         tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=6, padx=(10, 14))
 
@@ -357,13 +403,7 @@ class MainWindow(tk.Tk):
         self.btn_disconnect.grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
         self.progress = ttk.Progressbar(ble, mode='indeterminate')
-        self.progress.grid(row=3, column=0, sticky="ew", padx=6, pady=(2, 2))
-
-        self.lbl_connected_device = tk.Label(
-            ble, text=u"—", font=('Helvetica', 8), fg='#555555',
-            wraplength=200, justify='center'
-        )
-        self.lbl_connected_device.grid(row=4, column=0, padx=6, pady=(0, 4))
+        self.progress.grid(row=3, column=0, sticky="ew", padx=6, pady=(2, 6))
 
         # ── LORENZ ───────────────────────────────────────────────────
         lorenz = ttk.LabelFrame(bar, text="Lorenz")
@@ -414,7 +454,7 @@ class MainWindow(tk.Tk):
         self.entry_ip.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(6, 2))
 
         _rbo = ttk.Frame(banco)
-        _rbo.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+        _rbo.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 8))
         _rbo.grid_columnconfigure(0, weight=1)
         _rbo.grid_columnconfigure(1, weight=1)
         self.btn_connect_banco = ttk.Button(_rbo, text="Connetti", command=self.connect_modbus)
@@ -422,35 +462,6 @@ class MainWindow(tk.Tk):
         self.btn_disconnect_banco = ttk.Button(_rbo, text="Disconnetti",
                                                command=self.disconnect_modbus)
         self.btn_disconnect_banco.grid(row=0, column=1, sticky="ew", padx=(2, 0))
-
-        _vel = ttk.Frame(banco)
-        _vel.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
-        ttk.Label(_vel, text="Vel [km/h]:").grid(row=0, column=0, sticky="e", padx=(0, 4))
-        self.speed_banco_spin = ttk.Spinbox(
-            _vel, from_=0.0, to=100.0, increment=0.1, format="%.1f", width=8
-        )
-        self.speed_banco_spin.set(0.0)
-        self.speed_banco_spin.grid(row=0, column=1, padx=(0, 4))
-        self.btn_set_speed = ttk.Button(_vel, text="Set",
-                                        command=self.clicked_button_setspeed_modbus)
-        self.btn_set_speed.grid(row=0, column=2)
-
-        self.btn_zero_speed = tk.Button(
-            banco, text=u"⏹  STOP BANCO",
-            command=self.emergency_stop,
-            font=('Helvetica', 12, 'bold'),
-            bg="#D0021B", fg="white",
-            activebackground="#B00000", activeforeground="white",
-            relief='raised', bd=3, cursor='hand2', height=2,
-        )
-        self.btn_zero_speed.grid(row=3, column=0, columnspan=2, sticky="ew",
-                                 padx=6, pady=(4, 6))
-        try:
-            self.btn_zero_speed.config(highlightthickness=2,
-                                       highlightbackground="#660000",
-                                       highlightcolor="#FFFFFF")
-        except Exception:
-            pass
 
         # ── SENSORE COM ──────────────────────────────────────────────
         com = ttk.LabelFrame(bar, text="Sensore COM")
@@ -504,16 +515,12 @@ class MainWindow(tk.Tk):
         entry.config(state='readonly')
 
     def _update_connected_device_label(self):
-        """Aggiorna la label del dispositivo connesso nel pannello stato."""
+        """Aggiorna la label del dispositivo connesso nella status bar."""
         if self._connected_device_name or self._connected_device_address:
-            name = self._connected_device_name or "Sconosciuto"
-            addr = self._connected_device_address or "?"
-            self.lbl_connected_device.config(
-                text=f"{name}  {addr}",
-                foreground='#006600'
-            )
+            name = self._connected_device_name or self._connected_device_address
+            self.lbl_connected_device.config(text=name, fg='#88ffaa')
         else:
-            self.lbl_connected_device.config(text="—", foreground='#555555')
+            self.lbl_connected_device.config(text=u'—', fg='#666688')
 
     def _format_time(self, seconds):
         """Converte i secondi in una stringa formattata HH:MM:SS."""
@@ -809,7 +816,7 @@ class MainWindow(tk.Tk):
             btn.grid(row=i, column=2, padx=5, sticky="ew")
 
     def create_data_fields(self):
-        fields = ["power", "cadence", "speed", "resistance", "total_distance", "elapsed_time"]
+        fields = ["power", "speed", "resistance", "cadence", "total_distance", "elapsed_time"]
         self.data_entries = {}
         self.data_controls = ttk.Frame(self.frame_data)
         self.data_controls.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
