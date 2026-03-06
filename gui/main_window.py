@@ -34,7 +34,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander IV")
-        self.geometry("1300x850")
+        self.geometry("1150x850")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -108,6 +108,7 @@ class MainWindow(tk.Tk):
             on_banco_disconnect  = self._banco_disconnect,
             on_serial_connect    = self._serial_connect,
             on_serial_disconnect = self._serial_disconnect,
+            on_com_toggle        = self._on_com_toggle,
         )
         self._conn_bar.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 2))
 
@@ -611,6 +612,11 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore velocità banco: {e}")
 
     # ── Serial (COM sensor) ───────────────────────────────────────────────────
+
+
+    def _on_com_toggle(self, visible: bool):
+        """Sincronizza visibilità COM tra ConnectionsBar e LiveDataPanel."""
+        self._live_panel.set_com_visible(visible)
 
     def _serial_connect(self, port: str):
         if not port:

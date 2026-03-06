@@ -152,7 +152,7 @@ class LiveDataPanel(ttk.Frame):
         # Header con N=
         hdr = ttk.Frame(f)
         hdr.grid(row=0, column=0, sticky='ew', pady=(2, 10))
-        ttk.Label(hdr, text="# sample=", font=('Helvetica', 8)).grid(row=0, column=0)
+        ttk.Label(hdr, text="Δ%  N=", font=('Helvetica', 8)).grid(row=0, column=0)
         self._n_spin = ttk.Spinbox(hdr, from_=1, to=999, increment=1, width=4,
                                    command=self._on_n_changed)
         self._n_spin.set(self._n)
@@ -208,18 +208,17 @@ class LiveDataPanel(ttk.Frame):
                                      width=_W_S, font=_F_VAL_S)
         self._lrz_torque.grid(row=4, column=1, sticky='w', padx=(0, 8), pady=1)
 
-    # ── COM box ───────────────────────────────────────────────────────────────
+    # ── COM box (nascosta di default, controllata da main_window) ────────────
 
     def _build_com_box(self):
-        f = ttk.LabelFrame(self, text="Dati COM")
-        f.grid(row=0, column=1, sticky='nsew', padx=(4, 0))
-        f.grid_columnconfigure(1, weight=1)
+        self._com_frame = ttk.LabelFrame(self, text="Dati COM")
+        self._com_frame.grid_columnconfigure(1, weight=1)
         self._com = []
         for i in range(4):
-            tk.Label(f, text=f"Valore {i+1}", font=_F_VAL_S,
+            tk.Label(self._com_frame, text=f"Valore {i+1}", font=_F_VAL_S,
                      anchor='e', width=8).grid(row=i, column=0, sticky='e',
                                                padx=(8, 4), pady=3)
-            e = ttk.Entry(f, state='readonly', justify='right',
+            e = ttk.Entry(self._com_frame, state='readonly', justify='right',
                           width=8, font=_F_VAL_S)
             e.grid(row=i, column=1, sticky='ew', padx=(0, 8), pady=3)
             self._com.append(e)
@@ -339,3 +338,11 @@ class LiveDataPanel(ttk.Frame):
     def set_thresholds(self, speed, power):
         self._speed_thr = speed;  self._power_thr = power
         self._refresh_delta()
+
+    def set_com_visible(self, visible: bool):
+        if visible:
+            self.grid_columnconfigure(1, weight=1)
+            self._com_frame.grid(row=0, column=1, sticky='nsew', padx=(4, 0))
+        else:
+            self._com_frame.grid_remove()
+            self.grid_columnconfigure(1, weight=0, minsize=0)

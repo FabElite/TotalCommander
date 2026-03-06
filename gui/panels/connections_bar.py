@@ -1,6 +1,7 @@
 """
-Barra connessioni (row 1): sezioni BLE / Lorenz / Banco / Sensore COM.
-Riceve i callback come argomenti; espone metodi pubblici per aggiornare la UI.
+Barra connessioni (row 1): BLE / Lorenz / Banco / Sensore COM.
+La sezione COM è collassabile: di default mostra solo un pulsante "+COM".
+Il toggle chiama on_com_toggle(visible: bool) → main_window coordina anche LiveDataPanel.
 """
 import tkinter as tk
 from tkinter import ttk
@@ -12,44 +13,49 @@ class ConnectionsBar(ttk.Frame):
 
     def __init__(self, parent, lorenz_reader,
                  on_ble_search,
-                 on_ble_connect,       # () → avvia connessione al dispositivo selezionato
+                 on_ble_connect,
                  on_ble_disconnect,
                  on_lorenz_connect,
                  on_lorenz_disconnect,
                  on_lorenz_read_offset,
-                 on_lorenz_avg_change,  # (value_str) → chiamato su Return/FocusOut
-                 on_lorenz_invert,      # (bool) → invertito sì/no
-                 on_banco_connect,      # (ip_str) → chiamato con IP dalla entry
+                 on_lorenz_avg_change,
+                 on_lorenz_invert,
+                 on_banco_connect,
                  on_banco_disconnect,
-                 on_serial_connect,     # (port_str)
+                 on_serial_connect,
                  on_serial_disconnect,
+                 on_com_toggle,        # (visible: bool) → coordinato da main_window
                  **kwargs):
         super().__init__(parent, **kwargs)
-        self._lorenz_reader = lorenz_reader
-        self._cb_ble_search         = on_ble_search
-        self._cb_ble_connect        = on_ble_connect
-        self._cb_ble_disconnect     = on_ble_disconnect
-        self._cb_lorenz_connect     = on_lorenz_connect
-        self._cb_lorenz_disconnect  = on_lorenz_disconnect
-        self._cb_lorenz_offset      = on_lorenz_read_offset
-        self._cb_lorenz_avg         = on_lorenz_avg_change
-        self._cb_lorenz_invert      = on_lorenz_invert
-        self._cb_banco_connect      = on_banco_connect
-        self._cb_banco_disconnect   = on_banco_disconnect
-        self._cb_serial_connect     = on_serial_connect
-        self._cb_serial_disconnect  = on_serial_disconnect
+        self._lorenz_reader        = lorenz_reader
+        self._cb_ble_search        = on_ble_search
+        self._cb_ble_connect       = on_ble_connect
+        self._cb_ble_disconnect    = on_ble_disconnect
+        self._cb_lorenz_connect    = on_lorenz_connect
+        self._cb_lorenz_disconnect = on_lorenz_disconnect
+        self._cb_lorenz_offset     = on_lorenz_read_offset
+        self._cb_lorenz_avg        = on_lorenz_avg_change
+        self._cb_lorenz_invert     = on_lorenz_invert
+        self._cb_banco_connect     = on_banco_connect
+        self._cb_banco_disconnect  = on_banco_disconnect
+        self._cb_serial_connect    = on_serial_connect
+        self._cb_serial_disconnect = on_serial_disconnect
+        self._cb_com_toggle        = on_com_toggle
+
+        self._com_visible = False
 
         self.grid_columnconfigure(0, weight=3)
         self.grid_columnconfigure(1, weight=2)
         self.grid_columnconfigure(2, weight=2)
-        self.grid_columnconfigure(3, weight=2)
+        self.grid_columnconfigure(3, weight=0)   # COM: parte collassata, niente peso
 
         self._build_ble()
         self._build_lorenz()
         self._build_banco()
-        self._build_com()
+        self._build_com_toggle_btn()
+        self._build_com_panel()          # creato ma non griddato
 
-    # ── Sezioni ───────────────────────────────────────────────────────────────
+    # ── Sezioni sempre visibili ───────────────────────────────────────────────
 
     def _build_ble(self):
         f = ttk.LabelFrame(self, text="BLE")
@@ -67,9 +73,11 @@ class ConnectionsBar(ttk.Frame):
         rb.grid(row=2, column=0, sticky="ew", padx=6, pady=2)
         rb.grid_columnconfigure(0, weight=1); rb.grid_columnconfigure(1, weight=1)
         ttk.Button(rb, text="Connetti",
-                   command=self._cb_ble_connect).grid(row=0, column=0, sticky="ew", padx=(0, 2))
+                   command=self._cb_ble_connect
+                   ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
         ttk.Button(rb, text="Disconnetti",
-                   command=self._cb_ble_disconnect).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+                   command=self._cb_ble_disconnect
+                   ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
         self.progress = ttk.Progressbar(f, mode='indeterminate')
         self.progress.grid(row=3, column=0, sticky="ew", padx=6, pady=(2, 6))
@@ -83,12 +91,15 @@ class ConnectionsBar(ttk.Frame):
         rl.grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 2))
         rl.grid_columnconfigure(0, weight=1); rl.grid_columnconfigure(1, weight=1)
         ttk.Button(rl, text="Connetti",
-                   command=self._cb_lorenz_connect).grid(row=0, column=0, sticky="ew", padx=(0, 2))
+                   command=self._cb_lorenz_connect
+                   ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
         ttk.Button(rl, text="Disconnetti",
-                   command=self._cb_lorenz_disconnect).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+                   command=self._cb_lorenz_disconnect
+                   ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
         ttk.Button(f, text="Leggi Offset",
-                   command=self._cb_lorenz_offset).grid(row=1, column=0, sticky="ew", padx=6, pady=2)
+                   command=self._cb_lorenz_offset
+                   ).grid(row=1, column=0, sticky="ew", padx=6, pady=2)
         self._offset_entry = ttk.Entry(f, state='readonly', justify='right', width=9)
         self._offset_entry.grid(row=1, column=1, sticky="ew", padx=(2, 6), pady=2)
 
@@ -106,14 +117,16 @@ class ConnectionsBar(ttk.Frame):
         ttk.Checkbutton(f, text="Inverti Velocità",
                         variable=self._invert_var,
                         command=lambda: self._cb_lorenz_invert(self._invert_var.get())
-                        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=6, pady=(2, 6))
+                        ).grid(row=3, column=0, columnspan=2, sticky="w",
+                               padx=6, pady=(2, 6))
 
     def _build_banco(self):
         f = ttk.LabelFrame(self, text="Banco")
         f.grid(row=0, column=2, sticky="nsew", padx=4, pady=2)
         f.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(f, text="IP:").grid(row=0, column=0, sticky="e", padx=(6, 4), pady=(6, 2))
+        ttk.Label(f, text="IP:").grid(row=0, column=0, sticky="e",
+                                      padx=(6, 4), pady=(6, 2))
         self._entry_ip = ttk.Entry(f, width=14)
         self._entry_ip.insert(0, "192.168.0.10")
         self._entry_ip.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(6, 2))
@@ -125,14 +138,31 @@ class ConnectionsBar(ttk.Frame):
                    command=lambda: self._cb_banco_connect(self._entry_ip.get())
                    ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
         ttk.Button(rb, text="Disconnetti",
-                   command=self._cb_banco_disconnect).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+                   command=self._cb_banco_disconnect
+                   ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
-    def _build_com(self):
+    # ── Sezione COM collassabile ──────────────────────────────────────────────
+
+    def _build_com_toggle_btn(self):
+        """Pulsante piccolo sempre visibile in col 3 quando COM è chiuso."""
+        self._btn_com = tk.Button(
+            self, text="COM ＋",
+            command=self._toggle_com,
+            font=('Helvetica', 8, 'bold'),
+            bg='#e8e8e8', fg='#555555',
+            relief='flat', bd=1,
+            cursor='hand2', padx=6, pady=4,
+        )
+        self._btn_com.grid(row=0, column=3, sticky='ns', padx=(4, 0), pady=2)
+
+    def _build_com_panel(self):
+        """LabelFrame COM — costruito subito ma non griddato."""
         f = ttk.LabelFrame(self, text="Sensore COM")
-        f.grid(row=0, column=3, sticky="nsew", padx=(4, 0), pady=2)
         f.grid_columnconfigure(1, weight=1)
+        self._com_frame = f
 
-        ttk.Label(f, text="Porta:").grid(row=0, column=0, sticky="e", padx=(6, 4), pady=(6, 2))
+        ttk.Label(f, text="Porta:").grid(row=0, column=0, sticky="e",
+                                         padx=(6, 4), pady=(6, 2))
         self._com_combo = ttk.Combobox(f, values=self._get_ports(), width=10)
         self._com_combo.grid(row=0, column=1, sticky="ew", padx=(0, 2), pady=(6, 2))
         tk.Button(f, text="🔄", command=self._refresh_ports,
@@ -147,7 +177,12 @@ class ConnectionsBar(ttk.Frame):
                    command=lambda: self._cb_serial_connect(self._com_combo.get())
                    ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
         ttk.Button(rc, text="Disconnetti",
-                   command=self._cb_serial_disconnect).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+                   command=self._cb_serial_disconnect
+                   ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+    def _toggle_com(self):
+        self.set_com_visible(not self._com_visible)
+        self._cb_com_toggle(self._com_visible)
 
     # ── Helpers interni ───────────────────────────────────────────────────────
 
@@ -158,17 +193,34 @@ class ConnectionsBar(ttk.Frame):
         current = self._com_combo.get()
         ports = self._get_ports()
         self._com_combo['values'] = ports
-        if current in ports:
-            self._com_combo.set(current)
-        elif ports:
-            self._com_combo.set(ports[0])
-        else:
-            self._com_combo.set('')
+        self._com_combo.set(
+            current if current in ports else (ports[0] if ports else ''))
 
     # ── API pubblica ──────────────────────────────────────────────────────────
 
+    def set_com_visible(self, visible: bool):
+        self._com_visible = visible
+        if visible:
+            self.grid_columnconfigure(3, weight=2)
+            self._btn_com.grid_remove()
+            self._com_frame.grid(row=0, column=3, sticky="nsew",
+                                 padx=(4, 0), pady=2)
+            self._btn_com_close = tk.Button(
+                self._com_frame, text="✕",
+                command=self._toggle_com,
+                font=('Helvetica', 8), fg='#888888',
+                relief='flat', bd=0, cursor='hand2',
+            )
+            self._btn_com_close.place(relx=1.0, rely=0.0, anchor='ne', x=-4, y=2)
+        else:
+            self._com_frame.grid_remove()
+            if hasattr(self, '_btn_com_close'):
+                self._btn_com_close.destroy()
+            self.grid_columnconfigure(3, weight=0)
+            self._btn_com.grid(row=0, column=3, sticky='ns',
+                               padx=(4, 0), pady=2)
+
     def get_selected_ble_device(self):
-        """Restituisce (name, address) del dispositivo selezionato, o (None, None)."""
         sel = self.device_list.get(tk.ACTIVE) if self.device_list.size() > 0 else ""
         if not sel:
             return None, None
@@ -179,7 +231,6 @@ class ConnectionsBar(ttk.Frame):
             return None, None
 
     def populate_ble_list(self, devices: dict):
-        """devices: {address: (name, rssi)}"""
         self.device_list.delete(0, tk.END)
         for address, (name, rssi) in devices.items():
             self.device_list.insert(tk.END, f"{name} - {address} - RSSI: {rssi}")
