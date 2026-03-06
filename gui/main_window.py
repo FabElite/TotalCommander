@@ -883,12 +883,21 @@ class MainWindow(tk.Tk):
             self._set_led(self.led_ble, 'warn')
         elif is_connected:
             self._set_led(self.led_ble, 'ok')
+            if not self._ble_was_connected:
+                self.after(2000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
                 self._on_ble_unexpected_disconnect()
             self._set_led(self.led_ble, 'err')
             self._ble_was_connected = False
+
+    def _auto_enable_ftms(self):
+        """Abilita le notifiche FTMS automaticamente dopo connessione BLE."""
+        if (self.ble_manager.get_connection_status()
+                and self.btn_toggle_data.cget('text') == 'Abilita Dati'):
+            logging.getLogger().info("BLE connesso — abilito notifiche FTMS automaticamente.")
+            self.toggle_data()
 
     def _on_ble_unexpected_disconnect(self):
         """Chiamato quando il BLE passa da connesso a disconnesso senza un'azione esplicita dell'utente."""
