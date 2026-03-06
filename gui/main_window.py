@@ -1,771 +1,200 @@
+"""
+MainWindow — orchestratore principale.
+Istanzia librerie, pannelli e controller; gestisce solo la logica di collegamento
+tra i vari componenti (connessioni, polling, shutdown).
+Tutta la UI di dettaglio vive nei rispettivi panel; le funzioni pure in logic/.
+"""
 import tkinter as tk
 from tkinter import ttk
-import queue
-from concurrent.futures import ThreadPoolExecutor
-import logging
-import json
-import os
-import sys
-import subprocess
 import asyncio
+import logging
+import os
+import subprocess
+import sys
 import threading
-import math
 import time
-import datetime
-from collections import deque  # <-- per smoothing Δ
+from concurrent.futures import ThreadPoolExecutor
+
 from shared_lib.bluetooth_manager import BLEManager
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
-from logic.data_processing import DataProcessor
-from tkinter import filedialog
-import serial.tools.list_ports
 from shared_lib.SerialDataLib import SerialDataReader
+from logic.data_processing import DataProcessor
+from logic import settings_manager
+
+from gui.panels.status_bar      import StatusBar
+from gui.panels.connections_bar import ConnectionsBar
+from gui.panels.csv_panel       import CsvPanel
+from gui.panels.compare_panel   import ComparePanel
+from gui.panels.live_data_panel import LiveDataPanel
+from gui.panels.log_panel       import LogPanel
+
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.lorenz_update_id = None
-        self.periodic_check_id = None
-        self.auto_command_id = None
-        self.countdown_timer_id = None  # <-- Aggiunto
-        self.total_test_duration_seconds = 0  # <-- Aggiunto
-        self.remaining_test_duration_seconds = 0  # <-- Aggiunto
-        self._shutdown_future = None
-        self._shutdown_win = None
-
         self.title("Total Commander IV")
         self.geometry("1200x850")
 
+        # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
-
-        # Stile pulsante dati ON/OFF
-        self.style.configure('Data.Enabled.TButton', foreground='#008000', font=('Helvetica', 10, 'bold'))
+        self.style.configure('Data.Enabled.TButton',  foreground='#008000', font=('Helvetica', 10, 'bold'))
         self.style.configure('Data.Disabled.TButton', foreground='#CC0000', font=('Helvetica', 10, 'bold'))
-
-        # Stili compatti per la tabella CSV (ulteriore accorciamento)
-        self.style.configure('Compact.Treeview', rowheight=16, font=('Helvetica', 8))
+        self.style.configure('Compact.Treeview',         rowheight=16, font=('Helvetica', 8))
         self.style.configure('Compact.Treeview.Heading', font=('Helvetica', 8, 'bold'), padding=(3, 1))
 
-        # Font evidenziato per i valori chiave nel pannello di confronto
-        self.value_font = ('Helvetica', 12, 'bold')
-
-        self.ble_manager = BLEManager()
+        # ── Librerie ──────────────────────────────────────────────────────────
+        self.ble_manager    = BLEManager()
         self.data_processor = DataProcessor()
-        self.modbus = ModbusBancoCollaudo()
-        self.executor = ThreadPoolExecutor(max_workers=5)
-        self.auto_commands_running = False
-        self.lorenz_reader = LorenzReader()
-        self.serial_reader = SerialDataReader(baudrate=115200)
-        self.serial_update_id = None
+        self.modbus         = ModbusBancoCollaudo()
+        self.lorenz_reader  = LorenzReader()
+        self.serial_reader  = SerialDataReader(baudrate=115200)
+        self.executor       = ThreadPoolExecutor(max_workers=5)
 
+        # ── Stato connessioni (per rilevare disconnessioni inattese) ──────────
+        self._ble_was_connected    = False
+        self._lorenz_was_connected = False
+        self._serial_was_connected = False
+        self._modbus_was_connected = False
+        self._connected_device_name    = None
+        self._connected_device_address = None
+
+        # ── Settings ──────────────────────────────────────────────────────────
         self.settings_file = "settings.json"
-
-        # Soglie Δ (defaults) – sovrascritte da settings.json se presenti
-        self.delta_speed_thresholds_kmh = (1.0, 3.0)  # verde <=1.0, arancione <=3.0, rosso >3.0
-        self.delta_power_thresholds_pct = (2.0, 5.0)  # verde <=2%, arancione <=5%, rosso >5%
-        # Finestra smoothing (default) – overridable da settings
+        self.delta_speed_thresholds_kmh = (1.0, 3.0)
+        self.delta_power_thresholds_pct = (2.0, 5.0)
         self.delta_smoothing_window = 5
+        self._load_settings()
 
-        self._shutdown_anim_id = None
-        self._shutdown_pb = None
-        self._ble_was_connected = False       # traccia lo stato precedente per rilevare disconnessioni
-        self._connected_device_name = None    # nome del dispositivo connesso
-        self._connected_device_address = None # indirizzo del dispositivo connesso
-        self._lorenz_was_connected = False    # idem per Lorenz
-        self._serial_was_connected = False    # idem per sensore seriale
-        self._modbus_was_connected = False    # idem per Modbus
-
-        # --- Loop asyncio dedicato al BLE (persistente) ---
-        self._ble_loop = None
+        # ── Loop asyncio BLE persistente ──────────────────────────────────────
+        self._ble_loop       = None
         self._ble_loop_thread = None
-        self._ble_loop_ready = threading.Event()
+        self._ble_loop_ready  = threading.Event()
         self._init_ble_loop()
 
-        # Carica impostazioni (incluso soglie delta e smoothing)
-        self.load_settings()
+        # ── Timer ids ─────────────────────────────────────────────────────────
+        self.periodic_check_id = None
+        self.lorenz_update_id  = None
+        self.serial_update_id  = None
+        self._heartbeat_reset_id = None
+        self._last_packet_time   = None
+        self._shutdown_future = None
+        self._shutdown_win    = None
+        self._shutdown_anim_id = None
+        self._shutdown_pb      = None
 
-        # ── ROOT GRID ──────────────────────────────────────────────────
+        # ── Layout root ───────────────────────────────────────────────────────
         self.grid_rowconfigure(0, weight=0)   # status bar
-        self.grid_rowconfigure(1, weight=0)   # barra connessioni
-        self.grid_rowconfigure(2, weight=1)   # contenuto principale
+        self.grid_rowconfigure(1, weight=0)   # connections bar
+        self.grid_rowconfigure(2, weight=1)   # content
         self.grid_rowconfigure(3, weight=0)   # log
         self.grid_columnconfigure(0, weight=1)
 
-        # Stato heartbeat BLE
-        self._last_packet_time = None
-        self._heartbeat_reset_id = None
+        # ── Pannelli ──────────────────────────────────────────────────────────
+        self._status_bar = StatusBar(self)
+        self._status_bar.grid(row=0, column=0, sticky="ew")
 
-        # Buffer Δ e ultimi valori BLE/Lorenz
-        win = max(1, int(self.delta_smoothing_window))
-        self._delta_speed_hist = deque(maxlen=win)
-        self._delta_power_hist = deque(maxlen=win)
-        self._last_ble_speed = None
-        self._last_ble_power = None
-        self._last_lrz_speed = None
-        self._last_lrz_power = None
+        self._conn_bar = ConnectionsBar(
+            self, self.lorenz_reader,
+            on_ble_search        = self._ble_search,
+            on_ble_connect       = self._ble_connect,
+            on_ble_disconnect    = self._ble_disconnect,
+            on_lorenz_connect    = self._lorenz_connect,
+            on_lorenz_disconnect = self._lorenz_disconnect,
+            on_lorenz_read_offset= self._lorenz_read_offset,
+            on_lorenz_avg_change = self._lorenz_avg_changed,
+            on_lorenz_invert     = self._lorenz_invert_speed,
+            on_banco_connect     = self._banco_connect,
+            on_banco_disconnect  = self._banco_disconnect,
+            on_serial_connect    = self._serial_connect,
+            on_serial_disconnect = self._serial_disconnect,
+        )
+        self._conn_bar.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 2))
 
-        # ── ROW 0: STATUS BAR ──────────────────────────────────────────
-        self._create_status_bar()
-
-        # ── ROW 1: BARRA CONNESSIONI ───────────────────────────────────
-        self._create_connections_bar()
-
-        # ── ROW 2: CONTENUTO PRINCIPALE ────────────────────────────────
+        # Content area (2 colonne)
         content = ttk.Frame(self)
         content.grid(row=2, column=0, sticky="nsew", padx=6, pady=(0, 4))
         content.grid_columnconfigure(0, weight=0)
         content.grid_columnconfigure(1, weight=1)
         content.grid_rowconfigure(0, weight=1)
 
-        # ── COLONNA SINISTRA: col A (CSV+auto) | col B (BLE+Banco) ────
-        left = ttk.Frame(content)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        left.grid_columnconfigure(0, weight=1)   # col A espandibile
-        left.grid_columnconfigure(1, weight=0)   # col B larghezza fissa
-        left.grid_rowconfigure(0, weight=1)      # CSV si espande
-        left.grid_rowconfigure(1, weight=0)      # auto comandi fisso
-
-        # ── COL A – Tabella CSV ─────────────────────────────────────────
-        self.automatic_commands = ttk.LabelFrame(left, text="Comandi da CSV")
-        self.automatic_commands.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
-        self.automatic_commands.grid_rowconfigure(0, weight=1)
-        self.automatic_commands.grid_columnconfigure(0, weight=1)
-        self.scrollbar = ttk.Scrollbar(self.automatic_commands, orient="vertical")
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
-        self.commands_table = ttk.Treeview(
-            self.automatic_commands,
-            columns=("Comando", "Val", "t[s]", "Vb[km/h]"),
-            show='headings',
-            yscrollcommand=self.scrollbar.set,
-            style='Compact.Treeview'
+        self._csv_panel = CsvPanel(
+            content,
+            on_dispatch          = self._dispatch_command,
+            on_set_banco_speed   = self._set_banco_speed,
+            on_auto_status       = self._status_bar.set_auto,
+            on_auto_completed    = self._on_auto_commands_completed,
+            on_send_level        = self._send_level,
+            on_send_power        = self._send_power,
+            on_send_simulation   = self._send_simulation,
+            on_emergency_stop    = self._emergency_stop,
         )
-        self.commands_table.heading("Comando",   text="Comando")
-        self.commands_table.heading("Val",       text="Val")
-        self.commands_table.heading("t[s]",      text="t[s]")
-        self.commands_table.heading("Vb[km/h]",  text="Vb[km/h]")
-        self.commands_table.column("Comando",    width=95,  anchor='center')
-        self.commands_table.column("Val",        width=70,  anchor='center')
-        self.commands_table.column("t[s]",       width=55,  anchor='center')
-        self.commands_table.column("Vb[km/h]",   width=85,  anchor='center')
-        self.commands_table.grid(row=0, column=0, sticky="nsew", padx=8, pady=4)
-        self.scrollbar.config(command=self.commands_table.yview)
-        self.commands_table.tag_configure('oddrow',     background='lightgrey')
-        self.commands_table.tag_configure('evenrow',    background='white')
-        self.commands_table.tag_configure('currentrow', background='yellow')
+        self._csv_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
-        # ── COL A – Comandi automatici ──────────────────────────────────
-        self.frame_auto_commands = ttk.LabelFrame(left, text="Comandi automatici")
-        self.frame_auto_commands.grid(row=1, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
-        self.frame_auto_commands.grid_columnconfigure(0, weight=1)
-        self.frame_auto_commands.grid_columnconfigure(1, weight=1)
-
-        self._csv_single_cycle_seconds = 0
-        self.led_status = tk.Label(self.frame_auto_commands, text="Comandi Automatici: OFF",
-                                   fg="red", font=('Helvetica', 9))
-        self.led_status.grid(row=0, column=0, columnspan=2, padx=8, pady=(4, 2), sticky="w")
-
-        self.btn_load_commands = ttk.Button(self.frame_auto_commands, text="Carica CSV",
-                                            command=self.load_commands_from_csv)
-        self.btn_load_commands.grid(row=1, column=0, padx=(8, 4), pady=2, sticky='ew')
-        self.btn_auto_commands = ttk.Button(self.frame_auto_commands, text=u"▶  Start",
-                                            command=self.launch_auto_commands)
-        self.btn_auto_commands.grid(row=1, column=1, padx=(4, 8), pady=2, sticky='ew')
-
-        frame_cicli = ttk.Frame(self.frame_auto_commands)
-        frame_cicli.grid(row=2, column=0, padx=8, pady=2, sticky='w')
-        ttk.Label(frame_cicli, text="N. Cicli:").grid(row=0, column=0, padx=(0, 4))
-        self.cycles_spinbox = ttk.Spinbox(frame_cicli, from_=1, to=9999, increment=1, width=6,
-                                          command=self._on_cycles_changed)
-        self.cycles_spinbox.set(1)
-        self.cycles_spinbox.grid(row=0, column=1)
-        self.cycles_spinbox.bind("<FocusOut>", lambda e: self._on_cycles_changed())
-        self.cycles_spinbox.bind("<Return>",   lambda e: self._on_cycles_changed())
-
-        self.btn_stop_auto_commands = ttk.Button(self.frame_auto_commands, text=u"■  Stop",
-                                                 command=self.stop_auto_commands)
-        self.btn_stop_auto_commands.grid(row=2, column=1, padx=(4, 8), pady=2, sticky='ew')
-
-        # Riga durate
-        dur_row = ttk.Frame(self.frame_auto_commands)
-        dur_row.grid(row=3, column=0, columnspan=2, sticky='ew', padx=8, pady=(2, 2))
-        ttk.Label(dur_row, text="Totale:").grid(row=0, column=0, sticky='w', padx=(0, 4))
-        self.lbl_total_duration_value = ttk.Label(dur_row, text="--:--:--",
-                                                  font=('Helvetica', 9, 'bold'))
-        self.lbl_total_duration_value.grid(row=0, column=1, sticky='w', padx=(0, 14))
-        ttk.Label(dur_row, text="Rimanente:").grid(row=0, column=2, sticky='w', padx=(0, 4))
-        self.lbl_remaining_duration_value = ttk.Label(dur_row, text="--:--:--",
-                                                      font=('Helvetica', 9, 'bold'))
-        self.lbl_remaining_duration_value.grid(row=0, column=3, sticky='w')
-
-        # Riga ora inizio / ora fine
-        time_row = ttk.Frame(self.frame_auto_commands)
-        time_row.grid(row=4, column=0, columnspan=2, sticky='ew', padx=8, pady=(2, 6))
-        ttk.Label(time_row, text="Inizio:").grid(row=0, column=0, sticky='w', padx=(0, 4))
-        self.lbl_ora_inizio = ttk.Label(time_row, text="--:--:--",
-                                        font=('Helvetica', 9, 'bold'), foreground='#005500')
-        self.lbl_ora_inizio.grid(row=0, column=1, sticky='w', padx=(0, 14))
-        ttk.Label(time_row, text="Fine:").grid(row=0, column=2, sticky='w', padx=(0, 4))
-        self.lbl_ora_fine = ttk.Label(time_row, text="--:--:--",
-                                      font=('Helvetica', 9, 'bold'), foreground='#550000')
-        self.lbl_ora_fine.grid(row=0, column=3, sticky='w')
-
-        # ── COL B – contenitore senza spazi vuoti ──────────────────────
-        col_b = ttk.Frame(left)
-        col_b.grid(row=0, column=1, rowspan=2, sticky="new", padx=(4, 0))
-        col_b.grid_columnconfigure(0, weight=1)
-
-        # Comandi manuali BLE (in alto)
-        self.frame_commands = ttk.LabelFrame(col_b, text="Comandi manuali BLE")
-        self.frame_commands.grid(row=0, column=0, sticky="ew", pady=(0, 4))
-        self.create_command_controls()
-
-        # Controllo Banco (subito sotto, nessun gap)
-        frame_banco_ctrl = ttk.LabelFrame(col_b, text="Controllo Banco")
-        frame_banco_ctrl.grid(row=1, column=0, sticky="ew")
-        frame_banco_ctrl.grid_columnconfigure(0, weight=1)
-
-        _vel = ttk.Frame(frame_banco_ctrl)
-        _vel.grid(row=0, column=0, sticky="ew", padx=6, pady=(8, 4))
-        ttk.Label(_vel, text="Vel [km/h]:").grid(row=0, column=0, sticky="e", padx=(0, 4))
-        self.speed_banco_spin = ttk.Spinbox(
-            _vel, from_=0.0, to=100.0, increment=0.1, format="%.1f", width=8
-        )
-        self.speed_banco_spin.set(0.0)
-        self.speed_banco_spin.grid(row=0, column=1, padx=(0, 4))
-        self.btn_set_speed = ttk.Button(_vel, text="Set",
-                                        command=self.clicked_button_setspeed_modbus)
-        self.btn_set_speed.grid(row=0, column=2)
-
-        self.btn_zero_speed = tk.Button(
-            frame_banco_ctrl, text=u"⏹  STOP BANCO",
-            command=self.emergency_stop,
-            font=('Helvetica', 12, 'bold'),
-            bg="#D0021B", fg="white",
-            activebackground="#B00000", activeforeground="white",
-            relief='raised', bd=3, cursor='hand2', height=2,
-        )
-        self.btn_zero_speed.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 8))
-        try:
-            self.btn_zero_speed.config(highlightthickness=2,
-                                       highlightbackground="#660000",
-                                       highlightcolor="#FFFFFF")
-        except Exception:
-            pass
-
-        # ── COLONNA DESTRA: Confronto + Dati live ──────────────────────
         right = ttk.Frame(content)
         right.grid(row=0, column=1, sticky="nsew")
         right.grid_columnconfigure(0, weight=1)
         right.grid_rowconfigure(0, weight=0)
         right.grid_rowconfigure(1, weight=1)
 
-        # Pannello confronto BLE ↔ Lorenz
-        self.right_wrapper = right  # compatibilità con _create_compare_panel
-        self._create_compare_panel()
-        self.compare_frame.grid(row=0, column=0, sticky="ew", pady=(0, 4))
-
-        # Dati live — 3 box affiancati
-        live = ttk.Frame(right)
-        live.grid(row=1, column=0, sticky="nsew")
-        live.grid_columnconfigure(0, weight=1)
-        live.grid_columnconfigure(1, weight=1)
-        live.grid_columnconfigure(2, weight=1)
-        live.grid_rowconfigure(0, weight=1)
-
-        self.frame_data = ttk.LabelFrame(live, text="Dati BLE FTMS")
-        self.frame_data.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
-        self.create_data_fields()
-
-        frame_lorenz_data = ttk.LabelFrame(live, text="Dati Lorenz")
-        frame_lorenz_data.grid(row=0, column=1, sticky="nsew", padx=4)
-        frame_lorenz_data.grid_columnconfigure(1, weight=1)
-        self.power_lorenz_label  = self._make_live_entry(frame_lorenz_data, "Power",     0)
-        self.speed_avg_label     = self._make_live_entry(frame_lorenz_data, "Speed Avg", 1)
-        self.torque_lorenz_label = self._make_live_entry(frame_lorenz_data, "Torque",    2)
-
-        frame_com_data = ttk.LabelFrame(live, text="Dati COM")
-        frame_com_data.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
-        frame_com_data.grid_columnconfigure(1, weight=1)
-        self.value1_label = self._make_live_entry(frame_com_data, "Valore 1", 0)
-        self.value2_label = self._make_live_entry(frame_com_data, "Valore 2", 1)
-        self.value3_label = self._make_live_entry(frame_com_data, "Valore 3", 2)
-        self.value4_label = self._make_live_entry(frame_com_data, "Valore 4", 3)
-
-        # ── ROW 3: LOG ─────────────────────────────────────────────────
-        self.autoscroll_log_var = tk.BooleanVar(value=True)
-        self.frame_log = ttk.LabelFrame(self, text="Log delle Attività")
-        self.frame_log.grid(row=3, column=0, sticky="nsew", padx=6, pady=(0, 6))
-        self.frame_log.grid_columnconfigure(0, weight=1)
-        self.frame_log.grid_rowconfigure(0, weight=1)
-        self.log_queue = queue.Queue()
-        self._process_log_queue()
-        chk_autoscroll = ttk.Checkbutton(
-            self.frame_log, text="Auto-scroll", variable=self.autoscroll_log_var
+        self._compare_panel = ComparePanel(
+            right,
+            smoothing_window  = self.delta_smoothing_window,
+            speed_thresholds  = self.delta_speed_thresholds_kmh,
+            power_thresholds  = self.delta_power_thresholds_pct,
+            value_font        = ('Helvetica', 12, 'bold'),
         )
-        chk_autoscroll.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 5))
-        self.log_scrollbar = ttk.Scrollbar(self.frame_log, orient="vertical")
-        self.log_scrollbar.grid(row=0, column=1, sticky="ns", pady=6)
-        self.log_text = tk.Text(
-            self.frame_log, state='disabled', height=8,
-            yscrollcommand=self.log_scrollbar.set
-        )
-        self.log_text.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-        self.log_scrollbar.config(command=self.log_text.yview)
-        self.log_text.tag_configure('DEBUG',    foreground='#888888')
-        self.log_text.tag_configure('INFO',     foreground='#111111')
-        self.log_text.tag_configure('WARNING',  foreground='#B86000')
-        self.log_text.tag_configure('ERROR',    foreground='#CC0000')
-        self.log_text.tag_configure('CRITICAL', foreground='#ffffff', background='#CC0000',
-                                    font=('Helvetica', 9, 'bold'))
+        self._compare_panel.grid(row=0, column=0, sticky="ew", pady=(0, 4))
 
-        # Aggiorna offset all'avvio
-        self._set_ro(self.offset_label, f"{self.lorenz_reader.offset:.2f}")
+        self._live_panel = LiveDataPanel(right, on_toggle_ftms=self._toggle_ftms, style=self.style)
+        self._live_panel.grid(row=1, column=0, sticky="nsew")
+
+        self._log_panel = LogPanel(self)
+        self._log_panel.grid(row=3, column=0, sticky="nsew", padx=6, pady=(0, 6))
+        self.log_queue = self._log_panel.log_queue   # esposto per main.py
+
+        # Aggiorna offset al primo avvio
+        self._conn_bar.set_offset(self.lorenz_reader.offset)
 
         self._create_menu()
         self.periodic_connection_check()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    # ------------------------------
-    # Helper per entry readonly
-    # ------------------------------
+    # ── Settings ─────────────────────────────────────────────────────────────
 
-    # ------------------------------
-    # Status bar globale
-    # ------------------------------
-    def _create_status_bar(self):
-        bar = tk.Frame(self, bg='#1e1e2e', pady=5)
-        bar.grid(row=0, column=0, sticky="ew")
-        bar.grid_columnconfigure(99, weight=1)
-
-        tk.Label(bar, text="TOTAL COMMANDER IV", bg='#1e1e2e', fg='#8888aa',
-                 font=('Helvetica', 9, 'bold')).grid(row=0, column=0, padx=(12, 16))
-        tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=1, padx=(0, 14))
-
-        for col, (attr, label) in enumerate([
-            ('led_ble',    'BLE'),
-            ('led_lorenz', 'Lorenz'),
-            ('led_banco',  'Banco'),
-            ('led_com',    'COM'),
-        ], start=2):
-            g = tk.Frame(bar, bg='#1e1e2e')
-            g.grid(row=0, column=col, padx=10)
-            led = tk.Label(g, text=u'●', bg='#1e1e2e', fg='#555555', font=('Helvetica', 25))
-            led.grid(row=0, column=0, padx=(0, 3))
-            tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
-                     font=('Helvetica', 8)).grid(row=0, column=1)
-            setattr(self, attr, led)
-            # Nome + indirizzo solo per BLE (due righe nello stesso gruppo)
-            if attr == 'led_ble':
-                self.lbl_connected_device = tk.Label(
-                    g, text=u'—', bg='#1e1e2e', fg='#666688',
-                    font=('Helvetica', 8), anchor='w'
-                )
-                self.lbl_connected_device.grid(row=0, column=2, padx=(6, 0))
-                self.lbl_connected_address = tk.Label(
-                    g, text=u'', bg='#1e1e2e', fg='#555577',
-                    font=('Helvetica', 8), anchor='w'
-                )
-                self.lbl_connected_address.grid(row=1, column=1, columnspan=2,
-                                                padx=(3, 0), pady=(0, 1))
-
-        tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=6, padx=(10, 14))
-
-        # Heartbeat BLE: lampeggia ad ogni pacchetto ricevuto
-        g_hb = tk.Frame(bar, bg='#1e1e2e')
-        g_hb.grid(row=0, column=7, padx=10)
-        self.led_heartbeat = tk.Label(g_hb, text=u'●', bg='#1e1e2e', fg='#555555',
-                                      font=('Helvetica', 25))
-        self.led_heartbeat.grid(row=0, column=0, padx=(0, 3))
-        self.lbl_hz = tk.Label(g_hb, text='-- Hz', bg='#1e1e2e', fg='#aaaacc',
-                               font=('Helvetica', 8))
-        self.lbl_hz.grid(row=0, column=1)
-
-        tk.Frame(bar, bg='#444466', width=1, height=20).grid(row=0, column=8, padx=(10, 14))
-
-        g_auto = tk.Frame(bar, bg='#1e1e2e')
-        g_auto.grid(row=0, column=9, padx=10)
-        self.led_auto = tk.Label(g_auto, text=u'●', bg='#1e1e2e', fg='#555555',
-                                 font=('Helvetica', 25))
-        self.led_auto.grid(row=0, column=0, padx=(0, 3))
-        self.lbl_auto_status = tk.Label(g_auto, text='Auto: OFF', bg='#1e1e2e', fg='#aaaacc',
-                                        font=('Helvetica', 8))
-        self.lbl_auto_status.grid(row=0, column=1)
-
-    def _create_connections_bar(self):
-        bar = ttk.Frame(self)
-        bar.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 2))
-        bar.grid_columnconfigure(0, weight=3)
-        bar.grid_columnconfigure(1, weight=2)
-        bar.grid_columnconfigure(2, weight=2)
-        bar.grid_columnconfigure(3, weight=2)
-
-        # ── BLE ──────────────────────────────────────────────────────
-        ble = ttk.LabelFrame(bar, text="BLE")
-        ble.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=2)
-        ble.grid_columnconfigure(0, weight=1)
-
-        self.device_list = tk.Listbox(ble, height=4, font=('Helvetica', 8))
-        self.device_list.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 2))
-
-        self.btn_search = ttk.Button(ble, text="Cerca Dispositivi", command=self.search_devices)
-        self.btn_search.grid(row=1, column=0, sticky="ew", padx=6, pady=2)
-
-        _rb = ttk.Frame(ble)
-        _rb.grid(row=2, column=0, sticky="ew", padx=6, pady=2)
-        _rb.grid_columnconfigure(0, weight=1)
-        _rb.grid_columnconfigure(1, weight=1)
-        self.btn_connect = ttk.Button(_rb, text="Connetti", command=self.connect_device)
-        self.btn_connect.grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        self.btn_disconnect = ttk.Button(_rb, text="Disconnetti", command=self.disconnect_device)
-        self.btn_disconnect.grid(row=0, column=1, sticky="ew", padx=(2, 0))
-
-        self.progress = ttk.Progressbar(ble, mode='indeterminate')
-        self.progress.grid(row=3, column=0, sticky="ew", padx=6, pady=(2, 6))
-
-        # ── LORENZ ───────────────────────────────────────────────────
-        lorenz = ttk.LabelFrame(bar, text="Lorenz")
-        lorenz.grid(row=0, column=1, sticky="nsew", padx=4, pady=2)
-        lorenz.grid_columnconfigure(0, weight=1)
-        lorenz.grid_columnconfigure(1, weight=1)
-        self.lorenz_controls = lorenz
-
-        _rl = ttk.Frame(lorenz)
-        _rl.grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 2))
-        _rl.grid_columnconfigure(0, weight=1)
-        _rl.grid_columnconfigure(1, weight=1)
-        self.btn_connect_lorenz = ttk.Button(_rl, text="Connetti", command=self.connect_lorenz)
-        self.btn_connect_lorenz.grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        self.btn_disconnect_lorenz = ttk.Button(_rl, text="Disconnetti",
-                                                command=self.disconnect_lorenz)
-        self.btn_disconnect_lorenz.grid(row=0, column=1, sticky="ew", padx=(2, 0))
-
-        self.btn_read_offset = ttk.Button(lorenz, text="Leggi Offset",
-                                          command=self.read_lorenz_offset)
-        self.btn_read_offset.grid(row=1, column=0, sticky="ew", padx=6, pady=2)
-        self.offset_label = ttk.Entry(lorenz, state='readonly', justify='right', width=9)
-        self.offset_label.grid(row=1, column=1, sticky="ew", padx=(2, 6), pady=2)
-
-        _avg = ttk.Frame(lorenz)
-        _avg.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
-        _avg.grid_columnconfigure(1, weight=1)
-        ttk.Label(_avg, text="Media:").grid(row=0, column=0, sticky="e", padx=(0, 4))
-        self.avg_entry = ttk.Entry(_avg, width=8, justify='right')
-        self.avg_entry.grid(row=0, column=1, sticky="ew")
-        self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
-        self.avg_entry.bind("<Return>",   self.update_lorenz_avg)
-        self.avg_entry.bind("<FocusOut>", self.update_lorenz_avg)
-
-        self.invert_speed_var = tk.BooleanVar(value=self.lorenz_reader.invert_speed)
-        ttk.Checkbutton(lorenz, text="Inverti Velocità",
-                        variable=self.invert_speed_var,
-                        command=self.toggle_invert_speed
-                        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=6, pady=(2, 6))
-
-        # ── BANCO ────────────────────────────────────────────────────
-        banco = ttk.LabelFrame(bar, text="Banco")
-        banco.grid(row=0, column=2, sticky="nsew", padx=4, pady=2)
-        banco.grid_columnconfigure(1, weight=1)
-        self.banco_controls = banco
-
-        ttk.Label(banco, text="IP:").grid(row=0, column=0, sticky="e", padx=(6, 4), pady=(6, 2))
-        self.entry_ip = ttk.Entry(banco, width=14)
-        self.entry_ip.insert(0, "192.168.0.10")
-        self.entry_ip.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=(6, 2))
-
-        _rbo = ttk.Frame(banco)
-        _rbo.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 8))
-        _rbo.grid_columnconfigure(0, weight=1)
-        _rbo.grid_columnconfigure(1, weight=1)
-        self.btn_connect_banco = ttk.Button(_rbo, text="Connetti", command=self.connect_modbus)
-        self.btn_connect_banco.grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        self.btn_disconnect_banco = ttk.Button(_rbo, text="Disconnetti",
-                                               command=self.disconnect_modbus)
-        self.btn_disconnect_banco.grid(row=0, column=1, sticky="ew", padx=(2, 0))
-
-        # ── SENSORE COM ──────────────────────────────────────────────
-        com = ttk.LabelFrame(bar, text="Sensore COM")
-        com.grid(row=0, column=3, sticky="nsew", padx=(4, 0), pady=2)
-        com.grid_columnconfigure(1, weight=1)
-
-        ttk.Label(com, text="Porta:").grid(row=0, column=0, sticky="e",
-                                           padx=(6, 4), pady=(6, 2))
-        self.com_port_combo = ttk.Combobox(com, values=self._get_available_com_ports(), width=10)
-        self.com_port_combo.grid(row=0, column=1, sticky="ew", padx=(0, 2), pady=(6, 2))
-        self.btn_refresh_com = tk.Button(
-            com, text=u"🔄", command=self._refresh_com_ports,
-            font=('Segoe UI Emoji', 11), relief='flat', bd=1, cursor='hand2', padx=2, pady=1
-        )
-        self.btn_refresh_com.grid(row=0, column=2, padx=(0, 6), pady=(6, 2))
-
-        _rc = ttk.Frame(com)
-        _rc.grid(row=1, column=0, columnspan=3, sticky="ew", padx=6, pady=(2, 6))
-        _rc.grid_columnconfigure(0, weight=1)
-        _rc.grid_columnconfigure(1, weight=1)
-        self.btn_connect_serial = ttk.Button(_rc, text="Connetti", command=self.connect_serial)
-        self.btn_connect_serial.grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        self.btn_disconnect_serial = ttk.Button(_rc, text="Disconnetti",
-                                                command=self.disconnect_serial)
-        self.btn_disconnect_serial.grid(row=0, column=1, sticky="ew", padx=(2, 0))
-
-    def _set_led(self, led, state):
-        """Imposta colore LED: ok=verde, err=rosso, warn=arancione, off=grigio."""
-        colors = {'ok': '#00cc44', 'err': '#cc2222', 'warn': '#cc8800', 'off': '#555555'}
-        led.config(fg=colors.get(state, '#555555'))
-
-    def _make_live_entry(self, parent, label_text, row):
-        """Helper: crea label + entry readonly per i pannelli dati live."""
-        tk.Label(parent, text=label_text, font=('Helvetica', 9),
-                 anchor='e', width=10).grid(row=row, column=0, sticky='e',
-                                            padx=(8, 4), pady=2)
-        e = ttk.Entry(parent, state='readonly', justify='right', width=10)
-        e.grid(row=row, column=1, sticky='ew', padx=(0, 8), pady=2)
-        return e
-
-    def _heartbeat_timeout(self):
-        """Chiamato 2 secondi dopo l'ultimo pacchetto BLE ricevuto."""
-        self.led_heartbeat.config(fg='#555555')
-        self.lbl_hz.config(text='-- Hz')
-        self._heartbeat_reset_id = None
-
-    def _set_ro(self, entry, text):
-        entry.config(state='normal')
-        entry.delete(0, tk.END)
-        entry.insert(0, text)
-        entry.config(state='readonly')
-
-    def _update_connected_device_label(self):
-        """Aggiorna nome e indirizzo BLE nella status bar."""
-        if self._connected_device_name or self._connected_device_address:
-            self.lbl_connected_device.config(
-                text=self._connected_device_name or u'Sconosciuto', fg='#88ffaa')
-            self.lbl_connected_address.config(
-                text=self._connected_device_address or u'', fg='#88ffaa')
-        else:
-            self.lbl_connected_device.config(text=u'—', fg='#666688')
-            self.lbl_connected_address.config(text=u'')
-
-    def _format_time(self, seconds):
-        """Converte i secondi in una stringa formattata HH:MM:SS."""
+    def _load_settings(self):
+        data = settings_manager.load(self.settings_file)
+        d = settings_manager.DEFAULTS
+        self.lorenz_reader.avg_dim     = int(data.get('avg_dim', d['avg_dim']))
+        self.lorenz_reader.invert_speed = bool(data.get('invert_speed', d['invert_speed']))
+        self.lorenz_reader.offset       = float(data.get('offset', d['offset']))
+        sp = data.get('delta_speed_thresholds_kmh', d['delta_speed_thresholds_kmh'])
+        pw = data.get('delta_power_thresholds_pct', d['delta_power_thresholds_pct'])
+        if isinstance(sp, (list, tuple)) and len(sp) == 2:
+            self.delta_speed_thresholds_kmh = tuple(float(x) for x in sp)
+        if isinstance(pw, (list, tuple)) and len(pw) == 2:
+            self.delta_power_thresholds_pct = tuple(float(x) for x in pw)
         try:
-            seconds = int(float(seconds))
-            hours = seconds // 3600
-            minutes = (seconds % 3600) // 60
-            seconds = seconds % 60
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            self.delta_smoothing_window = max(1, int(data.get('delta_smoothing_window', d['delta_smoothing_window'])))
         except Exception:
-            return "--:--:--"
+            self.delta_smoothing_window = 5
+        if not data:
+            self._save_settings()
 
-    # ------------------------------
-    # Pannello di confronto (BLE | Δ | Lorenz)
-    # ------------------------------
-    def _create_compare_panel(self):
-        # Frame (internamente 3 colonne: BLE | Δ | Lorenz)
-        self.compare_frame = ttk.LabelFrame(self.right_wrapper, text="Confronto BLE ↔ Lorenz")
-        self.compare_frame.grid_columnconfigure(0, weight=1)  # BLE
-        self.compare_frame.grid_columnconfigure(1, weight=0)  # Δ
-        self.compare_frame.grid_columnconfigure(2, weight=1)  # Lorenz
+    def _save_settings(self):
+        settings_manager.save(self.settings_file, {
+            'avg_dim':                    self.lorenz_reader.avg_dim,
+            'invert_speed':               self.lorenz_reader.invert_speed,
+            'offset':                     self.lorenz_reader.offset,
+            'delta_speed_thresholds_kmh': list(self.delta_speed_thresholds_kmh),
+            'delta_power_thresholds_pct': list(self.delta_power_thresholds_pct),
+            'delta_smoothing_window':     int(self.delta_smoothing_window),
+        })
 
-        # --- Colonna sinistra: BLE FTMS ---
-        left = ttk.Frame(self.compare_frame)
-        left.grid(row=0, column=0, sticky="ew", padx=(10, 5), pady=8)
-        left.grid_columnconfigure(0, weight=0)
-        left.grid_columnconfigure(1, weight=1)
+    # ── Loop asyncio BLE ─────────────────────────────────────────────────────
 
-        ttk.Label(left, text="BLE FTMS", anchor="center").grid(
-            row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4)
-        )
-
-        ttk.Label(left, text="Speed [km/h]", width=14, anchor="e").grid(row=1, column=0, padx=5, pady=2, sticky="e")
-        self.cmp_ble_speed = ttk.Entry(left, state='readonly', width=12, justify='right', font=self.value_font)
-        self.cmp_ble_speed.grid(row=1, column=1, padx=0, pady=2, sticky="w")
-
-        ttk.Label(left, text="Power [W]", width=14, anchor="e").grid(row=2, column=0, padx=5, pady=2, sticky="e")
-        self.cmp_ble_power = ttk.Entry(left, state='readonly', width=12, justify='right', font=self.value_font)
-        self.cmp_ble_power.grid(row=2, column=1, padx=0, pady=2, sticky="w")
-
-        # --- Colonna centrale: Δ (velocità in km/h, potenza in %) ---
-        center = ttk.Frame(self.compare_frame)
-        center.grid(row=0, column=1, sticky="ns", padx=5, pady=8)
-
-        # Header dinamico con finestra media
-        self.cmp_delta_header = ttk.Label(
-            center,
-            text=f"Δ % – media N={self.delta_smoothing_window}",
-            anchor="center"
-        )
-        self.cmp_delta_header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
-
-        # Etichette Δ: altezza fissa a 2 righe per evitare shift del layout
-        # quando il valore puntuale compare/scompare (es. Lorenz fermo)
-        self.cmp_delta_speed = tk.Label(
-            center, text="—", width=18, anchor="center", fg="#666666",
-            justify='center', height=2
-        )
-        self.cmp_delta_speed.grid(row=1, column=0, padx=2, pady=2, sticky="ew")
-        self.cmp_delta_power = tk.Label(
-            center, text="—", width=18, anchor="center", fg="#666666",
-            justify='center', height=2
-        )
-        self.cmp_delta_power.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
-
-        # --- Colonna destra: LORENZ ---
-        right = ttk.Frame(self.compare_frame)
-        right.grid(row=0, column=2, sticky="ew", padx=(5, 10), pady=8)
-        right.grid_columnconfigure(0, weight=0)
-        right.grid_columnconfigure(1, weight=1)
-
-        ttk.Label(right, text="Gestione Lorenz", anchor="center").grid(
-            row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4)
-        )
-
-        ttk.Label(right, text="Speed [km/h]", width=14, anchor="e").grid(row=1, column=0, padx=5, pady=2, sticky="e")
-        self.cmp_lrz_speed = ttk.Entry(right, state='readonly', width=12, justify='right', font=self.value_font)
-        self.cmp_lrz_speed.grid(row=1, column=1, padx=0, pady=2, sticky="w")
-
-        ttk.Label(right, text="Power [W]", width=14, anchor="e").grid(row=2, column=0, padx=5, pady=2, sticky="e")
-        self.cmp_lrz_power = ttk.Entry(right, state='readonly', width=12, justify='right', font=self.value_font)
-        self.cmp_lrz_power.grid(row=2, column=1, padx=0, pady=2, sticky="w")
-
-    # -------- Colori/soglie e formattazioni Δ --------
-    def _color_for_speed_delta(self, abs_kmh):
-        if abs_kmh is None:
-            return "#666666"
-        a = float(abs_kmh)
-        t1, t2 = self.delta_speed_thresholds_kmh
-        if a <= t1:
-            return "#0A7A0A"  # verde
-        elif a <= t2:
-            return "#C98000"  # arancione
-        else:
-            return "#B00000"  # rosso
-
-    def _color_for_power_delta(self, pct):
-        if pct is None:
-            return "#666666"
-        a = abs(float(pct))
-        t1, t2 = self.delta_power_thresholds_pct
-        if a <= t1:
-            return "#0A7A0A"  # verde
-        elif a <= t2:
-            return "#C98000"  # arancione
-        else:
-            return "#B00000"  # rosso
-
-    def _fmt_speed_delta(self, diff_kmh):
-        if diff_kmh is None:
-            return "—"
-        sign = "+" if diff_kmh >= 0 else "−"
-        return f"{sign}{abs(diff_kmh):.2f} km/h"
-
-    def _fmt_power_delta(self, pct):
-        if pct is None:
-            return "—"
-        sign = "+" if pct >= 0 else "−"
-        return f"{sign}{abs(pct):.1f}%"
-
-    # -------- Calcolo Δ (inst) e smoothing --------
-    def _compute_speed_delta_abs(self, ble_val, lrz_val):
-        """Restituisce (BLE - Lorenz) in km/h; None se non computabile."""
-        try:
-            if ble_val is None or lrz_val is None:
-                return None
-            return float(ble_val) - float(lrz_val)
-        except Exception:
-            return None
-
-    def _compute_power_delta_pct(self, ble_val, lrz_val):
-        """Restituisce (BLE - Lorenz) / Lorenz * 100; None se non computabile/denominatore 0."""
-        try:
-            if ble_val is None or lrz_val is None:
-                return None
-            lrz = float(lrz_val)
-            if lrz == 0:
-                return None
-            ble = float(ble_val)
-            return (ble - lrz) / lrz * 100.0
-        except Exception:
-            return None
-
-    def _mean_or_none(self, values_deque):
-        vals = [v for v in values_deque if v is not None]
-        return (sum(vals) / len(vals)) if vals else None
-
-    def _update_compare_panel(self):
-        # Δ istantanei
-        d_speed_inst = self._compute_speed_delta_abs(self._last_ble_speed, self._last_lrz_speed)
-        d_power_inst = self._compute_power_delta_pct(self._last_ble_power, self._last_lrz_power)
-
-        # Aggiorna buffer smoothing (solo se disponibili)
-        if d_speed_inst is not None:
-            self._delta_speed_hist.append(d_speed_inst)
-        if d_power_inst is not None:
-            self._delta_power_hist.append(d_power_inst)
-
-        # Δ medi (media mobile sui buffer)
-        d_speed_avg = self._mean_or_none(self._delta_speed_hist)
-        d_power_avg = self._mean_or_none(self._delta_power_hist)
-
-        # Testi (media su 1 riga, instanteo tra parentesi su seconda riga)
-        if d_speed_avg is not None or d_speed_inst is not None:
-            smooth_txt = self._fmt_speed_delta(d_speed_avg if d_speed_avg is not None else d_speed_inst)
-            inst_txt = self._fmt_speed_delta(d_speed_inst)
-            txt = smooth_txt if inst_txt == "—" else f"{smooth_txt}\n({inst_txt})"
-            color = self._color_for_speed_delta(abs(d_speed_avg) if d_speed_avg is not None else None)
-            self.cmp_delta_speed.config(text=txt, fg=color)
-        else:
-            self.cmp_delta_speed.config(text="—", fg="#666666")
-
-        if d_power_avg is not None or d_power_inst is not None:
-            smooth_txt = self._fmt_power_delta(d_power_avg if d_power_avg is not None else d_power_inst)
-            inst_txt = self._fmt_power_delta(d_power_inst)
-            txt = smooth_txt if inst_txt == "—" else f"{smooth_txt}\n({inst_txt})"
-            color = self._color_for_power_delta(d_power_avg)
-            self.cmp_delta_power.config(text=txt, fg=color)
-        else:
-            self.cmp_delta_power.config(text="—", fg="#666666")
-
-        # Aggiorna header con N
-        self.cmp_delta_header.config(
-            text=f"Δ (Speed: km/h, Power: %) – media N={self.delta_smoothing_window}"
-        )
-
-    # ------------------------------
-    # Log queue
-    # ------------------------------
-    def _process_log_queue(self):
-        """Processa i messaggi di log dalla coda in modo thread-safe."""
-        try:
-            while True:
-                record = self.log_queue.get_nowait()
-                # Rileva il livello dal testo formattato (es. "... - WARNING - ...")
-                tag = 'INFO'
-                upper = record.upper()
-                if ' - CRITICAL - ' in upper:
-                    tag = 'CRITICAL'
-                elif ' - ERROR - ' in upper:
-                    tag = 'ERROR'
-                elif ' - WARNING - ' in upper:
-                    tag = 'WARNING'
-                elif ' - DEBUG - ' in upper:
-                    tag = 'DEBUG'
-
-                self.log_text.config(state='normal')
-                self.log_text.insert(tk.END, record + '\n', tag)
-                self.log_text.config(state='disabled')
-                if self.autoscroll_log_var.get():
-                    self.log_text.yview(tk.END)
-        except queue.Empty:
-            pass
-        finally:
-            self.after(100, self._process_log_queue)
-
-    # ------------------------------
-    # Loop asyncio BLE persistente
-    # ------------------------------
     def _init_ble_loop(self):
-        """Crea un thread dedicato con un event loop asyncio persistente per BLE."""
-
         def _worker():
             self._ble_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._ble_loop)
@@ -785,7 +214,6 @@ class MainWindow(tk.Tk):
         self._ble_loop_ready.wait()
 
     def _shutdown_ble_loop(self, join_timeout=3.0):
-        """Ferma il loop BLE e attende il thread."""
         if self._ble_loop is not None:
             try:
                 self._ble_loop.call_soon_threadsafe(self._ble_loop.stop)
@@ -794,1217 +222,590 @@ class MainWindow(tk.Tk):
         if self._ble_loop_thread is not None:
             self._ble_loop_thread.join(timeout=join_timeout)
 
-    # ------------------------------
-    # Menu (solo File)
-    # ------------------------------
-    def _create_menu(self):
-        self.menubar = tk.Menu(self)
-        self.config(menu=self.menubar)
+    def _run_ble(self, coro):
+        """Esegue una coroutine BLE sul loop dedicato e restituisce il Future."""
+        return asyncio.run_coroutine_threadsafe(coro, self._ble_loop)
 
-        file_menu = tk.Menu(self.menubar, tearoff=0)
-        self.menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Cartella di lavoro", command=self._open_working_directory)
+    # ── Polling stato connessioni ─────────────────────────────────────────────
 
-    # ------------------------------
-    # UI controls
-    # ------------------------------
-    def create_command_controls(self):
-        commands = [
-            ("Livello [/200]", self.send_level_command),
-            ("Potenza [W]", self.send_power_command),
-            ("Simulazione [%]", self.send_simulation_command)
-        ]
-        self.frame_commands.grid_columnconfigure(0, weight=2)
-        self.frame_commands.grid_columnconfigure(1, weight=1)
-        self.frame_commands.grid_columnconfigure(2, weight=1)
-
-        for i, (label, command) in enumerate(commands):
-            lbl = ttk.Label(self.frame_commands, text=label)
-            lbl.grid(row=i, column=0, padx=5, sticky="ew")
-            if "Livello" in label:
-                entry = ttk.Spinbox(self.frame_commands, from_=0, to=200, increment=1, width=12)
-                entry.set(0)
-                self.livello_entry = entry
-            elif "Potenza" in label:
-                entry = ttk.Spinbox(self.frame_commands, from_=0, to=5000, increment=1, width=12)
-                entry.set(0)
-                self.potenza_entry = entry
-            elif "Simulazione" in label:
-                entry = ttk.Spinbox(self.frame_commands, from_=-999999, to=999999,
-                                    increment=0.1, format="%.1f", width=12)
-                entry.set(0.0)
-                self.simulazione_entry = entry
-            entry.grid(row=i, column=1, padx=5, sticky="ew")
-            btn = ttk.Button(self.frame_commands, text="Invia", command=command)
-            btn.grid(row=i, column=2, padx=5, sticky="ew")
-
-    def create_data_fields(self):
-        fields = ["power", "speed", "resistance", "cadence", "total_distance", "elapsed_time"]
-        self.data_entries = {}
-        self.data_controls = ttk.Frame(self.frame_data)
-        self.data_controls.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
-        self.data_controls.grid_columnconfigure(1, weight=1)
-
-        for i, field in enumerate(fields):
-            tk.Label(self.data_controls, text=field.capitalize(), font=('Helvetica', 9),
-                     anchor='e', width=14).grid(row=i, column=0, sticky='e', padx=(6, 4), pady=2)
-            entry = ttk.Entry(self.data_controls, state='readonly', justify='right', width=10)
-            entry.grid(row=i, column=1, sticky='ew', padx=(0, 6), pady=2)
-            self.data_entries[field.lower().replace(" ", "_")] = entry
-
-        self.btn_toggle_data = ttk.Button(
-            self.data_controls, text="Abilita Dati",
-            command=self.toggle_data, style='Data.Disabled.TButton'
-        )
-        self.btn_toggle_data.grid(row=len(fields), column=0, columnspan=2,
-                                  padx=6, pady=(4, 6), sticky='ew')
-
-    # ------------------------------
-    # Status check periodic
-    # ------------------------------
     def periodic_connection_check(self):
-        # Usa il loop BLE persistente già esistente, coerente con il resto del codice
-        asyncio.run_coroutine_threadsafe(self._async_check_ble_status(), self._ble_loop)
-        self._check_lorenz_status()
-        self._check_serial_status()
-        self._check_and_update_modbus_status()
+        self._run_ble(self._async_check_ble())
+        self._check_lorenz()
+        self._check_serial()
+        self._check_modbus()
         self.periodic_check_id = self.after(1000, self.periodic_connection_check)
 
-    async def _async_check_ble_status(self):
+    async def _async_check_ble(self):
         try:
-            is_connected = self.ble_manager.get_connection_status()
-            self.after(0, self._update_ble_status_ui, is_connected, False)
+            connected = self.ble_manager.get_connection_status()
+            self.after(0, self._update_ble_status, connected, False)
         except Exception as e:
-            logging.getLogger().error(f"Errore durante il controllo dello stato BLE: {e}")
-            self.after(0, self._update_ble_status_ui, None, True)
+            logging.getLogger().error(f"Errore check stato BLE: {e}")
+            self.after(0, self._update_ble_status, None, True)
 
-    def _update_ble_status_ui(self, is_connected, error=False):
+    def _update_ble_status(self, connected, error=False):
         if error:
-            self._set_led(self.led_ble, 'warn')
-        elif is_connected:
-            self._set_led(self.led_ble, 'ok')
+            self._status_bar.set_ble('warn')
+        elif connected:
+            self._status_bar.set_ble('ok')
             if not self._ble_was_connected:
                 self.after(2000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
                 self._on_ble_unexpected_disconnect()
-            self._set_led(self.led_ble, 'err')
+            self._status_bar.set_ble('err')
             self._ble_was_connected = False
 
     def _auto_enable_ftms(self):
-        """Abilita le notifiche FTMS automaticamente dopo connessione BLE."""
-        if (self.ble_manager.get_connection_status()
-                and self.btn_toggle_data.cget('text') == 'Abilita Dati'):
+        if self.ble_manager.get_connection_status() and not self._live_panel.is_ftms_enabled():
             logging.getLogger().info("BLE connesso — abilito notifiche FTMS automaticamente.")
-            self.toggle_data()
+            self._toggle_ftms()
 
     def _on_ble_unexpected_disconnect(self):
-        """Chiamato quando il BLE passa da connesso a disconnesso senza un'azione esplicita dell'utente."""
         sep = "=" * 55
         logging.getLogger().warning(sep)
         logging.getLogger().warning("*** DISCONNESSIONE BLE - connessione persa ***")
         if self._connected_device_name or self._connected_device_address:
             logging.getLogger().warning(
-                f"    Dispositivo: {self._connected_device_name or '?'}  [{self._connected_device_address or '?'}]"
-            )
+                f"    Dispositivo: {self._connected_device_name or '?'}  [{self._connected_device_address or '?'}]")
         logging.getLogger().warning(sep)
-
-        # Resetta i flag interni del BLEManager (notifiche, client, ecc.)
-        # In caso di disconnessione inattesa disconnect_device() non viene mai chiamato,
-        # quindi i flag rimarrebbero sporchi impedendo la riabilitazione delle notifiche.
         self.ble_manager.reset_connection_state()
-
-        # Resetta info dispositivo
         self._connected_device_name = None
         self._connected_device_address = None
-        self._update_connected_device_label()
-
-        # Se le notifiche dati erano attive, riportare il pulsante allo stato corretto
-        if self.btn_toggle_data.cget('text') == 'Disabilita Dati':
-            self.btn_toggle_data.config(text='Abilita Dati', style='Data.Disabled.TButton')
-            self._clear_data_fields_ui()
+        self._status_bar.set_device_info()
+        if self._live_panel.is_ftms_enabled():
+            self._live_panel.set_ftms_button(False)
+            self._live_panel.clear_ble()
+            self._status_bar.set_heartbeat(None)
             logging.getLogger().warning("    Notifiche FTMS disabilitate automaticamente.")
 
-    def _check_and_update_modbus_status(self, from_user_action=False):
-        is_connected = self.modbus.is_connesso()
-        if is_connected:
-            self._set_led(self.led_banco, 'ok')
+    def _check_lorenz(self):
+        connected = self.lorenz_reader.connected
+        self._status_bar.set_lorenz('ok' if connected else 'err')
+        if connected:
+            self._lorenz_was_connected = True
+        elif self._lorenz_was_connected:
+            logging.getLogger().warning("=" * 55)
+            logging.getLogger().warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
+            logging.getLogger().warning("=" * 55)
+            self._stop_lorenz_update()
+            self._lorenz_was_connected = False
+
+    def _check_serial(self):
+        connected = self.serial_reader.connected
+        self._status_bar.set_com('ok' if connected else 'err')
+        if connected:
+            self._serial_was_connected = True
+        elif self._serial_was_connected:
+            logging.getLogger().warning("=" * 55)
+            logging.getLogger().warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
+            logging.getLogger().warning("=" * 55)
+            self._stop_serial_update()
+            self._serial_was_connected = False
+
+    def _check_modbus(self, from_user_action=False):
+        connected = self.modbus.is_connesso()
+        self._status_bar.set_banco('ok' if connected else 'err')
+        if connected:
             if not self._modbus_was_connected:
                 logging.getLogger().info("Modbus connesso.")
             self._modbus_was_connected = True
         else:
             if self._modbus_was_connected:
-                self._on_modbus_unexpected_disconnect()
+                logging.getLogger().warning("=" * 55)
+                logging.getLogger().warning("*** DISCONNESSIONE MODBUS - connessione persa ***")
+                logging.getLogger().warning("=" * 55)
             elif from_user_action:
                 logging.getLogger().warning("Modbus: nessuna connessione attiva da chiudere.")
-            self._set_led(self.led_banco, 'err')
             self._modbus_was_connected = False
 
-    def _on_modbus_unexpected_disconnect(self):
-        sep = "=" * 55
-        logging.getLogger().warning(sep)
-        logging.getLogger().warning("*** DISCONNESSIONE MODBUS - connessione persa ***")
-        logging.getLogger().warning(sep)
+    # ── BLE: scan / connect / disconnect ─────────────────────────────────────
 
-    def _check_lorenz_status(self):
-        is_connected = self.lorenz_reader.connected
-        if is_connected:
-            self._set_led(self.led_lorenz, 'ok')
-            self._lorenz_was_connected = True
-        else:
-            if self._lorenz_was_connected:
-                self._on_lorenz_unexpected_disconnect()
-            self._set_led(self.led_lorenz, 'err')
-            self._lorenz_was_connected = False
+    def _ble_search(self):
+        logging.getLogger().info("Ricerca dispositivi BLE...")
+        self._conn_bar.set_progress(True)
+        self.executor.submit(self._ble_search_worker)
 
-    def _on_lorenz_unexpected_disconnect(self):
-        sep = "=" * 55
-        logging.getLogger().warning(sep)
-        logging.getLogger().warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
-        logging.getLogger().warning(sep)
-        self.stop_lorenz_update()
-
-    def _check_serial_status(self):
-        is_connected = self.serial_reader.connected
-        if is_connected:
-            self._set_led(self.led_com, 'ok')
-            self._serial_was_connected = True
-        else:
-            if self._serial_was_connected:
-                self._on_serial_unexpected_disconnect()
-            self._set_led(self.led_com, 'err')
-            self._serial_was_connected = False
-
-    def _on_serial_unexpected_disconnect(self):
-        sep = "=" * 55
-        logging.getLogger().warning(sep)
-        logging.getLogger().warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
-        logging.getLogger().warning(sep)
-        self.stop_serial_update()
-
-    # ------------------------------
-    # Ricerca/Connessione BLE
-    # ------------------------------
-    def search_devices(self):
-        logging.getLogger().info("Richiesta ricerca dispositivi")
-        self.progress.start()
-        self.executor.submit(self._search_devices)
-
-    def _search_devices(self):
-        fut = asyncio.run_coroutine_threadsafe(self.ble_manager.scan_devices(timeout=5), self._ble_loop)
+    def _ble_search_worker(self):
+        fut = self._run_ble(self.ble_manager.scan_devices(timeout=5))
         try:
             devices = fut.result()
         except Exception as e:
-            logging.getLogger().error(f"Errore nella scansione BLE: {e}")
+            logging.getLogger().error(f"Errore scansione BLE: {e}")
             devices = {}
-        self.after(0, self._populate_device_list, devices)
+        self.after(0, self._conn_bar.populate_ble_list, devices)
+        self.after(0, self._conn_bar.set_progress, False)
 
-    def _populate_device_list(self, devices):
-        self.device_list.delete(0, tk.END)
-        for address, (name, rssi) in devices.items():
-            self.device_list.insert(tk.END, f"{name} - {address} - RSSI: {rssi}")
-            if rssi > -50:
-                try:
-                    self.device_list.itemconfig(tk.END, {'bg': 'lightcoral'})
-                except Exception:
-                    pass
-                logging.getLogger().info(f"Dispositivo trovato: {name} - {address} - RSSI: {rssi}")
-        self.progress.stop()
-
-    def connect_device(self):
-        selected_device = self.device_list.get(tk.ACTIVE)
-        if not selected_device:
+    def _ble_connect(self):
+        name, address = self._conn_bar.get_selected_ble_device()
+        if not address:
             return
-        try:
-            parts = selected_device.split(" - ")
-            name = parts[0]
-            address = parts[1]
-        except Exception:
-            logging.getLogger().warning("Formato elemento lista dispositivi inatteso; impossibile estrarre address.")
-            return
-        self.progress.start()
-        self.executor.submit(self._connect_device, address, name)
+        self._conn_bar.set_progress(True)
+        self.executor.submit(self._ble_connect_worker, address, name)
 
-    def _connect_device(self, address, name=""):
-        logging.getLogger().info(f"Tentativo connessione a {address}")
-        fut = asyncio.run_coroutine_threadsafe(
-            self.ble_manager.connect_to_device(address, connection_timeout=15.0),
-            self._ble_loop
-        )
+    def _ble_connect_worker(self, address, name=""):
+        logging.getLogger().info(f"Connessione BLE a {address}...")
+        fut = self._run_ble(self.ble_manager.connect_to_device(address, connection_timeout=15.0))
         try:
-            result = fut.result()
-            if result:
-                self._connected_device_name = name
+            if fut.result():
+                self._connected_device_name    = name
                 self._connected_device_address = address
-                self.after(0, self._update_connected_device_label)
+                self.after(0, self._status_bar.set_device_info, name, address)
         except Exception as e:
-            logging.getLogger().error(f"Errore imprevisto nella gestione della connessione BLE: {e}")
+            logging.getLogger().error(f"Errore connessione BLE: {e}")
         finally:
-            self.after(0, self.progress.stop)
+            self.after(0, self._conn_bar.set_progress, False)
 
-    def disconnect_device(self):
+    def _ble_disconnect(self):
         if not self.ble_manager.get_connection_status():
             logging.getLogger().info("Nessun dispositivo BLE connesso.")
             return
-        self.progress.start()
-        logging.getLogger().info("Richiesta Disconnessione BLE...")
-        self.executor.submit(self._disconnect_device)
+        self._conn_bar.set_progress(True)
+        logging.getLogger().info("Disconnessione BLE...")
+        self.executor.submit(self._ble_disconnect_worker)
 
-    def _disconnect_device(self):
+    def _ble_disconnect_worker(self):
         ok = False
         try:
-            fut = asyncio.run_coroutine_threadsafe(self.ble_manager.disconnect_device(), self._ble_loop)
-            ok = fut.result()
+            ok = self._run_ble(self.ble_manager.disconnect_device()).result()
         except Exception as e:
             logging.getLogger().error(f"Errore disconnessione BLE: {e}")
         finally:
             def _ui():
-                self.progress.stop()
+                self._conn_bar.set_progress(False)
                 if ok:
                     self._ble_was_connected = False
                     self._connected_device_name = None
                     self._connected_device_address = None
-                    self._update_connected_device_label()
-                    logging.getLogger().info("Dispositivo BLE disconnesso.")
+                    self._status_bar.set_device_info()
+                    logging.getLogger().info("BLE disconnesso.")
                 else:
-                    logging.getLogger().warning("Disconnessione BLE non riuscita o dispositivo già disconnesso.")
+                    logging.getLogger().warning("Disconnessione BLE non riuscita o già disconnesso.")
             self.after(0, _ui)
 
-    # ------------------------------
-    # Invio comandi BLE
-    # ------------------------------
-    def send_level_command(self, level=None):
-        if level is None:
-            level = self.livello_entry.get()
-        self.executor.submit(self._send_level_command, level)
+    # ── BLE: comandi frenata ─────────────────────────────────────────────────
 
-    def _send_level_command(self, level):
+    def _send_level(self, value):
+        self.executor.submit(self._send_level_worker, value)
+
+    def _send_level_worker(self, value):
         try:
-            level = int(float(level))
+            level = int(float(value))
         except ValueError:
-            logging.getLogger().error(f"Valore livello non valido: {level}")
-            return
-        logging.getLogger().info(f"Invio comando livello: {level}/200")
-        fut = asyncio.run_coroutine_threadsafe(self.ble_manager.set_brake_percentage(level), self._ble_loop)
+            logging.getLogger().error(f"Valore livello non valido: {value}"); return
+        logging.getLogger().info(f"Invio livello: {level}/200")
         try:
-            fut.result()
+            self._run_ble(self.ble_manager.set_brake_percentage(level)).result()
         except Exception as e:
             logging.getLogger().error(f"Errore invio livello: {e}")
 
-    def send_power_command(self, power=None):
-        if power is None:
-            power = self.potenza_entry.get()
-        self.executor.submit(self._send_power_command, power)
+    def _send_power(self, value):
+        self.executor.submit(self._send_power_worker, value)
 
-    def _send_power_command(self, power):
+    def _send_power_worker(self, value):
         try:
-            power = int(float(power))
+            power = int(float(value))
         except ValueError:
-            logging.getLogger().error(f"Valore potenza non valido: {power}")
-            return
-        logging.getLogger().info(f"Invio comando potenza: {power}W")
-        fut = asyncio.run_coroutine_threadsafe(self.ble_manager.set_brake_power(int(power)), self._ble_loop)
+            logging.getLogger().error(f"Valore potenza non valido: {value}"); return
+        logging.getLogger().info(f"Invio potenza: {power}W")
         try:
-            fut.result()
+            self._run_ble(self.ble_manager.set_brake_power(power)).result()
         except Exception as e:
             logging.getLogger().error(f"Errore invio potenza: {e}")
 
-    def send_simulation_command(self, simulation=None):
-        if simulation is None:
-            simulation = self.simulazione_entry.get()
-        self.executor.submit(self._send_simulation_command, simulation)
+    def _send_simulation(self, value):
+        self.executor.submit(self._send_simulation_worker, value)
 
-    def _send_simulation_command(self, simulation):
-        logging.getLogger().info(f"Invio comando simulazione: {simulation}%")
-        fut = asyncio.run_coroutine_threadsafe(
-            self.ble_manager.set_brake_simulation(grade=int(simulation)),
-            self._ble_loop
-        )
+    def _send_simulation_worker(self, value):
+        logging.getLogger().info(f"Invio simulazione: {value}%")
         try:
-            fut.result()
+            self._run_ble(self.ble_manager.set_brake_simulation(grade=int(float(value)))).result()
         except Exception as e:
             logging.getLogger().error(f"Errore invio simulazione: {e}")
 
-    # ------------------------------
-    # Dati FTMS (UI)
-    # ------------------------------
-    def toggle_data(self):
-        if self.btn_toggle_data.cget('text') == 'Abilita Dati':
+    # ── Dispatch comandi automatici ───────────────────────────────────────────
+
+    def _dispatch_command(self, command_type, value, speed_banco):
+        """Smista un comando proveniente dalla sequenza automatica."""
+        if command_type == "potenza":
+            self._send_power(value)
+        elif command_type == "livelli":
+            self._send_level(value)
+        elif command_type == "simulazione":
+            self._send_simulation(value)
+        if speed_banco is not None and speed_banco != "None":
+            self._set_banco_speed(float(speed_banco))
+
+    def _on_auto_commands_completed(self):
+        """Chiamato da CsvPanel al termine di tutti i cicli."""
+        if self._live_panel.is_ftms_enabled():
+            logging.getLogger().info("Comandi automatici terminati, disabilito le notifiche dati.")
+            self._toggle_ftms()
+
+    # ── FTMS notifications ────────────────────────────────────────────────────
+
+    def _toggle_ftms(self):
+        if not self._live_panel.is_ftms_enabled():
             if self.ble_manager.get_connection_status():
-                self.btn_toggle_data.config(text='Disabilita Dati', style='Data.Enabled.TButton')
+                self._live_panel.set_ftms_button(True)
                 logging.getLogger().info("Abilitate notifiche FTMS")
-                self.executor.submit(self._enable_ftms_notifications)
+                self.executor.submit(self._enable_ftms_worker)
             else:
-                logging.getLogger().info("Nessun dispositivo connesso, abilitazione FTMS non possibile")
+                logging.getLogger().info("Nessun dispositivo connesso, FTMS non abilitabile")
         else:
-            self.btn_toggle_data.config(text='Abilita Dati', style='Data.Disabled.TButton')
-            self._clear_data_fields_ui()
+            self._live_panel.set_ftms_button(False)
+            self._live_panel.clear_ble()
+            self._compare_panel.clear_ble()
+            self._status_bar.set_heartbeat(None)
             logging.getLogger().info("Disabilitate notifiche FTMS")
-            self.executor.submit(self._disable_ftms_notifications)
+            self.executor.submit(self._disable_ftms_worker)
 
-    def _enable_ftms_notifications(self):
-        fut = asyncio.run_coroutine_threadsafe(
-            self.ble_manager.enable_indoor_bike_data_notifications(self.update_data_fields),
-            self._ble_loop
-        )
+    def _enable_ftms_worker(self):
         try:
-            fut.result()
+            self._run_ble(
+                self.ble_manager.enable_indoor_bike_data_notifications(self._on_ble_data)
+            ).result()
         except Exception as e:
-            logging.getLogger().error(f"Errore abilitazione notifiche FTMS: {e}")
+            logging.getLogger().error(f"Errore abilitazione FTMS: {e}")
 
-    def _disable_ftms_notifications(self):
-        fut = asyncio.run_coroutine_threadsafe(
-            self.ble_manager.disable_indoor_bike_data_notifications(),
-            self._ble_loop
-        )
+    def _disable_ftms_worker(self):
         try:
-            fut.result()
+            self._run_ble(self.ble_manager.disable_indoor_bike_data_notifications()).result()
         except Exception as e:
-            logging.getLogger().error(f"Errore disabilitazione notifiche FTMS: {e}")
+            logging.getLogger().error(f"Errore disabilitazione FTMS: {e}")
 
-    def update_data_fields(self, bike_data):
-        # Aggiorna la UI subito, nel thread GUI (thread-safe via after)
-        self.after(0, self._update_data_fields_ui, bike_data)
-        # Elaborazione dati pesante (lock Lorenz + scrittura CSV) → thread pool
-        # Non blocca il loop asyncio BLE che ha invocato questa callback
+    def _on_ble_data(self, bike_data: dict):
+        """Callback invocata dal loop BLE ad ogni pacchetto FTMS."""
+        self.after(0, self._update_ble_ui, bike_data)
         self.executor.submit(self._process_bike_data, bike_data)
 
-    def _process_bike_data(self, bike_data):
-        lorenz_data = self.lorenz_reader.get_data()
-        serial_data = {}
-        if self.serial_reader.connected:
-            serial_data = self.serial_reader.get_data()
-        combined_data = {**bike_data, **lorenz_data, **serial_data}
-        self.data_processor.handle_bike_data(combined_data)
-
-    def _update_data_fields_ui(self, bike_data):
-        # Heartbeat BLE: LED lampeggiante + frequenza
-        _now = time.monotonic()
+    def _update_ble_ui(self, bike_data: dict):
+        # Heartbeat
+        now = time.monotonic()
         if self._last_packet_time is not None:
-            _dt = _now - self._last_packet_time
-            if _dt > 0:
-                self.lbl_hz.config(text=f"{1.0 / _dt:.1f} Hz")
-        self._last_packet_time = _now
-        self.led_heartbeat.config(fg='#00cc44')
+            dt = now - self._last_packet_time
+            if dt > 0:
+                self._status_bar.set_heartbeat(1.0 / dt)
+        self._last_packet_time = now
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id)
-        self._heartbeat_reset_id = self.after(2000, self._heartbeat_timeout)
-        # Mappa tra chiavi di bike_data e nomi dei campi UI
-        key_mapping = {
-            'Cad': 'cadence',
-            'ElaTime': 'elapsed_time',
-            'Pwr': 'power',
-            'Res': 'resistance',
-            'Spd': 'speed',
-            'TotDist': 'total_distance'
-        }
-        for data_key, value in bike_data.items():
-            if value is None:
-                continue
-            ui_key = key_mapping.get(data_key)
-            if ui_key is None:
-                continue
-            entry = self.data_entries.get(ui_key)
-            if entry is None:
-                continue
-            entry.config(state='normal')
-            entry.delete(0, tk.END)
-            entry.insert(0, str(value))
-            entry.config(state='readonly')
+        self._heartbeat_reset_id = self.after(2000, lambda: self._status_bar.set_heartbeat(None))
 
-            # Aggiorna pannello di confronto per BLE + memorizza ultimi valori
-            try:
-                if ui_key == 'speed' and hasattr(self, 'cmp_ble_speed'):
-                    self._set_ro(self.cmp_ble_speed, str(value))
-                    self._last_ble_speed = float(value)
-                elif ui_key == 'power' and hasattr(self, 'cmp_ble_power'):
-                    self._set_ro(self.cmp_ble_power, str(value))
-                    self._last_ble_power = float(value)
-            except Exception:
-                pass
+        # Aggiorna live panel e ottieni speed/power per ComparePanel
+        speed, power = self._live_panel.update_ble(bike_data)
+        if speed is not None or power is not None:
+            self._compare_panel.update_ble(speed, power)
 
-        # Ricalcola Δ (medie + istantanei)
-        self._update_compare_panel()
+    def _process_bike_data(self, bike_data: dict):
+        lorenz_data = self.lorenz_reader.get_data()
+        serial_data = self.serial_reader.get_data() if self.serial_reader.connected else {}
+        self.data_processor.handle_bike_data({**bike_data, **lorenz_data, **serial_data})
 
-    def _clear_data_fields_ui(self):
-        """Pulisce tutti i campi dati nella UI e resetta il contatore pacchetti."""
-        logging.getLogger().debug("Pulizia campi dati UI...")
-        for entry in self.data_entries.values():
-            entry.config(state='normal')
-            entry.delete(0, tk.END)
-            entry.config(state='readonly')
-        # Reset heartbeat
-        if self._heartbeat_reset_id:
-            self.after_cancel(self._heartbeat_reset_id)
-            self._heartbeat_reset_id = None
-        self.led_heartbeat.config(fg='#555555')
-        self.lbl_hz.config(text='-- Hz')
-        self._last_packet_time = None
-        # Reset BLE last values + buffer smoothing
-        self._last_ble_speed = None
-        self._last_ble_power = None
-        self._delta_speed_hist.clear()
-        self._delta_power_hist.clear()
-        self._update_compare_panel()
+    # ── Lorenz ────────────────────────────────────────────────────────────────
 
-    # ------------------------------
-    # CSV / comandi automatici
-    # ------------------------------
-    def load_commands_from_csv(self):
-        if self.auto_commands_running:
-            logging.getLogger().warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
-            return
+    def _lorenz_connect(self):
+        logging.getLogger().info("Connessione Lorenz...")
+        self.executor.submit(self._lorenz_connect_worker)
 
-        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
-        if file_path:
-            # Resetta i timer e le etichette
-            self._stop_countdown_timer()
-            self.lbl_remaining_duration_value.config(text="--:--:--")
-            self.lbl_total_duration_value.config(text="--:--:--")
-            self.lbl_ora_inizio.config(text="--:--:--", foreground='#005500')
-            self.lbl_ora_fine.config(text="--:--:--", foreground='#550000')
-            self.total_test_duration_seconds = 0
-            self._csv_single_cycle_seconds = 0
-
-            # Pulisce la tabella
-            for item in self.commands_table.get_children():
-                self.commands_table.delete(item)
-
-            commands = DataProcessor.read_brake_commands_from_csv(file_path)
-            if not commands:
-                logging.getLogger().warning("File CSV vuoto o non valido.")
-                return
-
-            single_cycle_seconds = 0
-            for i, command in enumerate(commands):
-                # Calcola durata di un singolo ciclo
-                try:
-                    wait_time = int(float(command[2]))
-                    single_cycle_seconds += wait_time
-                except (ValueError, TypeError, IndexError):
-                    logging.getLogger().warning(f"Valore tempo non valido nel CSV: {command}")
-
-                # Inserisce nella tabella
-                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                self.commands_table.insert("", "end", values=command, tags=(tag,))
-
-            # Salva durata singolo ciclo e aggiorna la UI con cicli × durata
-            self._csv_single_cycle_seconds = single_cycle_seconds
-            self._update_total_duration_label()
-            logging.getLogger().info(
-                f"Caricati {len(commands)} comandi. Durata 1 ciclo: {self._format_time(single_cycle_seconds)}"
-            )
-
-    def launch_auto_commands(self):
-        if self.auto_commands_running:
-            logging.getLogger().warning("Comandi automatici già in esecuzione.")
-            return
-
-        if not self.commands_table.get_children():
-            logging.getLogger().info("La tabella dei comandi è vuota.")
-            return
-
-        # Leggi numero di cicli
+    def _lorenz_connect_worker(self):
         try:
-            num_cycles = max(1, int(self.cycles_spinbox.get()))
-        except (ValueError, TypeError):
-            num_cycles = 1
-
-        # Calcola la durata totale = cicli × durata singolo ciclo
-        if self._csv_single_cycle_seconds == 0:
-            logging.getLogger().warning("Ricalcolo durata test...")
-            commands_list = [self.commands_table.item(item, 'values') for item in
-                             self.commands_table.get_children()]
-            single_cycle_seconds = 0
-            for cmd in commands_list:
-                try:
-                    single_cycle_seconds += int(float(cmd[2]))
-                except Exception:
-                    pass
-            self._csv_single_cycle_seconds = single_cycle_seconds
-
-        self.total_test_duration_seconds = self._csv_single_cycle_seconds * num_cycles
-        self.lbl_total_duration_value.config(text=self._format_time(self.total_test_duration_seconds))
-
-        commands = [self.commands_table.item(item, 'values') for item in self.commands_table.get_children()]
-        command_items = self.commands_table.get_children()
-        for index, item in enumerate(command_items):
-            self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
-
-        total_commands = len(commands) * num_cycles
-
-        def send_next_command(absolute_index):
-            if absolute_index < total_commands and self.auto_commands_running:
-                # Indice all'interno del ciclo corrente
-                index = absolute_index % len(commands)
-                cycle = absolute_index // len(commands) + 1
-
-                command_type, value, wait_time, speed_banco = commands[index]
-                wait_time = int(wait_time)
-
-                # Evidenzia la riga corrente nella tabella (solo ciclo visivo)
-                if absolute_index > 0:
-                    prev_index = (absolute_index - 1) % len(commands)
-                    self.commands_table.item(command_items[prev_index],
-                                             tags=('evenrow' if prev_index % 2 == 0 else 'oddrow',))
-                self.commands_table.item(command_items[index], tags=('currentrow',))
-
-                # Aggiorna titolo ciclo nel led_status
-                self.led_status.config(
-                    text=f"Comandi Automatici: ON  [Ciclo {cycle}/{num_cycles}]", fg="green"
-                )
-
-                if command_type == "potenza":
-                    self.send_power_command(value)
-                elif command_type == "livelli":
-                    self.send_level_command(value)
-                elif command_type == "simulazione":
-                    self.send_simulation_command(value)
-
-                if speed_banco is not None and speed_banco != "None":
-                    self.setspeed_modbus(float(speed_banco))
-                else:
-                    print("speed_banco is None or 'None'")
-
-                self.auto_command_id = self.after(wait_time * 1000, lambda: send_next_command(absolute_index + 1))
+            port = trova_porta_usb_serial("Lorenz USB sensor interface Port")
+            if port:
+                ok = self.lorenz_reader.open_connection(int(port.split("COM")[-1]))
+                self.after(0, self._on_lorenz_connect_result, ok)
             else:
-                self.auto_commands_running = False
-                self._stop_countdown_timer()
-                self.lbl_remaining_duration_value.config(text="00:00:00")
-                self.led_status.config(text="Comandi Automatici: Completati", fg="blue")
-                self._set_led(self.led_auto, 'warn')
-                self.lbl_auto_status.config(text="Auto: OK")
-                self.lbl_ora_fine.config(
-                    text=datetime.datetime.now().strftime("%H:%M:%S"),
-                    foreground='#005500'
-                )
-                logging.getLogger().info(f"Comandi automatici completati ({num_cycles} ciclo/i)")
-                self.setspeed_modbus(0)
-                self.commands_table.tag_configure('oddrow', background='lightgrey')
-                self.commands_table.tag_configure('evenrow', background='white')
-                self.commands_table.tag_configure('currentrow', background='yellow')
-                if self.btn_toggle_data.cget('text') == 'Disabilita Dati':
-                    logging.getLogger().info("Comandi automatici terminati, disabilito le notifiche dati.")
-                    self.toggle_data()
-
-        self.auto_commands_running = True
-        self.led_status.config(text=f"Comandi Automatici: ON  [Ciclo 1/{num_cycles}]", fg="green")
-        self._set_led(self.led_auto, 'ok')
-        self.lbl_auto_status.config(text="Auto: ON")
-
-        # Ora inizio (reale) e ora fine (stima)
-        _now = datetime.datetime.now()
-        self.lbl_ora_inizio.config(text=_now.strftime("%H:%M:%S"), foreground='#005500')
-        _fine_stima = _now + datetime.timedelta(seconds=self.total_test_duration_seconds)
-        self.lbl_ora_fine.config(text=_fine_stima.strftime("%H:%M:%S") + " ~", foreground='#885500')
-
-        # Avvia countdown
-        self.remaining_test_duration_seconds = self.total_test_duration_seconds
-        self.lbl_remaining_duration_value.config(text=self._format_time(self.remaining_test_duration_seconds))
-        self._start_countdown_timer()
-
-        send_next_command(0)
-
-    def stop_auto_commands(self):
-        if self.auto_commands_running:
-            self.auto_commands_running = False
-            self._stop_countdown_timer()
-            self.lbl_remaining_duration_value.config(text="Interrotto")
-            self.lbl_ora_fine.config(
-                text=datetime.datetime.now().strftime("%H:%M:%S"),
-                foreground='#550000'
-            )
-            self.led_status.config(text="Comandi Automatici: OFF", fg="red")
-            self._set_led(self.led_auto, 'err')
-            self.lbl_auto_status.config(text="Auto: OFF")
-            if hasattr(self, 'auto_command_id') and self.auto_command_id is not None:
-                self.after_cancel(self.auto_command_id)
-                self.auto_command_id = None
-            logging.getLogger().info("Comandi automatici interrotti")
-            for item in self.commands_table.get_children():
-                if 'currentrow' in self.commands_table.item(item, 'tags'):
-                    index = self.commands_table.index(item)
-                    self.commands_table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
-                    break
-        else:
-            logging.getLogger().info("Non ci sono comandi automatici attivi")
-            # Resetta le etichette se non è in esecuzione nulla
-            self.lbl_remaining_duration_value.config(text="--:--:--")
-            self.lbl_total_duration_value.config(text="--:--:--")
-            self.total_test_duration_seconds = 0
-
-    def _on_cycles_changed(self):
-        """Aggiorna la label durata totale quando cambia il numero di cicli."""
-        self._update_total_duration_label()
-
-    def _update_total_duration_label(self):
-        """Ricalcola e mostra la durata totale = cicli × durata singolo ciclo."""
-        if self._csv_single_cycle_seconds == 0:
-            return  # nessun CSV caricato, niente da aggiornare
-        try:
-            num_cycles = max(1, int(self.cycles_spinbox.get()))
-        except (ValueError, TypeError):
-            num_cycles = 1
-        total = self._csv_single_cycle_seconds * num_cycles
-        self.total_test_duration_seconds = total
-        self.lbl_total_duration_value.config(text=self._format_time(total))
-
-    def _refresh_com_ports(self):
-        """Aggiorna l'elenco delle COM port disponibili senza perdere la selezione corrente."""
-        current = self.com_port_combo.get()
-        ports = self._get_available_com_ports()
-        self.com_port_combo['values'] = ports
-        if current in ports:
-            self.com_port_combo.set(current)   # mantieni la selezione precedente se ancora presente
-        elif ports:
-            self.com_port_combo.set(ports[0])  # altrimenti seleziona la prima disponibile
-        else:
-            self.com_port_combo.set('')
-        logging.getLogger().info(f"COM port aggiornate: {ports}")
-
-    def _start_countdown_timer(self):
-        """Avvia il timer per il conto alla rovescia (richiama _tick)."""
-        self._stop_countdown_timer()  # Assicura che non ce ne siano altri attivi
-
-        def _tick():
-            if self.auto_commands_running and self.remaining_test_duration_seconds > 0:
-                self.remaining_test_duration_seconds -= 1
-                self.lbl_remaining_duration_value.config(text=self._format_time(self.remaining_test_duration_seconds))
-                # Riprogramma il prossimo tick
-                self.countdown_timer_id = self.after(1000, _tick)
-            elif self.auto_commands_running:
-                # Arrivato a zero (o negativo) ma ancora "running" (in attesa del cleanup)
-                self.lbl_remaining_duration_value.config(text="00:00:00")
-                self.countdown_timer_id = None
-            else:
-                # Stoppato da 'stop_auto_commands' o completato
-                self.countdown_timer_id = None
-
-        # Avvia il primo tick
-        _tick()
-
-    def _stop_countdown_timer(self):
-        """Ferma il timer 'after' del conto alla rovescia, se attivo."""
-        if self.countdown_timer_id is not None:
-            self.after_cancel(self.countdown_timer_id)
-            self.countdown_timer_id = None
-
-    # --- [FINE NUOVE FUNZIONI] ---
-
-    def emergency_stop(self, event=None):
-        """
-        Interrompe immediatamente i comandi automatici (se attivi)
-        e porta la velocità del banco a 0 km/h.
-        Fornisce un feedback visivo 'flash' sul pulsante di stop.
-        """
-        try:
-            # 1) Ferma eventuali comandi automatici
-            if getattr(self, "auto_commands_running", False):
-                self.stop_auto_commands()
-
-            # 2) Porta a zero la velocità del banco
-            self.setspeed_modbus(0)
-
-            # 3) Feedback visivo sul pulsante: breve flash/darken
-            try:
-                btn = self.btn_zero_speed  # definito nella create_banco_controls()
-                original_bg = btn.cget("bg")
-                btn.config(bg="#7A0000")  # scurisci per il flash
-                self.after(180, lambda: btn.config(bg=original_bg))
-            except Exception:
-                pass
-
-            # 4) Log esplicito
-            logging.getLogger().warning("*** EMERGENCY STOP ATTIVATO: speed=0, auto-cmd OFF ***")
-
+                self.after(0, self._on_lorenz_connect_result, False)
         except Exception as e:
-            logging.getLogger().error(f"Errore durante l'emergency_stop: {e}")
+            logging.getLogger().error(f"Errore connessione Lorenz: {e}")
+            self.after(0, self._on_lorenz_connect_result, False)
 
-    def _get_available_com_ports(self):
-        """Elenca le COM ports disponibili."""
-        ports = serial.tools.list_ports.comports()
-        return [port.device for port in ports]
-
-    def connect_serial(self):
-        com_port = self.com_port_combo.get()
-        if not com_port:
-            logging.getLogger().warning("Seleziona una COM port prima di connettere.")
-            return
-        logging.getLogger().info(f"Richiesta connessione sensore temperatura su {com_port}...")
-        self.executor.submit(self._connect_serial_worker, com_port)
-
-    def _connect_serial_worker(self, com_port):
-        if self.serial_reader.open_connection(com_port):
-            self.after(0, self._update_serial_ui, True)
-        else:
-            self.after(0, self._update_serial_ui, False)
-
-    def _update_serial_ui(self, is_connected):
-        if is_connected:
-            logging.getLogger().info("Sensore temperatura connesso")
-            self.start_serial_update()
-        else:
-            logging.getLogger().warning("Sensore temperatura non connesso o connessione fallita.")
-
-    def start_serial_update(self):
-        self.stop_serial_update()  # Cancella sempre il loop precedente, se esiste
-        self.update_serial_data()
-        self.serial_update_id = self.after(500, self.start_serial_update)
-
-    def stop_serial_update(self):
-        if self.serial_update_id is not None:
-            self.after_cancel(self.serial_update_id)
-            self.serial_update_id = None
-
-    def update_serial_data(self):
-        data = self.serial_reader.get_data()
-        val1 = data.get('Valore1')
-        val2 = data.get('Valore2')
-        val3 = data.get('Valore3')
-        val4 = data.get('Valore4')
-
-        def format_value(val):
-            if val is not None and not math.isnan(val):
-                return f"{val:.2f}"
-            else:
-                return 'N/A'
-
-        self._set_ro(self.value1_label, format_value(val1))
-        self._set_ro(self.value2_label, format_value(val2))
-        self._set_ro(self.value3_label, format_value(val3))
-        self._set_ro(self.value4_label, format_value(val4))
-
-    def disconnect_serial(self):
-        logging.getLogger().info("Richiesta disconnessione sensore seriale...")
-        self._serial_was_connected = False   # disconnessione volontaria, non triggera l'alert
-        self.stop_serial_update()
-        self.executor.submit(self._disconnect_serial_worker)
-
-    def _disconnect_serial_worker(self):
-        ok = self.serial_reader.close_connection()
-        self.after(0, self._update_serial_disconnect_ui, ok)
-
-    def _update_serial_disconnect_ui(self, ok):
+    def _on_lorenz_connect_result(self, ok):
         if ok:
-            logging.getLogger().info("Sensore seriale disconnesso.")
+            logging.getLogger().info("Lorenz connesso")
+            self._start_lorenz_update()
         else:
-            logging.getLogger().warning("Sensore seriale: nessuna connessione attiva da chiudere.")
+            logging.getLogger().warning("Lorenz non connesso.")
 
-    def create_labeled_entry(self, parent, label_text, row):
-        label = ttk.Label(parent, text=label_text)
-        label.grid(row=row, column=0, sticky="e", padx=5, pady=2)
-        entry = ttk.Entry(parent, width=12, state='readonly', justify='right')
-        entry.grid(row=row, column=1, padx=5, pady=2)
-        return entry
+    def _start_lorenz_update(self):
+        self._stop_lorenz_update()
+        self._lorenz_update_tick()
 
-    def update_lorenz_data(self):
+    def _lorenz_update_tick(self):
         data = self.lorenz_reader.get_data()
-        values = {
-            self.offset_label: data.get("offset_lorenz"),
-            self.speed_avg_label: data.get("speed_avg_lorenz"),
-            self.torque_lorenz_label: data.get("torque_lorenz"),
-            self.power_lorenz_label: data.get("power_lorenz"),
-        }
-        for entry, val in values.items():
-            entry.config(state='normal')
-            entry.delete(0, tk.END)
-            entry.insert(0, f"{val:.2f}" if val is not None else "N/A")
-            entry.config(state='readonly')
+        speed, power = self._live_panel.update_lorenz(data)
+        self._conn_bar.set_offset(self.lorenz_reader.offset)
+        if speed is not None or power is not None:
+            self._compare_panel.update_lorenz(speed, power)
+        self.lorenz_update_id = self.after(500, self._lorenz_update_tick)
 
-        # Aggiorna pannello di confronto lato Lorenz + memorizza ultimi valori
-        try:
-            v_speed = data.get("speed_avg_lorenz")
-            if v_speed is not None and hasattr(self, 'cmp_lrz_speed'):
-                self._set_ro(self.cmp_lrz_speed, f"{v_speed:.2f}")
-                self._last_lrz_speed = float(v_speed)
-            v_power = data.get("power_lorenz")
-            if v_power is not None and hasattr(self, 'cmp_lrz_power'):
-                self._set_ro(self.cmp_lrz_power, f"{v_power:.2f}")
-                self._last_lrz_power = float(v_power)
-        except Exception:
-            pass
-
-        # Ricalcola Δ (medie + istantanei)
-        self._update_compare_panel()
-
-    def connect_lorenz(self):
-        logging.getLogger().info("Richiesta connessione a Lorenz...")
-        self.executor.submit(self._connect_lorenz_worker)
-
-    def _connect_lorenz_worker(self):
-        try:
-            porta_com_lorenz = trova_porta_usb_serial("Lorenz USB sensor interface Port")
-            if porta_com_lorenz:
-                if self.lorenz_reader.open_connection(int(porta_com_lorenz.split("COM")[-1])):
-                    self.after(0, self._update_lorenz_ui, True)
-                else:
-                    self.after(0, self._update_lorenz_ui, False)
-            else:
-                self.after(0, self._update_lorenz_ui, False)
-        except Exception as e:
-            logging.getLogger().error(f"Errore durante la connessione a Lorenz: {e}")
-            self.after(0, self._update_lorenz_ui, False)
-
-    def _update_lorenz_ui(self, is_connected):
-        if is_connected:
-            logging.getLogger().info("Lorenz Connesso")
-            self.start_lorenz_update()
-        else:
-            logging.getLogger().warning("Lorenz non connesso o connessione fallita.")
-
-    def start_lorenz_update(self):
-        self.stop_lorenz_update()  # Cancella sempre il loop precedente, se esiste
-        self.update_lorenz_data()
-        self.lorenz_update_id = self.after(500, self.start_lorenz_update)
-
-    def stop_lorenz_update(self):
+    def _stop_lorenz_update(self):
         if self.lorenz_update_id is not None:
             self.after_cancel(self.lorenz_update_id)
             self.lorenz_update_id = None
 
-    def disconnect_lorenz(self):
-        logging.getLogger().info("Richiesta disconnessione Lorenz...")
-        self._lorenz_was_connected = False   # disconnessione volontaria, non triggera l'alert
-        self.stop_lorenz_update()
-        self.executor.submit(self._disconnect_lorenz_worker)
+    def _lorenz_disconnect(self):
+        logging.getLogger().info("Disconnessione Lorenz...")
+        self._lorenz_was_connected = False
+        self._stop_lorenz_update()
+        self.executor.submit(self._lorenz_disconnect_worker)
 
-    def _disconnect_lorenz_worker(self):
+    def _lorenz_disconnect_worker(self):
         ok = self.lorenz_reader.close_connection()
-        self.after(0, self._update_lorenz_disconnect_ui, ok)
+        msg = "Lorenz disconnesso." if ok else "Lorenz: nessuna connessione attiva."
+        self.after(0, logging.getLogger().info if ok else logging.getLogger().warning, msg)
 
-    def _update_lorenz_disconnect_ui(self, ok):
-        if ok:
-            logging.getLogger().info("Lorenz disconnesso.")
-        else:
-            logging.getLogger().warning("Lorenz: nessuna connessione attiva da chiudere.")
-
-    def read_lorenz_offset(self):
+    def _lorenz_read_offset(self):
         self.lorenz_reader.read_offset()
         logging.getLogger().info(f"Offset letto: {self.lorenz_reader.offset}")
-        self.save_settings()
+        self._conn_bar.set_offset(self.lorenz_reader.offset)
+        self._save_settings()
 
-    # ------------------------------
-    # Modbus
-    # ------------------------------
-    def connect_modbus(self):
-        logging.getLogger().info("Richiesta connessione Modbus...")
-        ip_address = self.entry_ip.get()
-        self.executor.submit(self._connect_modbus_worker, ip_address)
-
-    def _connect_modbus_worker(self, ip_address):
+    def _lorenz_avg_changed(self, value_str):
         try:
-            self.modbus.connetti(ip_address, 502)
+            new_avg = int(value_str)
+            if new_avg > 0 and self.lorenz_reader.avg_dim != new_avg:
+                self.lorenz_reader.avg_dim = new_avg
+                logging.getLogger().info(f"Media Lorenz impostata a: {new_avg}")
+                self._conn_bar.set_avg(new_avg)
+                self._save_settings()
+            elif new_avg <= 0:
+                logging.getLogger().warning("La dimensione della media deve essere > 0.")
+                self._conn_bar.set_avg(self.lorenz_reader.avg_dim)
+        except ValueError:
+            logging.getLogger().error("Valore media non valido.")
+            self._conn_bar.set_avg(self.lorenz_reader.avg_dim)
+
+    def _lorenz_invert_speed(self, inverted: bool):
+        self.lorenz_reader.invert_speed = inverted
+        logging.getLogger().info(f"Inversione velocità Lorenz: {'Attiva' if inverted else 'Disattiva'}")
+        self._save_settings()
+
+    # ── Modbus / Banco ────────────────────────────────────────────────────────
+
+    def _banco_connect(self, ip: str):
+        logging.getLogger().info(f"Connessione Banco a {ip}...")
+        self.executor.submit(self._banco_connect_worker, ip)
+
+    def _banco_connect_worker(self, ip):
+        try:
+            self.modbus.connetti(ip, 502)
         except Exception as e:
-            logging.getLogger().error(f"Errore durante la connessione Modbus: {e}")
+            logging.getLogger().error(f"Errore connessione Banco: {e}")
         finally:
-            self.after(0, lambda: self._check_and_update_modbus_status(from_user_action=True))
+            self.after(0, self._check_modbus, True)
 
-    def disconnect_modbus(self):
-        logging.getLogger().info("Richiesta disconnessione Modbus...")
-        self.executor.submit(self._disconnect_modbus_worker)
+    def _banco_disconnect(self):
+        logging.getLogger().info("Disconnessione Banco...")
+        self.executor.submit(self._banco_disconnect_worker)
 
-    def _disconnect_modbus_worker(self):
+    def _banco_disconnect_worker(self):
         try:
-            self._modbus_was_connected = False  # disconnessione volontaria, non triggera l'alert
+            self._modbus_was_connected = False
             self.modbus.disconnetti()
         except Exception as e:
-            logging.getLogger().error(f"Errore durante la disconnessione Modbus: {e}")
+            logging.getLogger().error(f"Errore disconnessione Banco: {e}")
         finally:
-            self.after(0, lambda: self._check_and_update_modbus_status(from_user_action=True))
+            self.after(0, self._check_modbus, True)
 
-    def clicked_button_setspeed_modbus(self):
-        try:
-            speed_value = float(self.speed_banco_spin.get())
-            self.setspeed_modbus(speed_value)
-        except (ValueError, TypeError):
-            logging.getLogger().error(f"Valore velocità non valido: {self.speed_banco_spin.get()}")
+    def _set_banco_speed(self, speedkmh):
+        logging.getLogger().info(f"Velocità banco: {speedkmh} km/h")
+        self.executor.submit(self._set_banco_speed_worker, speedkmh)
 
-    def setspeed_modbus(self, speedkmh):
-        logging.getLogger().info(f"Invio comando velocità banco: {speedkmh} km/h")
-        self.executor.submit(self._setspeed_modbus_worker, speedkmh)
-
-    def _setspeed_modbus_worker(self, speedkmh):
+    def _set_banco_speed_worker(self, speedkmh):
         try:
             if speedkmh is None:
                 raise ValueError("La velocità non può essere None")
             if speedkmh > 80:
-                raise ValueError("La velocità richiesta è superiore a 80km/h. Comando rifiutato.")
+                raise ValueError("Velocità > 80 km/h. Comando rifiutato.")
             if self.modbus.set_motor_speed(speedkmh * 10):
-                logging.getLogger().info(f"Comando velocità {speedkmh} km/h inviato con successo.")
+                logging.getLogger().info(f"Velocità banco {speedkmh} km/h impostata.")
             else:
-                logging.getLogger().info(f"Il comando di velocità non è andato a buon fine")
+                logging.getLogger().info("Comando velocità non riuscito.")
         except Exception as e:
-            logging.getLogger().error(f"Errore nell'invio della velocità del banco: {e}")
+            logging.getLogger().error(f"Errore velocità banco: {e}")
 
-    # ------------------------------
-    # Settings (soglie + smoothing + lorenz)
-    # ------------------------------
-    def load_settings(self):
-        """Carica le impostazioni da un file JSON (Lorenz + soglie delta + smoothing finestra)."""
-        defaults = {'avg_dim': 20, 'invert_speed': False, 'offset': 0.0}
-        try:
-            if os.path.exists(self.settings_file):
-                with open(self.settings_file, 'r') as f:
-                    settings = json.load(f)
-                # Lorenz
-                self.lorenz_reader.avg_dim = int(settings.get('avg_dim', defaults['avg_dim']))
-                self.lorenz_reader.invert_speed = bool(settings.get('invert_speed', defaults['invert_speed']))
-                self.lorenz_reader.offset = float(settings.get('offset', defaults['offset']))
-                # Soglie delta
-                sp = settings.get('delta_speed_thresholds_kmh', self.delta_speed_thresholds_kmh)
-                pw = settings.get('delta_power_thresholds_pct', self.delta_power_thresholds_pct)
-                if isinstance(sp, (list, tuple)) and len(sp) == 2:
-                    self.delta_speed_thresholds_kmh = (float(sp[0]), float(sp[1]))
-                if isinstance(pw, (list, tuple)) and len(pw) == 2:
-                    self.delta_power_thresholds_pct = (float(pw[0]), float(pw[1]))
-                # Finestra smoothing
-                win = settings.get('delta_smoothing_window', self.delta_smoothing_window)
-                try:
-                    self.delta_smoothing_window = max(1, int(win))
-                except Exception:
-                    self.delta_smoothing_window = 5
-                logging.getLogger().info(f"Impostazioni caricate da {self.settings_file}")
-            else:
-                # default + salva
-                self.lorenz_reader.avg_dim = defaults['avg_dim']
-                self.lorenz_reader.invert_speed = defaults['invert_speed']
-                self.lorenz_reader.offset = defaults['offset']
-                self.save_settings()
-                logging.getLogger().info("File di impostazioni non trovato, uso i valori di default.")
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            logging.getLogger().error(f"Errore nel caricare le impostazioni: {e}. Uso i valori di default.")
-            self.lorenz_reader.avg_dim = defaults['avg_dim']
-            self.lorenz_reader.invert_speed = defaults['invert_speed']
-            self.lorenz_reader.offset = defaults['offset']
+    # ── Serial (COM sensor) ───────────────────────────────────────────────────
 
-    def save_settings(self):
-        """Salva le impostazioni correnti in un file JSON (Lorenz + soglie delta + smoothing)."""
-        settings = {
-            'avg_dim': self.lorenz_reader.avg_dim,
-            'invert_speed': self.lorenz_reader.invert_speed,
-            'offset': self.lorenz_reader.offset,
-            'delta_speed_thresholds_kmh': list(self.delta_speed_thresholds_kmh),
-            'delta_power_thresholds_pct': list(self.delta_power_thresholds_pct),
-            'delta_smoothing_window': int(self.delta_smoothing_window),
-        }
-        try:
-            with open(self.settings_file, 'w') as f:
-                json.dump(settings, f, indent=4)
-            logging.getLogger().info(f"Impostazioni salvate in {self.settings_file}")
-        except IOError as e:
-            logging.getLogger().error(f"Errore nel salvare le impostazioni: {e}")
+    def _serial_connect(self, port: str):
+        if not port:
+            logging.getLogger().warning("Seleziona una COM port prima di connettere.")
+            return
+        logging.getLogger().info(f"Connessione sensore su {port}...")
+        self.executor.submit(self._serial_connect_worker, port)
 
-    def update_lorenz_avg(self, event=None):
-        try:
-            new_avg = int(self.avg_entry.get())
-            if new_avg > 0:
-                if self.lorenz_reader.avg_dim != new_avg:
-                    self.lorenz_reader.avg_dim = new_avg
-                    logging.getLogger().info(f"Dimensione media Lorenz impostata a: {new_avg}")
-                    self.save_settings()
-            else:
-                logging.getLogger().warning("La dimensione della media deve essere un intero positivo.")
-                self.avg_entry.delete(0, tk.END)
-                self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
-        except ValueError:
-            logging.getLogger().error("Valore non valido per la media. Inserire un numero intero.")
-            self.avg_entry.delete(0, tk.END)
-            self.avg_entry.insert(0, str(self.lorenz_reader.avg_dim))
-
-    def toggle_invert_speed(self):
-        is_inverted = self.invert_speed_var.get()
-        self.lorenz_reader.invert_speed = is_inverted
-        logging.getLogger().info(f"Inversione velocità Lorenz: {'Attiva' if is_inverted else 'Disattiva'}")
-        self.save_settings()
-
-    # ------------------------------
-    # Utility
-    # ------------------------------
-    def _get_application_path(self):
-        """Restituisce il percorso della cartella dell'eseguibile o dello script."""
-        if getattr(sys, 'frozen', False):
-            application_path = os.path.dirname(sys.executable)
+    def _serial_connect_worker(self, port):
+        ok = self.serial_reader.open_connection(port)
+        if ok:
+            self.after(0, logging.getLogger().info, "Sensore seriale connesso")
+            self.after(0, self._start_serial_update)
         else:
-            application_path = os.path.dirname(os.path.abspath(__file__))
-        return application_path
+            self.after(0, logging.getLogger().warning, "Sensore seriale non connesso.")
+
+    def _start_serial_update(self):
+        self._stop_serial_update()
+        self._serial_update_tick()
+
+    def _serial_update_tick(self):
+        self._live_panel.update_serial(self.serial_reader.get_data())
+        self.serial_update_id = self.after(500, self._serial_update_tick)
+
+    def _stop_serial_update(self):
+        if self.serial_update_id is not None:
+            self.after_cancel(self.serial_update_id)
+            self.serial_update_id = None
+
+    def _serial_disconnect(self):
+        logging.getLogger().info("Disconnessione sensore seriale...")
+        self._serial_was_connected = False
+        self._stop_serial_update()
+        self.executor.submit(self._serial_disconnect_worker)
+
+    def _serial_disconnect_worker(self):
+        ok = self.serial_reader.close_connection()
+        msg = "Sensore seriale disconnesso." if ok else "Sensore: nessuna connessione attiva."
+        self.after(0, logging.getLogger().info if ok else logging.getLogger().warning, msg)
+
+    # ── Emergency stop ────────────────────────────────────────────────────────
+
+    def _emergency_stop(self):
+        try:
+            if self._csv_panel.auto_commands_running:
+                self._csv_panel.stop()
+            self._set_banco_speed(0)
+            self._csv_panel.flash_stop_button()
+            logging.getLogger().warning("*** EMERGENCY STOP: speed=0, auto-cmd OFF ***")
+        except Exception as e:
+            logging.getLogger().error(f"Errore emergency_stop: {e}")
+
+    # ── Menu ─────────────────────────────────────────────────────────────────
+
+    def _create_menu(self):
+        menubar = tk.Menu(self)
+        self.config(menu=menubar)
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Cartella di lavoro", command=self._open_working_directory)
+
+    def _get_application_path(self):
+        if getattr(sys, 'frozen', False):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(os.path.abspath(__file__))
 
     def _open_working_directory(self):
-        """Apre la cartella di lavoro nel file explorer del sistema operativo."""
         path = self._get_application_path()
         try:
             if sys.platform == "win32":
                 os.startfile(path)
-            elif sys.platform == "darwin":  # macOS
+            elif sys.platform == "darwin":
                 subprocess.Popen(["open", path])
-            else:  # linux
+            else:
                 subprocess.Popen(["xdg-open", path])
-            logging.info(f"Apertura cartella di lavoro: {path}")
         except Exception as e:
-            logging.error(f"Impossibile aprire la cartella di lavoro: {e}")
+            logging.error(f"Impossibile aprire la cartella: {e}")
 
-    # ------------------------------
-    # Chiusura pulita
-    # ------------------------------
+    # ── Chiusura ──────────────────────────────────────────────────────────────
+
     def on_closing(self):
-        """
-        Gestisce l'evento di chiusura della finestra in modo non bloccante e senza deadlock.
-        """
-        # Ferma task periodici
         if self.periodic_check_id:
-            self.after_cancel(self.periodic_check_id)
-            self.periodic_check_id = None
+            self.after_cancel(self.periodic_check_id);  self.periodic_check_id = None
         if self.lorenz_update_id:
-            self.after_cancel(self.lorenz_update_id)
-            self.lorenz_update_id = None
-        if self.auto_command_id:
-            try:
-                self.after_cancel(self.auto_command_id)
-            except Exception:
-                pass
-            self.auto_command_id = None
+            self.after_cancel(self.lorenz_update_id);   self.lorenz_update_id = None
+        self._stop_serial_update()
+        self._csv_panel.stop()
 
-        self.stop_serial_update()
-        self._stop_countdown_timer()
-        self.auto_commands_running = False
-
-        # Disabilita chiusure multiple
         self.protocol("WM_DELETE_WINDOW", lambda: None)
         self.title("Total Commander - Chiusura in corso...")
 
-        # Finestra di spegnimento
         shutdown_win = tk.Toplevel(self)
         shutdown_win.title("Chiusura")
-
         w, h = 300, 130
         shutdown_win.withdraw()
         self.update_idletasks()
-
         pw, ph = self.winfo_width(), self.winfo_height()
         if pw <= 1 or ph <= 1:
-            sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-            x = (sw - w) // 2
-            y = (sh - h) // 2
+            x = (self.winfo_screenwidth()  - w) // 2
+            y = (self.winfo_screenheight() - h) // 2
         else:
-            px, py = self.winfo_rootx(), self.winfo_rooty()
-            x = px + (pw - w) // 2
-            y = py + (ph - h) // 2
+            x = self.winfo_rootx() + (pw - w) // 2
+            y = self.winfo_rooty() + (ph - h) // 2
         shutdown_win.geometry(f"{w}x{h}+{x}+{y}")
 
         status_var = tk.StringVar(value="Chiusura delle connessioni in corso...\nAttendere prego.")
-        label = ttk.Label(shutdown_win, textvariable=status_var, anchor="center", justify="center")
-        label.pack(expand=True, padx=20, pady=(16, 6))
-
+        ttk.Label(shutdown_win, textvariable=status_var,
+                  anchor="center", justify="center").pack(expand=True, padx=20, pady=(16, 6))
         pb = ttk.Progressbar(shutdown_win, mode='indeterminate', length=220)
         pb.pack(padx=20, pady=(0, 14), fill='x')
         pb.start(12)
 
         dots = [' ', '. ', '.. ', '...']
-        idx = 0
+        idx  = [0]
 
-        def _animate_text():
-            nonlocal idx
-            status_var.set(f"Chiusura delle connessioni in corso{dots[idx]}\nAttendere prego.")
-            idx = (idx + 1) % len(dots)
+        def _anim():
+            status_var.set(f"Chiusura delle connessioni in corso{dots[idx[0]]}\nAttendere prego.")
+            idx[0] = (idx[0] + 1) % len(dots)
             try:
-                self._shutdown_anim_id = shutdown_win.after(350, _animate_text)
+                self._shutdown_anim_id = shutdown_win.after(350, _anim)
             except Exception:
                 self._shutdown_anim_id = None
 
-        _animate_text()
-
+        _anim()
         shutdown_win.resizable(False, False)
         shutdown_win.transient(self)
         shutdown_win.grab_set()
         shutdown_win.deiconify()
         shutdown_win.lift()
         shutdown_win.focus_force()
-
         self._shutdown_win = shutdown_win
-        self._shutdown_pb = pb
-
+        self._shutdown_pb  = pb
         self._shutdown_future = self.executor.submit(self._graceful_shutdown)
-        self._poll_shutdown_done()
+        self._poll_shutdown()
 
-    def _poll_shutdown_done(self):
+    def _poll_shutdown(self):
         if self._shutdown_future and self._shutdown_future.done():
             try:
                 self._shutdown_future.result()
             except Exception as e:
-                logging.getLogger().error(f"Errore durante lo spegnimento: {e}")
-
-            logging.getLogger().info("Arresto dei worker...")
+                logging.getLogger().error(f"Errore shutdown: {e}")
             try:
                 self.executor.shutdown(wait=True, cancel_futures=True)
             except TypeError:
                 self.executor.shutdown(wait=True)
-            logging.getLogger().info("Spegnimento completato.")
-
-            if self._shutdown_win is not None and self._shutdown_win.winfo_exists():
+            if self._shutdown_win and self._shutdown_win.winfo_exists():
                 try:
-                    if hasattr(self, "_shutdown_anim_id") and self._shutdown_anim_id:
-                        try:
-                            self._shutdown_win.after_cancel(self._shutdown_anim_id)
-                        except Exception:
-                            pass
-                        self._shutdown_anim_id = None
-                    if hasattr(self, "_shutdown_pb") and self._shutdown_pb is not None:
-                        try:
-                            self._shutdown_pb.stop()
-                        except Exception:
-                            pass
-                        self._shutdown_pb = None
+                    if self._shutdown_anim_id:
+                        self._shutdown_win.after_cancel(self._shutdown_anim_id)
+                    if self._shutdown_pb:
+                        self._shutdown_pb.stop()
                     self._shutdown_win.destroy()
                 except Exception:
                     pass
-                self._shutdown_win = None
             self.destroy()
         else:
-            self.after(100, self._poll_shutdown_done)
+            self.after(100, self._poll_shutdown)
 
     def _graceful_shutdown(self):
-        """
-        Chiude in modo ordinato: Lorenz, Modbus, BLE (sul loop persistente),
-        poi ferma il loop BLE e join-a il thread.
-        """
-        logging.getLogger().info("Avvio procedura di spegnimento controllato...")
+        logging.getLogger().info("Spegnimento controllato in corso...")
         try:
-            # Flush finale dati — prima di tutto il resto per non perdere righe
-            logging.getLogger().info("Flush finale dati su disco...")
             self.data_processor.close()
-            logging.getLogger().info("Dati salvati.")
             if self.lorenz_reader.connected:
-                logging.getLogger().info("Chiusura connessione Lorenz...")
                 self.lorenz_reader.close_connection()
-                logging.getLogger().info("Connessione Lorenz chiusa.")
-
             if self.serial_reader.connected:
-                logging.getLogger().info("Chiusura connessione sensore temperatura...")
                 self.serial_reader.close_connection()
-                logging.getLogger().info("Connessione sensore temperatura chiusa.")
-
             if self.modbus.is_connesso():
-                logging.getLogger().info("Chiusura connessione Modbus...")
                 self.modbus.disconnetti()
-                logging.getLogger().info("Connessione Modbus chiusa.")
-
             if self.ble_manager.get_connection_status():
-                logging.getLogger().info("Chiusura connessione BLE...")
-                fut = asyncio.run_coroutine_threadsafe(self.ble_manager.disconnect_device(), self._ble_loop)
                 try:
-                    fut.result(timeout=10)
+                    self._run_ble(self.ble_manager.disconnect_device()).result(timeout=10)
                 except Exception as e:
-                    logging.getLogger().error(f"Errore nella disconnessione BLE: {e}")
-                logging.getLogger().info("Connessione BLE chiusa.")
+                    logging.getLogger().error(f"Errore disconnessione BLE in shutdown: {e}")
         except Exception as e:
-            logging.getLogger().error(f"Errore durante la disconnessione dei dispositivi: {e}")
+            logging.getLogger().error(f"Errore durante lo spegnimento: {e}")
         finally:
             self._shutdown_ble_loop(join_timeout=3.0)
-            # L'executor e la UI vengono chiusi nel main thread.
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    logging.getLogger().info("Avvio del programma...")
     app = MainWindow()
     app.mainloop()
