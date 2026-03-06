@@ -26,7 +26,6 @@ from logic import settings_manager
 from gui.panels.status_bar      import StatusBar
 from gui.panels.connections_bar import ConnectionsBar
 from gui.panels.csv_panel       import CsvPanel
-from gui.panels.compare_panel   import ComparePanel
 from gui.panels.live_data_panel import LiveDataPanel
 from gui.panels.log_panel       import LogPanel
 
@@ -35,7 +34,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander IV")
-        self.geometry("1200x850")
+        self.geometry("1300x850")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -132,23 +131,14 @@ class MainWindow(tk.Tk):
         )
         self._csv_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
-        right = ttk.Frame(content)
-        right.grid(row=0, column=1, sticky="nsew")
-        right.grid_columnconfigure(0, weight=1)
-        right.grid_rowconfigure(0, weight=0)
-        right.grid_rowconfigure(1, weight=1)
-
-        self._compare_panel = ComparePanel(
-            right,
-            smoothing_window  = self.delta_smoothing_window,
-            speed_thresholds  = self.delta_speed_thresholds_kmh,
-            power_thresholds  = self.delta_power_thresholds_pct,
-            value_font        = ('Helvetica', 12, 'bold'),
+        self._live_panel = LiveDataPanel(
+            content,
+            on_toggle_ftms   = self._toggle_ftms,
+            smoothing_window = self.delta_smoothing_window,
+            speed_thresholds = self.delta_speed_thresholds_kmh,
+            power_thresholds = self.delta_power_thresholds_pct,
         )
-        self._compare_panel.grid(row=0, column=0, sticky="ew", pady=(0, 4))
-
-        self._live_panel = LiveDataPanel(right, on_toggle_ftms=self._toggle_ftms, style=self.style)
-        self._live_panel.grid(row=1, column=0, sticky="nsew")
+        self._live_panel.grid(row=0, column=1, sticky="nsew")
 
         self._log_panel = LogPanel(self)
         self._log_panel.grid(row=3, column=0, sticky="nsew", padx=6, pady=(0, 6))
@@ -456,7 +446,6 @@ class MainWindow(tk.Tk):
         else:
             self._live_panel.set_ftms_button(False)
             self._live_panel.clear_ble()
-            self._compare_panel.clear_ble()
             self._status_bar.set_heartbeat(None)
             logging.getLogger().info("Disabilitate notifiche FTMS")
             self.executor.submit(self._disable_ftms_worker)
@@ -493,9 +482,7 @@ class MainWindow(tk.Tk):
         self._heartbeat_reset_id = self.after(2000, lambda: self._status_bar.set_heartbeat(None))
 
         # Aggiorna live panel e ottieni speed/power per ComparePanel
-        speed, power = self._live_panel.update_ble(bike_data)
-        if speed is not None or power is not None:
-            self._compare_panel.update_ble(speed, power)
+        self._live_panel.update_ble(bike_data)
 
     def _process_bike_data(self, bike_data: dict):
         lorenz_data = self.lorenz_reader.get_data()
@@ -533,10 +520,8 @@ class MainWindow(tk.Tk):
 
     def _lorenz_update_tick(self):
         data = self.lorenz_reader.get_data()
-        speed, power = self._live_panel.update_lorenz(data)
+        self._live_panel.update_lorenz(data)
         self._conn_bar.set_offset(self.lorenz_reader.offset)
-        if speed is not None or power is not None:
-            self._compare_panel.update_lorenz(speed, power)
         self.lorenz_update_id = self.after(500, self._lorenz_update_tick)
 
     def _stop_lorenz_update(self):

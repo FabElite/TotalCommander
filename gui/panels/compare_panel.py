@@ -49,12 +49,12 @@ class ComparePanel(ttk.LabelFrame):
         ttk.Label(left, text="BLE FTMS", anchor="center").grid(
             row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         ttk.Label(left, text="Speed [km/h]", width=14, anchor="e").grid(
-            row=1, column=0, padx=5, pady=2, sticky="e")
+            row=2, column=0, padx=5, pady=2, sticky="e")
         self._ble_speed = ttk.Entry(left, state='readonly', width=12,
                                     justify='right', font=self._value_font)
         self._ble_speed.grid(row=1, column=1, pady=2, sticky="w")
         ttk.Label(left, text="Power [W]", width=14, anchor="e").grid(
-            row=2, column=0, padx=5, pady=2, sticky="e")
+            row=1, column=0, padx=5, pady=2, sticky="e")
         self._ble_power = ttk.Entry(left, state='readonly', width=12,
                                     justify='right', font=self._value_font)
         self._ble_power.grid(row=2, column=1, pady=2, sticky="w")
@@ -81,12 +81,12 @@ class ComparePanel(ttk.LabelFrame):
         ttk.Label(right, text="Gestione Lorenz", anchor="center").grid(
             row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         ttk.Label(right, text="Speed [km/h]", width=14, anchor="e").grid(
-            row=1, column=0, padx=5, pady=2, sticky="e")
+            row=2, column=0, padx=5, pady=2, sticky="e")
         self._lrz_speed = ttk.Entry(right, state='readonly', width=12,
                                     justify='right', font=self._value_font)
         self._lrz_speed.grid(row=1, column=1, pady=2, sticky="w")
         ttk.Label(right, text="Power [W]", width=14, anchor="e").grid(
-            row=2, column=0, padx=5, pady=2, sticky="e")
+            row=1, column=0, padx=5, pady=2, sticky="e")
         self._lrz_power = ttk.Entry(right, state='readonly', width=12,
                                     justify='right', font=self._value_font)
         self._lrz_power.grid(row=2, column=1, pady=2, sticky="w")
