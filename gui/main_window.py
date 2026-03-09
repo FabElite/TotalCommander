@@ -369,6 +369,9 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logging.getLogger().error(f"Errore disconnessione BLE: {e}")
         finally:
+            if ok:
+                self.data_processor.flush()
+                logging.getLogger().info("Flush dati eseguito dopo disconnessione BLE.")
             def _ui():
                 self._conn_bar.set_progress(False)
                 if ok:
@@ -376,6 +379,11 @@ class MainWindow(tk.Tk):
                     self._connected_device_name = None
                     self._connected_device_address = None
                     self._status_bar.set_device_info()
+                    if self._live_panel.is_ftms_enabled():
+                        self._live_panel.set_ftms_button(False)
+                        self._live_panel.clear_ble()
+                        self._status_bar.set_heartbeat(None)
+                        logging.getLogger().info("Notifiche FTMS disabilitate.")
                     logging.getLogger().info("BLE disconnesso.")
                 else:
                     logging.getLogger().warning("Disconnessione BLE non riuscita o già disconnesso.")
@@ -468,6 +476,8 @@ class MainWindow(tk.Tk):
     def _disable_ftms_worker(self):
         try:
             self._run_ble(self.ble_manager.disable_indoor_bike_data_notifications()).result()
+            self.data_processor.flush()
+            logging.getLogger().info("Flush dati eseguito dopo disabilitazione FTMS.")
         except Exception as e:
             logging.getLogger().error(f"Errore disabilitazione FTMS: {e}")
 
