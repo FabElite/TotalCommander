@@ -240,7 +240,7 @@ class MainWindow(tk.Tk):
         elif connected:
             self._status_bar.set_ble('ok')
             if not self._ble_was_connected:
-                self.after(2000, self._auto_enable_ftms)
+                self.after(3000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
