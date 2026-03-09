@@ -78,7 +78,7 @@ class MainWindow(tk.Tk):
         self.serial_update_id  = None
         self._heartbeat_reset_id = None
         self._last_packet_time   = None
-        self._shutdown_future = None
+        self._ui_pulse_id    = None
         self._shutdown_win    = None
         self._shutdown_anim_id = None
         self._shutdown_pb      = None
@@ -150,6 +150,7 @@ class MainWindow(tk.Tk):
 
         self._create_menu()
         self.periodic_connection_check()
+        self._ui_pulse()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     # ── Settings ─────────────────────────────────────────────────────────────
@@ -218,6 +219,11 @@ class MainWindow(tk.Tk):
         return asyncio.run_coroutine_threadsafe(coro, self._ble_loop)
 
     # ── Polling stato connessioni ─────────────────────────────────────────────
+
+    def _ui_pulse(self):
+        """Batte nel main thread ogni 500 ms — si ferma se la UI si congela."""
+        self._status_bar.pulse_ui()
+        self._ui_pulse_id = self.after(500, self._ui_pulse)
 
     def periodic_connection_check(self):
         self._run_ble(self._async_check_ble())
@@ -674,11 +680,304 @@ class MainWindow(tk.Tk):
     def _create_menu(self):
         menubar = tk.Menu(self)
         self.config(menu=menubar)
+
+        # ── File ─────────────────────────────────────────────────────────────
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Cartella di lavoro", command=self._open_working_directory)
+        file_menu.add_command(label="Cartella di lavoro",
+                              command=self._open_working_directory)
+        file_menu.add_separator()
+        file_menu.add_command(label="Forza salvataggio dati",
+                              command=self._menu_flush_data)
+        file_menu.add_command(label="File dati corrente",
+                              command=self._menu_show_current_file)
 
-    def _get_application_path(self):
+        # ── Impostazioni ─────────────────────────────────────────────────────
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Impostazioni", menu=settings_menu)
+        settings_menu.add_command(label="Parametri delta e smoothing…",
+                                  command=self._menu_open_settings)
+
+        # ── Visualizza ───────────────────────────────────────────────────────
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Visualizza", menu=view_menu)
+        view_menu.add_command(label="Mostra/Nascondi pannello COM",
+                              command=self._menu_toggle_com)
+
+        # ── Info ─────────────────────────────────────────────────────────────
+        info_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Info", menu=info_menu)
+        info_menu.add_command(label="Guida all'uso…",
+                              command=self._menu_show_info)
+
+    # ── Azioni menu File ──────────────────────────────────────────────────────
+
+    def _menu_flush_data(self):
+        self.data_processor.flush()
+        logging.getLogger().info("Flush manuale dati eseguito.")
+
+    def _menu_show_current_file(self):
+        fname = os.path.basename(self.data_processor.xlsx_filename)
+        fpath = os.path.abspath(self.data_processor.xlsx_filename)
+        win = tk.Toplevel(self)
+        win.title("File dati corrente")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+        ttk.Label(win, text="File in uso:", font=('Helvetica', 9, 'bold')
+                  ).pack(padx=20, pady=(16, 4))
+        ttk.Label(win, text=fname, foreground='#0055aa'
+                  ).pack(padx=20, pady=(0, 4))
+        ttk.Label(win, text=fpath, foreground='#555555', font=('Helvetica', 8),
+                  wraplength=420, justify='center'
+                  ).pack(padx=20, pady=(0, 12))
+        ttk.Button(win, text="Chiudi", command=win.destroy
+                   ).pack(pady=(0, 14))
+
+    # ── Azioni menu Impostazioni ──────────────────────────────────────────────
+
+    def _menu_open_settings(self):
+        win = tk.Toplevel(self)
+        win.title("Parametri delta e smoothing")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+
+        pad = dict(padx=12, pady=4)
+
+        ttk.Label(win, text="Soglie Δ Velocità (km/h)",
+                  font=('Helvetica', 9, 'bold')).grid(
+            row=0, column=0, columnspan=3, sticky='w', padx=12, pady=(14, 2))
+        ttk.Label(win, text="Verde  ≤").grid(row=1, column=0, sticky='e', **pad)
+        spd_t1 = ttk.Entry(win, width=8, justify='right')
+        spd_t1.insert(0, str(self.delta_speed_thresholds_kmh[0]))
+        spd_t1.grid(row=1, column=1, **pad)
+        ttk.Label(win, text="km/h").grid(row=1, column=2, sticky='w', padx=(0, 12))
+
+        ttk.Label(win, text="Arancione  ≤").grid(row=2, column=0, sticky='e', **pad)
+        spd_t2 = ttk.Entry(win, width=8, justify='right')
+        spd_t2.insert(0, str(self.delta_speed_thresholds_kmh[1]))
+        spd_t2.grid(row=2, column=1, **pad)
+        ttk.Label(win, text="km/h").grid(row=2, column=2, sticky='w', padx=(0, 12))
+
+        ttk.Separator(win, orient='horizontal').grid(
+            row=3, column=0, columnspan=3, sticky='ew', padx=12, pady=6)
+
+        ttk.Label(win, text="Soglie Δ Potenza (%)",
+                  font=('Helvetica', 9, 'bold')).grid(
+            row=4, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
+        ttk.Label(win, text="Verde  ≤").grid(row=5, column=0, sticky='e', **pad)
+        pwr_t1 = ttk.Entry(win, width=8, justify='right')
+        pwr_t1.insert(0, str(self.delta_power_thresholds_pct[0]))
+        pwr_t1.grid(row=5, column=1, **pad)
+        ttk.Label(win, text="%").grid(row=5, column=2, sticky='w', padx=(0, 12))
+
+        ttk.Label(win, text="Arancione  ≤").grid(row=6, column=0, sticky='e', **pad)
+        pwr_t2 = ttk.Entry(win, width=8, justify='right')
+        pwr_t2.insert(0, str(self.delta_power_thresholds_pct[1]))
+        pwr_t2.grid(row=6, column=1, **pad)
+        ttk.Label(win, text="%").grid(row=6, column=2, sticky='w', padx=(0, 12))
+
+        ttk.Separator(win, orient='horizontal').grid(
+            row=7, column=0, columnspan=3, sticky='ew', padx=12, pady=6)
+
+        ttk.Label(win, text="Smoothing window",
+                  font=('Helvetica', 9, 'bold')).grid(
+            row=8, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
+        ttk.Label(win, text="Campioni (N)").grid(row=9, column=0, sticky='e', **pad)
+        smw = ttk.Entry(win, width=8, justify='right')
+        smw.insert(0, str(self.delta_smoothing_window))
+        smw.grid(row=9, column=1, **pad)
+
+        err_var = tk.StringVar()
+        ttk.Label(win, textvariable=err_var, foreground='#CC0000',
+                  font=('Helvetica', 8)).grid(
+            row=10, column=0, columnspan=3, padx=12, pady=(2, 0))
+
+        def _apply():
+            try:
+                s1 = float(spd_t1.get())
+                s2 = float(spd_t2.get())
+                p1 = float(pwr_t1.get())
+                p2 = float(pwr_t2.get())
+                n  = int(smw.get())
+                if s1 <= 0 or s2 <= s1:
+                    raise ValueError("Soglie velocità: richiede 0 < verde < arancione")
+                if p1 <= 0 or p2 <= p1:
+                    raise ValueError("Soglie potenza: richiede 0 < verde < arancione")
+                if n < 1:
+                    raise ValueError("Smoothing window deve essere ≥ 1")
+            except ValueError as e:
+                err_var.set(str(e))
+                return
+
+            self.delta_speed_thresholds_kmh = (s1, s2)
+            self.delta_power_thresholds_pct = (p1, p2)
+            self.delta_smoothing_window     = n
+            self._live_panel.set_thresholds(
+                self.delta_speed_thresholds_kmh,
+                self.delta_power_thresholds_pct)
+            self._live_panel.set_smoothing_window(n)
+            self._save_settings()
+            logging.getLogger().info(
+                f"Impostazioni aggiornate — "
+                f"Δspd ({s1},{s2}) km/h | Δpwr ({p1},{p2})% | N={n}")
+            win.destroy()
+
+        bf = ttk.Frame(win)
+        bf.grid(row=11, column=0, columnspan=3, pady=(8, 14))
+        ttk.Button(bf, text="Applica", command=_apply).grid(
+            row=0, column=0, padx=6)
+        ttk.Button(bf, text="Annulla", command=win.destroy).grid(
+            row=0, column=1, padx=6)
+
+    # ── Azioni menu Visualizza ────────────────────────────────────────────────
+
+    def _menu_toggle_com(self):
+        new_state = not self._conn_bar._com_visible
+        self._conn_bar.set_com_visible(new_state)
+        self._on_com_toggle(new_state)
+
+    # ── Azioni menu Info ──────────────────────────────────────────────────────
+
+    def _menu_show_info(self):
+        win = tk.Toplevel(self)
+        win.title("Guida all'uso")
+        win.resizable(True, True)
+        win.transient(self)
+        win.geometry("580x540")
+
+        outer = ttk.Frame(win)
+        outer.pack(fill='both', expand=True, padx=2, pady=2)
+
+        sb = ttk.Scrollbar(outer, orient='vertical')
+        sb.pack(side='right', fill='y')
+        canvas = tk.Canvas(outer, yscrollcommand=sb.set,
+                           highlightthickness=0, bg='white')
+        canvas.pack(side='left', fill='both', expand=True)
+        sb.config(command=canvas.yview)
+
+        inner = tk.Frame(canvas, bg='white')
+        canvas_win = canvas.create_window((0, 0), window=inner, anchor='nw')
+
+        def _on_resize(e):
+            canvas.itemconfig(canvas_win, width=e.width)
+        canvas.bind('<Configure>', _on_resize)
+        inner.bind('<Configure>',
+                   lambda e: canvas.configure(
+                       scrollregion=canvas.bbox('all')))
+        canvas.bind_all('<MouseWheel>',
+                        lambda e: canvas.yview_scroll(
+                            int(-1 * (e.delta / 120)), 'units'))
+
+        _BG  = 'white'
+        _H1  = ('Helvetica', 11, 'bold')
+        _H2  = ('Helvetica', 10, 'bold')
+        _TXT = ('Helvetica', 9)
+
+        def h1(text):
+            tk.Label(inner, text=text, font=_H1, bg=_BG,
+                     fg='#1a1a2e', anchor='w'
+                     ).pack(fill='x', padx=16, pady=(14, 2))
+            tk.Frame(inner, bg='#aaaacc', height=1).pack(
+                fill='x', padx=16, pady=(0, 6))
+
+        def h2(text):
+            tk.Label(inner, text=text, font=_H2, bg=_BG,
+                     fg='#333366', anchor='w'
+                     ).pack(fill='x', padx=20, pady=(8, 1))
+
+        def body(text):
+            tk.Label(inner, text=text, font=_TXT, bg=_BG,
+                     fg='#333333', anchor='nw', justify='left',
+                     wraplength=510
+                     ).pack(fill='x', padx=24, pady=(0, 4))
+
+        # ── Contenuto ─────────────────────────────────────────────────────
+        h1("● Barra di Stato — LED")
+
+        h2("UI  (primo LED a sinistra)")
+        body("Pulsa ogni 500 ms. Finché alterna colore e il contatore sale, "
+             "l'interfaccia è attiva e risponde. Se si blocca su un colore fisso "
+             "significa che il programma è congelato.")
+
+        h2("BLE / Lorenz / Banco / COM")
+        body("Verde = dispositivo connesso e raggiungibile. "
+             "Rosso = non connesso o connessione persa. "
+             "La perdita improvvisa viene segnalata anche nel log.")
+
+        h2("HB — Heartbeat dati")
+        body("Mostra la frequenza (Hz) con cui arrivano i pacchetti dati dal "
+             "trainer BLE. Attivo solo quando le notifiche FTMS sono abilitate. "
+             "Si spegne automaticamente se i dati si interrompono per più di 2 secondi.")
+
+        h2("Auto")
+        body("Verde = sequenza automatica da CSV in esecuzione. "
+             "Spento = nessuna sequenza attiva.")
+
+        h1("● Barra Connessioni")
+
+        h2("BLE")
+        body("Cerca i dispositivi Bluetooth nelle vicinanze, seleziona il trainer "
+             "dalla lista e premi Connetti. La barra di avanzamento indica che "
+             "un'operazione è in corso. Una volta connesso, le notifiche FTMS "
+             "vengono abilitate automaticamente dopo 3 secondi.")
+
+        h2("Lorenz")
+        body("Connette il sensore di coppia/potenza esterno sulla porta USB dedicata. "
+             "'Leggi Offset' acquisisce il valore di offset attuale (eseguire a riposo). "
+             "'Media' imposta quanti campioni usare per la media mobile. "
+             "'Inverti Velocità' inverte il segno del canale B.")
+
+        h2("Banco")
+        body("Connette il motore tramite Modbus TCP. Inserire l'IP del banco e premere "
+             "Connetti. La velocità viene impostata automaticamente durante le sequenze "
+             "automatiche se specificata nel CSV.")
+
+        h2("Sensore COM")
+        body("Connette un sensore seriale aggiuntivo (fino a 4 valori numerici separati "
+             "da ';'). Il pannello è collassabile con il pulsante '+COM'.")
+
+        h1("● Comandi e Sequenza Automatica")
+
+        h2("Comandi manuali")
+        body("Inviano direttamente al trainer un livello di resistenza (0–200), "
+             "una potenza target (W) o un profilo di simulazione (pendenza %). "
+             "Usare per test rapidi o verifica risposta.")
+
+        h2("Sequenza da CSV")
+        body("Carica un file CSV con colonne: tempo_attesa; livello; potenza; "
+             "simulazione; velocità_banco. Una sola colonna per riga deve essere "
+             "valorizzata. Il programma esegue i comandi nell'ordine, aspettando "
+             "il tempo indicato tra uno e l'altro. Al termine, le notifiche FTMS "
+             "vengono disabilitate automaticamente.")
+
+        h2("Emergency Stop")
+        body("Ferma immediatamente la sequenza automatica e imposta la velocità "
+             "del banco a 0. Usare in caso di necessità.")
+
+        h1("● Dati Live e Pannello Δ")
+
+        body("Il pannello mostra in tempo reale i valori ricevuti dal trainer BLE "
+             "e dal sensore Lorenz affiancati. Il Δ centrale indica la differenza "
+             "tra le due sorgenti: verde se rientra nella soglia, arancione se "
+             "moderato, rosso se elevato. Le soglie e la finestra di smoothing "
+             "sono configurabili da Impostazioni → Parametri delta.")
+
+        h1("● Salvataggio Dati")
+
+        body("I dati vengono scritti su file Excel (.xlsx) nella cartella 'output/', "
+             "con nome basato su data e ora di avvio. Il salvataggio avviene "
+             "automaticamente ogni 30 secondi. Se il file supera 100 MB viene "
+             "creato automaticamente un nuovo file (_part02, _part03…) con la "
+             "stessa intestazione. Per forzare il salvataggio immediato usare "
+             "File → Forza salvataggio dati.")
+
+        # ── Pulsante chiudi ────────────────────────────────────────────────
+        ttk.Button(win, text="Chiudi", command=win.destroy
+                   ).pack(pady=10)
+
+
         if getattr(sys, 'frozen', False):
             return os.path.dirname(sys.executable)
         return os.path.dirname(os.path.abspath(__file__))
@@ -702,6 +1001,8 @@ class MainWindow(tk.Tk):
             self.after_cancel(self.periodic_check_id);  self.periodic_check_id = None
         if self.lorenz_update_id:
             self.after_cancel(self.lorenz_update_id);   self.lorenz_update_id = None
+        if self._ui_pulse_id:
+            self.after_cancel(self._ui_pulse_id);       self._ui_pulse_id = None
         self._stop_serial_update()
         self._csv_panel.stop()
 

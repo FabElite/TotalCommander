@@ -34,8 +34,17 @@ class StatusBar(tk.Frame):
         return led
 
     def _build(self):
-        tk.Label(self, text="TOTAL COMMANDER IV", bg=_BG, fg='#8888aa',
-                 font=('Helvetica', 9, 'bold')).grid(row=0, column=0, padx=(12, 16))
+        # UI Watchdog pulse
+        g_ui = tk.Frame(self, bg=_BG)
+        g_ui.grid(row=0, column=0, padx=(12, 0))
+        self._led_ui = tk.Label(g_ui, text='●', bg=_BG, fg='#555555',
+                                font=('Helvetica', 25))
+        self._led_ui.grid(row=0, column=0, padx=(0, 3))
+        self._lbl_ui_tick = tk.Label(g_ui, text='UI  0', bg=_BG, fg='#aaaacc',
+                                     font=('Helvetica', 8))
+        self._lbl_ui_tick.grid(row=0, column=1)
+        self._ui_tick     = 0
+        self._ui_phase    = False   # alterna i due toni di verde
         self._sep(1)
 
         # LED connessioni — BLE ha due label extra (nome + indirizzo)
@@ -75,6 +84,14 @@ class StatusBar(tk.Frame):
         self._lbl_address.grid(row=1, column=1, columnspan=2, padx=(3, 0), pady=(0, 1))
 
     # ── API pubblica ──────────────────────────────────────────────────────────
+
+    def pulse_ui(self):
+        """Chiamato dal main thread ogni ~500 ms. Fa battere il LED UI."""
+        _PULSE = ('#00cc44', '#006622')
+        self._ui_phase = not self._ui_phase
+        self._ui_tick  = (self._ui_tick + 1) % 10000
+        self._led_ui.config(fg=_PULSE[self._ui_phase])
+        self._lbl_ui_tick.config(text=f'UI  {self._ui_tick}')
 
     def set_ble(self, state: str):
         self._led_ble.config(fg=_LED_COLORS.get(state, '#555555'))
