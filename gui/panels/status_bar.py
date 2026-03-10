@@ -74,6 +74,18 @@ class StatusBar(tk.Frame):
         self._lbl_auto = tk.Label(g_auto, text='Auto: OFF', bg=_BG, fg='#aaaacc',
                                   font=('Helvetica', 8))
         self._lbl_auto.grid(row=0, column=1)
+        self._sep(10)
+
+        # REC
+        g_rec = tk.Frame(self, bg=_BG)
+        g_rec.grid(row=0, column=11, padx=10)
+        self._led_rec = tk.Label(g_rec, text='●', bg=_BG, fg='#555555',
+                                 font=('Helvetica', 25))
+        self._led_rec.grid(row=0, column=0, padx=(0, 3))
+        self._lbl_rec = tk.Label(g_rec, text='REC', bg=_BG, fg='#aaaacc',
+                                 font=('Helvetica', 8))
+        self._lbl_rec.grid(row=0, column=1)
+        self._rec_phase = False
 
     def _ble_extra(self, g):
         self._lbl_device = tk.Label(g, text='—', bg=_BG, fg='#666688',
@@ -86,12 +98,27 @@ class StatusBar(tk.Frame):
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def pulse_ui(self):
-        """Chiamato dal main thread ogni ~500 ms. Fa battere il LED UI."""
-        _PULSE = ('#00cc44', '#006622')
-        self._ui_phase = not self._ui_phase
-        self._ui_tick  = (self._ui_tick + 1) % 10000
-        self._led_ui.config(fg=_PULSE[self._ui_phase])
-        self._lbl_ui_tick.config(text=f'UI  {self._ui_tick}')
+        """Chiamato dal main thread ogni ~500 ms. Fa battere LED UI e LED REC."""
+        _PULSE_UI  = ("#00cc44", "#006622")
+        _PULSE_REC = ("#cc2222", "#880000")
+        self._ui_phase  = not self._ui_phase
+        self._rec_phase = not self._rec_phase
+        self._ui_tick   = (self._ui_tick + 1) % 10000
+        self._led_ui.config(fg=_PULSE_UI[self._ui_phase])
+        self._lbl_ui_tick.config(text=f"UI  {self._ui_tick}")
+        if self._led_rec.cget("fg") != "#555555":
+            self._led_rec.config(fg=_PULSE_REC[self._rec_phase])
+
+    def set_rec(self, recording: bool):
+        """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""
+        if not recording:
+            self._led_rec.config(fg="#555555")
+            self._lbl_rec.config(text="REC", fg="#aaaacc")
+        else:
+            self._rec_phase = False
+            self._led_rec.config(fg="#cc2222")
+            self._lbl_rec.config(text="REC ●", fg="#ff6666")
+
 
     def set_ble(self, state: str):
         self._led_ble.config(fg=_LED_COLORS.get(state, '#555555'))

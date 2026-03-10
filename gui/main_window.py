@@ -64,6 +64,7 @@ class MainWindow(tk.Tk):
         self.delta_speed_thresholds_kmh = (1.0, 3.0)
         self.delta_power_thresholds_pct = (2.0, 5.0)
         self.delta_smoothing_window = 5
+        self._rec_hz = 1
         self._load_settings()
 
         # ── Loop asyncio BLE persistente ──────────────────────────────────────
@@ -79,6 +80,8 @@ class MainWindow(tk.Tk):
         self._heartbeat_reset_id = None
         self._last_packet_time   = None
         self._ui_pulse_id    = None
+        self._rec_timer_id   = None
+        self._latest_data    = {}
         self._shutdown_win    = None
         self._shutdown_anim_id = None
         self._shutdown_pb      = None
@@ -96,6 +99,9 @@ class MainWindow(tk.Tk):
 
         self._conn_bar = ConnectionsBar(
             self, self.lorenz_reader,
+            on_rec_start         = self._rec_start_dialog,
+            on_rec_stop          = self._rec_stop,
+            on_open_output       = self._open_output_dir,
             on_ble_search        = self._ble_search,
             on_ble_connect       = self._ble_connect,
             on_ble_disconnect    = self._ble_disconnect,
@@ -171,6 +177,7 @@ class MainWindow(tk.Tk):
             self.delta_smoothing_window = max(1, int(data.get('delta_smoothing_window', d['delta_smoothing_window'])))
         except Exception:
             self.delta_smoothing_window = 5
+        self._rec_hz = 1
         if not data:
             self._save_settings()
 
@@ -182,6 +189,7 @@ class MainWindow(tk.Tk):
             'delta_speed_thresholds_kmh': list(self.delta_speed_thresholds_kmh),
             'delta_power_thresholds_pct': list(self.delta_power_thresholds_pct),
             'delta_smoothing_window':     int(self.delta_smoothing_window),
+            'rec_hz':                     int(self._rec_hz),
         })
 
     # ── Loop asyncio BLE ─────────────────────────────────────────────────────
@@ -483,8 +491,8 @@ class MainWindow(tk.Tk):
 
     def _on_ble_data(self, bike_data: dict):
         """Callback invocata dal loop BLE ad ogni pacchetto FTMS."""
+        self._latest_data.update(bike_data)
         self.after(0, self._update_ble_ui, bike_data)
-        self.executor.submit(self._process_bike_data, bike_data)
 
     def _update_ble_ui(self, bike_data: dict):
         # Heartbeat
@@ -501,10 +509,6 @@ class MainWindow(tk.Tk):
         # Aggiorna live panel e ottieni speed/power per ComparePanel
         self._live_panel.update_ble(bike_data)
 
-    def _process_bike_data(self, bike_data: dict):
-        lorenz_data = self.lorenz_reader.get_data()
-        serial_data = self.serial_reader.get_data() if self.serial_reader.connected else {}
-        self.data_processor.handle_bike_data({**bike_data, **lorenz_data, **serial_data})
 
     # ── Lorenz ────────────────────────────────────────────────────────────────
 
@@ -537,6 +541,7 @@ class MainWindow(tk.Tk):
 
     def _lorenz_update_tick(self):
         data = self.lorenz_reader.get_data()
+        self._latest_data.update(data)
         self._live_panel.update_lorenz(data)
         self._conn_bar.set_offset(self.lorenz_reader.offset)
         self.lorenz_update_id = self.after(500, self._lorenz_update_tick)
@@ -654,7 +659,9 @@ class MainWindow(tk.Tk):
         self._serial_update_tick()
 
     def _serial_update_tick(self):
-        self._live_panel.update_serial(self.serial_reader.get_data())
+        data = self.serial_reader.get_data()
+        self._latest_data.update(data)
+        self._live_panel.update_serial(data)
         self.serial_update_id = self.after(500, self._serial_update_tick)
 
     def _stop_serial_update(self):
@@ -687,6 +694,90 @@ class MainWindow(tk.Tk):
 
     # ── Menu ─────────────────────────────────────────────────────────────────
 
+    # ── Registrazione dati ───────────────────────────────────────────────────
+
+    def _rec_start_dialog(self):
+        win = tk.Toplevel(self)
+        win.title("Nuova sessione di registrazione")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+
+        ts_preview = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        ttk.Label(win, text="Nome sessione (opzionale):",
+                  font=('Helvetica', 9, 'bold')
+                  ).grid(row=0, column=0, columnspan=2, padx=16, pady=(14, 4), sticky='w')
+
+        name_entry = ttk.Entry(win, width=30)
+        name_entry.grid(row=1, column=0, columnspan=2, padx=16, pady=(0, 4), sticky='ew')
+        name_entry.focus()
+
+        preview_var = tk.StringVar(value=f"{ts_preview}_bike_data.xlsx")
+        ttk.Label(win, text="File:").grid(row=2, column=0, padx=(16, 4), pady=(4, 2), sticky='e')
+        ttk.Label(win, textvariable=preview_var, foreground='#0055aa',
+                  font=('Helvetica', 8)
+                  ).grid(row=2, column=1, padx=(0, 16), pady=(4, 2), sticky='w')
+
+        def _update_preview(*_):
+            ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+            raw = name_entry.get().strip().replace(' ', '_')
+            fname = f"{ts}_{raw}_bike_data.xlsx" if raw else f"{ts}_bike_data.xlsx"
+            preview_var.set(fname)
+
+        name_entry.bind('<KeyRelease>', _update_preview)
+
+        err_var = tk.StringVar()
+        ttk.Label(win, textvariable=err_var, foreground='#CC0000',
+                  font=('Helvetica', 8)
+                  ).grid(row=3, column=0, columnspan=2, padx=16, pady=(2, 0))
+
+        def _start():
+            try:
+                self.data_processor.start_session(name_entry.get())
+            except Exception as e:
+                err_var.set(str(e))
+                return
+            fname = os.path.basename(self.data_processor.xlsx_filename)
+            self._conn_bar.set_rec_state(True, fname)
+            self._status_bar.set_rec(True)
+            self._rec_tick()
+            logging.getLogger().info(f"Registrazione avviata: {fname}")
+            win.destroy()
+
+        bf = ttk.Frame(win)
+        bf.grid(row=4, column=0, columnspan=2, pady=(8, 14))
+        ttk.Button(bf, text="Avvia", command=_start).grid(row=0, column=0, padx=6)
+        ttk.Button(bf, text="Annulla", command=win.destroy).grid(row=0, column=1, padx=6)
+        win.bind('<Return>', lambda e: _start())
+
+    def _rec_stop(self):
+        self.executor.submit(self._rec_stop_worker)
+
+    def _rec_stop_worker(self):
+        self.data_processor.stop_session()
+        self.after(0, self._rec_stop_ui)
+
+    def _rec_stop_ui(self):
+        if self._rec_timer_id is not None:
+            self.after_cancel(self._rec_timer_id)
+            self._rec_timer_id = None
+        self._status_bar.set_rec(False)
+        fname = os.path.basename(self.data_processor.xlsx_filename) \
+            if self.data_processor.xlsx_filename else "—"
+        self._conn_bar.set_rec_state(False, f"OK {fname}")
+        logging.getLogger().info(f"Registrazione terminata: {fname}")
+
+    def _rec_tick(self):
+        """Timer fisso per la scrittura dati. Indipendente da BLE."""
+        if self.data_processor.is_recording:
+            lorenz = self.lorenz_reader.get_data()
+            serial = self.serial_reader.get_data() if self.serial_reader.connected else {}
+            snapshot = {**self._latest_data, **lorenz, **serial}
+            self.executor.submit(self.data_processor.handle_bike_data, snapshot)
+        interval_ms = max(100, int(1000 / self._rec_hz))
+        self._rec_timer_id = self.after(interval_ms, self._rec_tick)
+
     def _create_menu(self):
         menubar = tk.Menu(self)
         self.config(menu=menubar)
@@ -701,6 +792,10 @@ class MainWindow(tk.Tk):
                               command=self._menu_flush_data)
         file_menu.add_command(label="File dati corrente",
                               command=self._menu_show_current_file)
+        file_menu.add_separator()
+        file_menu.add_command(label="Apri cartella output",
+                              command=lambda: self._open_working_directory(
+                                  os.path.join(self._get_application_path(), 'output')))
 
         # ── Impostazioni ─────────────────────────────────────────────────────
         settings_menu = tk.Menu(menubar, tearoff=0)
@@ -723,10 +818,17 @@ class MainWindow(tk.Tk):
     # ── Azioni menu File ──────────────────────────────────────────────────────
 
     def _menu_flush_data(self):
+        if not self.data_processor.is_recording:
+            logging.getLogger().warning("Nessuna sessione attiva — flush non necessario.")
+            return
         self.data_processor.flush()
         logging.getLogger().info("Flush manuale dati eseguito.")
 
     def _menu_show_current_file(self):
+        if not self.data_processor.xlsx_filename:
+            import tkinter.messagebox as mb
+            mb.showinfo("File dati corrente", "Nessuna sessione attiva.")
+            return
         fname = os.path.basename(self.data_processor.xlsx_filename)
         fpath = os.path.abspath(self.data_processor.xlsx_filename)
         win = tk.Toplevel(self)
@@ -799,6 +901,18 @@ class MainWindow(tk.Tk):
         smw.insert(0, str(self.delta_smoothing_window))
         smw.grid(row=9, column=1, **pad)
 
+        ttk.Separator(win, orient='horizontal').grid(
+            row=10, column=0, columnspan=3, sticky='ew', padx=12, pady=6)
+        ttk.Label(win, text="Frequenza registrazione",
+                  font=('Helvetica', 9, 'bold')).grid(
+            row=11, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
+        ttk.Label(win, text="Hz").grid(row=12, column=0, sticky='e', **pad)
+        rec_hz_cb = ttk.Combobox(win, values=['1', '2', '4', '10'], width=6,
+                                 justify='right', state='readonly')
+        rec_hz_cb.set(str(self._rec_hz))
+        rec_hz_cb.grid(row=12, column=1, **pad)
+        ttk.Label(win, text="(1=default)").grid(row=12, column=2, sticky='w', padx=(0,12))
+
         err_var = tk.StringVar()
         ttk.Label(win, textvariable=err_var, foreground='#CC0000',
                   font=('Helvetica', 8)).grid(
@@ -817,6 +931,7 @@ class MainWindow(tk.Tk):
                     raise ValueError("Soglie potenza: richiede 0 < verde < arancione")
                 if n < 1:
                     raise ValueError("Smoothing window deve essere ≥ 1")
+                hz = int(rec_hz_cb.get())
             except ValueError as e:
                 err_var.set(str(e))
                 return
@@ -824,15 +939,14 @@ class MainWindow(tk.Tk):
             self.delta_speed_thresholds_kmh = (s1, s2)
             self.delta_power_thresholds_pct = (p1, p2)
             self.delta_smoothing_window     = n
+            self._rec_hz                    = hz
             self._live_panel.set_thresholds(
                 self.delta_speed_thresholds_kmh,
                 self.delta_power_thresholds_pct)
             self._live_panel.set_smoothing_window(n)
             self._save_settings()
             logging.getLogger().info(
-                f"Impostazioni aggiornate — "
-                f"Δspd ({s1},{s2}) km/h | Δpwr ({p1},{p2})% | N={n}")
-            win.destroy()
+                f"Settings updated - spd ({s1},{s2}) km/h | pwr ({p1},{p2})% | N={n} | REC {hz}Hz")
 
         bf = ttk.Frame(win)
         bf.grid(row=11, column=0, columnspan=3, pady=(8, 14))
@@ -976,24 +1090,34 @@ class MainWindow(tk.Tk):
 
         h1("● Salvataggio Dati")
 
-        body("I dati vengono scritti su file Excel (.xlsx) nella cartella 'output/', "
-             "con nome basato su data e ora di avvio. Il salvataggio avviene "
-             "automaticamente ogni 30 secondi. Se il file supera 100 MB viene "
-             "creato automaticamente un nuovo file (_part02, _part03…) con la "
-             "stessa intestazione. Per forzare il salvataggio immediato usare "
-             "File → Forza salvataggio dati.")
+        body("Per avviare la registrazione premere ⏺ REC: verrà chiesto un nome "
+             "opzionale per la sessione. Il file verrà creato nella cartella 'output/' "
+             "con nome YYYYMMDD_HHMMSS_nome_bike_data.xlsx, ordinato cronologicamente "
+             "in automatico. Premere ⏹ STOP per terminare la sessione con flush finale garantito. "
+             "È possibile avviare più sessioni consecutive senza riavviare il programma.")
+        body("Il salvataggio avviene automaticamente ogni 30 secondi. Se il file supera "
+             "100 MB viene creato un nuovo file (_part02, _part03…) con la stessa intestazione. "
+             "Per forzare il salvataggio immediato usare File → Forza salvataggio dati. "
+             "La frequenza di registrazione (default 1 Hz) è configurabile da "
+             "Impostazioni → Parametri delta.")
 
         # ── Pulsante chiudi ────────────────────────────────────────────────
         ttk.Button(win, text="Chiudi", command=win.destroy
                    ).pack(pady=10)
 
 
+    def _get_application_path(self):
         if getattr(sys, 'frozen', False):
             return os.path.dirname(sys.executable)
         return os.path.dirname(os.path.abspath(__file__))
 
-    def _open_working_directory(self):
-        path = self._get_application_path()
+    def _open_output_dir(self):
+        self._open_working_directory(
+            os.path.join(self._get_application_path(), 'output'))
+
+    def _open_working_directory(self, path=None):
+        if path is None:
+            path = self._get_application_path()
         try:
             if sys.platform == "win32":
                 os.startfile(path)
@@ -1013,6 +1137,8 @@ class MainWindow(tk.Tk):
             self.after_cancel(self.lorenz_update_id);   self.lorenz_update_id = None
         if self._ui_pulse_id:
             self.after_cancel(self._ui_pulse_id);       self._ui_pulse_id = None
+        if self._rec_timer_id:
+            self.after_cancel(self._rec_timer_id);      self._rec_timer_id = None
         self._stop_serial_update()
         self._csv_panel.stop()
 

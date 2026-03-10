@@ -339,6 +339,17 @@ class LiveDataPanel(ttk.Frame):
         self._speed_thr = speed;  self._power_thr = power
         self._refresh_delta()
 
+
+    def set_smoothing_window(self, n: int):
+        n = max(1, int(n))
+        if n == self._n:
+            return
+        self._n = n
+        self._n_spin.set(n)
+        self._speed_hist = deque(list(self._speed_hist)[-n:], maxlen=n)
+        self._power_hist = deque(list(self._power_hist)[-n:], maxlen=n)
+        self._refresh_delta()
+
     def set_com_visible(self, visible: bool):
         if visible:
             self.grid_columnconfigure(1, weight=1)

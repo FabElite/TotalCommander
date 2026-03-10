@@ -20,13 +20,13 @@ class DataProcessor:
     Raccoglie i dati del banco prova e li persiste su file Excel.
 
     Strategia di scrittura:
+    - Le sessioni sono esplicite: start_session(name) / stop_session().
     - Le righe nuove vengono accumulate in un buffer in RAM (semplici liste Python).
     - Un thread di background ogni FLUSH_INTERVAL_SECONDS appende le righe al file
-      su disco e svuota il buffer. La RAM occupata e' proporzionale solo agli ultimi
-      30 secondi di dati, indipendentemente dalla durata del test.
+      su disco e svuota il buffer.
     - Se dopo il flush il file supera MAX_FILE_SIZE_BYTES, viene creato un nuovo
       file con suffisso _part02, _part03, ... con la stessa intestazione.
-    - Un flush finale garantito viene eseguito chiamando close().
+    - Un flush finale garantito viene eseguito da stop_session() / close().
     - Tutte le operazioni sul buffer sono protette da lock.
     """
 
@@ -40,30 +40,83 @@ class DataProcessor:
 
     def __init__(self):
         self.log = logging.getLogger(__name__)
-        self.start_time = time.time()
         self.output_dir = "output"
         self._lock = threading.Lock()
         self._buffer = []
-        self._closed = False
+        self._recording = False
         self._file_index = 1
-        self._base_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-
+        self._base_name = ""
+        self.xlsx_filename = None
+        self.start_time = None
+        self._flush_stop_event = threading.Event()
+        self._flush_thread = None
         self._create_output_dir()
+        self.log.info("DataProcessor pronto. Nessuna sessione attiva.")
+
+    @property
+    def is_recording(self) -> bool:
+        return self._recording
+
+    # ------------------------------------------------------------------
+    # Gestione sessioni
+    # ------------------------------------------------------------------
+
+    def start_session(self, session_name: str = ""):
+        """
+        Avvia una nuova sessione di registrazione.
+        Se una sessione e' gia' attiva, la chiude prima con flush finale.
+        Nome file: YYYYMMDD_HHMMSS_<session_name>_bike_data.xlsx
+        """
+        if self._recording:
+            self.log.info("Sessione precedente in corso, chiusura automatica.")
+            self.stop_session()
+
+        self._file_index = 1
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safe = session_name.strip().replace(' ', '_') if session_name.strip() else ""
+        self._base_name = f"{ts}_{safe}" if safe else ts
+        self.start_time = time.time()
+
+        with self._lock:
+            self._buffer.clear()
+
         self.xlsx_filename = self._make_filename(self._file_index)
         self._initialize_file(self.xlsx_filename)
 
-        self._flush_stop_event = threading.Event()
+        self._flush_stop_event.clear()
         self._flush_thread = threading.Thread(
             target=self._periodic_flush_worker,
             name="DataProcessor-FlushWorker",
             daemon=True
         )
         self._flush_thread.start()
+        self._recording = True
         self.log.info(
-            f"DataProcessor avviato. File: {self.xlsx_filename} -- "
+            f"Sessione avviata: {self.xlsx_filename} -- "
             f"flush ogni {FLUSH_INTERVAL_SECONDS}s -- "
             f"rotazione a {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB"
         )
+
+    def stop_session(self):
+        """
+        Ferma la sessione corrente con flush finale garantito.
+        Idempotente: sicuro da chiamare piu' volte.
+        """
+        if not self._recording:
+            return
+        self._recording = False
+        self._flush_stop_event.set()
+        if self._flush_thread is not None:
+            self._flush_thread.join(timeout=5.0)
+            self._flush_thread = None
+
+        with self._lock:
+            pending = len(self._buffer)
+            if pending:
+                self.log.info(f"Flush finale: {pending} righe rimaste nel buffer.")
+            self._flush_buffer()
+
+        self.log.info(f"Sessione terminata. File: {self.xlsx_filename}")
 
     # ------------------------------------------------------------------
     # Setup / helpers
@@ -73,7 +126,7 @@ class DataProcessor:
         suffix = f"_part{index:02d}" if index > 1 else ""
         return os.path.join(
             self.output_dir,
-            f"{self._base_timestamp}_bike_data_log{suffix}.xlsx"
+            f"{self._base_name}_bike_data{suffix}.xlsx"
         )
 
     def _create_output_dir(self):
@@ -100,8 +153,7 @@ class DataProcessor:
     # ------------------------------------------------------------------
 
     def handle_bike_data(self, data: dict):
-        if self._closed:
-            self.log.warning("handle_bike_data chiamato dopo close() -- riga ignorata.")
+        if not self._recording:
             return
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -142,7 +194,7 @@ class DataProcessor:
         poi verifica se occorre ruotare il file.
         DEVE essere chiamato con self._lock gia' acquisito.
         """
-        if not self._buffer:
+        if not self._buffer or self.xlsx_filename is None:
             return
 
         rows_to_write = self._buffer[:]
@@ -190,13 +242,15 @@ class DataProcessor:
             self.xlsx_filename = new_filename
 
     def flush(self):
-        """Forza un flush immediato. Thread-safe."""
+        """Forza un flush immediato. Thread-safe. No-op se non sta registrando."""
+        if not self._recording:
+            return
         with self._lock:
             self._flush_buffer()
 
     def _periodic_flush_worker(self):
         while not self._flush_stop_event.wait(timeout=FLUSH_INTERVAL_SECONDS):
-            if self._closed:
+            if not self._recording:
                 break
             with self._lock:
                 if self._buffer:
@@ -204,27 +258,12 @@ class DataProcessor:
                     self._flush_buffer()
 
     # ------------------------------------------------------------------
-    # Chiusura
+    # Chiusura programma
     # ------------------------------------------------------------------
 
     def close(self):
-        """
-        Ferma il thread di flush e garantisce il salvataggio di tutte le righe.
-        Idempotente: sicuro da chiamare piu' volte.
-        """
-        if self._closed:
-            return
-        self._closed = True
-        self._flush_stop_event.set()
-        self._flush_thread.join(timeout=5.0)
-
-        with self._lock:
-            pending = len(self._buffer)
-            if pending:
-                self.log.info(f"Flush finale: {pending} righe rimaste nel buffer.")
-            self._flush_buffer()
-
-        self.log.info(f"DataProcessor chiuso. Ultimo file: {self.xlsx_filename}")
+        """Alias di stop_session() — chiamato da on_closing. Idempotente."""
+        self.stop_session()
 
     # ------------------------------------------------------------------
     # Lettura comandi CSV
