@@ -711,6 +711,11 @@ class MainWindow(tk.Tk):
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
+        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
 
         ts_preview = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -845,6 +850,11 @@ class MainWindow(tk.Tk):
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
+        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
         ttk.Label(win, text="File in uso:", font=('Helvetica', 9, 'bold')
                   ).pack(padx=20, pady=(16, 4))
         ttk.Label(win, text=fname, foreground='#0055aa'
@@ -863,6 +873,11 @@ class MainWindow(tk.Tk):
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
+        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
 
         pad = dict(padx=12, pady=4)
 
