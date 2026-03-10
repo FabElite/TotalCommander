@@ -1,6 +1,7 @@
 """
 Barra di stato orizzontale in cima alla finestra.
-Espone metodi pubblici per aggiornare LED e label; non contiene logica applicativa.
+Layout:
+  ● UI 234  |  ● BLE  nome  addr  ● FTMS 2.1Hz  |  ● Lorenz  ● Banco  ● COM  |  ● Auto  |  ● REC
 """
 import tkinter as tk
 
@@ -15,110 +16,108 @@ class StatusBar(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=_BG, pady=5, **kwargs)
         self.grid_columnconfigure(99, weight=1)
+        self._ui_tick  = 0
+        self._ui_phase = False
+        self._rec_phase = False
         self._build()
 
     # ── Costruzione ───────────────────────────────────────────────────────────
 
     def _sep(self, col):
-        tk.Frame(self, bg=_SEP, width=1, height=20).grid(row=0, column=col, padx=(10, 14))
+        tk.Frame(self, bg=_SEP, width=1, height=20).grid(
+            row=0, column=col, padx=(10, 14))
 
-    def _make_led_group(self, col, label_text, extra_fn=None):
-        g = tk.Frame(self, bg=_BG)
-        g.grid(row=0, column=col, padx=10)
-        led = tk.Label(g, text='●', bg=_BG, fg='#555555', font=('Helvetica', 25))
-        led.grid(row=0, column=0, padx=(0, 3))
-        tk.Label(g, text=label_text, bg=_BG, fg='#aaaacc',
-                 font=('Helvetica', 8)).grid(row=0, column=1)
-        if extra_fn:
-            extra_fn(g)
-        return led
+    def _led_label(self, parent, text, row=0, col=0, colspan=1):
+        lbl = tk.Label(parent, text=text, bg=_BG, fg='#aaaacc', font=('Helvetica', 8))
+        lbl.grid(row=row, column=col, columnspan=colspan)
+        return lbl
 
     def _build(self):
-        # UI Watchdog pulse
+        # ── col 0: UI watchdog ────────────────────────────────────────────────
         g_ui = tk.Frame(self, bg=_BG)
         g_ui.grid(row=0, column=0, padx=(12, 0))
         self._led_ui = tk.Label(g_ui, text='●', bg=_BG, fg='#555555',
                                 font=('Helvetica', 25))
         self._led_ui.grid(row=0, column=0, padx=(0, 3))
-        self._lbl_ui_tick = tk.Label(g_ui, text='UI  0', bg=_BG, fg='#aaaacc',
-                                     font=('Helvetica', 8))
-        self._lbl_ui_tick.grid(row=0, column=1)
-        self._ui_tick     = 0
-        self._ui_phase    = False   # alterna i due toni di verde
+        self._lbl_ui_tick = self._led_label(g_ui, 'APP  0', col=1)
         self._sep(1)
 
-        # LED connessioni — BLE ha due label extra (nome + indirizzo)
-        self._led_ble    = self._make_led_group(2, 'BLE',    extra_fn=self._ble_extra)
-        self._led_lorenz = self._make_led_group(3, 'Lorenz')
-        self._led_banco  = self._make_led_group(4, 'Banco')
-        self._led_com    = self._make_led_group(5, 'COM')
-        self._sep(6)
+        # ── col 2: BLE + FTMS (stesso gruppo visivo) ──────────────────────────
+        g_ble = tk.Frame(self, bg=_BG)
+        g_ble.grid(row=0, column=2, padx=10)
 
-        # Heartbeat
-        g_hb = tk.Frame(self, bg=_BG)
-        g_hb.grid(row=0, column=7, padx=10)
-        self._led_heartbeat = tk.Label(g_hb, text='●', bg=_BG, fg='#555555',
-                                       font=('Helvetica', 25))
-        self._led_heartbeat.grid(row=0, column=0, padx=(0, 3))
-        self._lbl_hz = tk.Label(g_hb, text='-- Hz', bg=_BG, fg='#aaaacc',
-                                font=('Helvetica', 8))
-        self._lbl_hz.grid(row=0, column=1)
-        self._sep(8)
+        # LED BLE
+        self._led_ble = tk.Label(g_ble, text='●', bg=_BG, fg='#555555',
+                                 font=('Helvetica', 25))
+        self._led_ble.grid(row=0, column=0, padx=(0, 3))
+        self._led_label(g_ble, 'BLE', col=1)
+        # nome e indirizzo device
+        self._lbl_device = tk.Label(g_ble, text='—', bg=_BG, fg='#666688',
+                                    font=('Helvetica', 8), anchor='w')
+        self._lbl_device.grid(row=0, column=2, padx=(6, 12))
+        self._lbl_address = tk.Label(g_ble, text='', bg=_BG, fg='#555577',
+                                     font=('Helvetica', 8), anchor='w')
+        self._lbl_address.grid(row=1, column=1, columnspan=3,
+                               padx=(3, 12), pady=(0, 1))
 
-        # Stato comandi automatici
+        # LED FTMS
+        self._led_ftms = tk.Label(g_ble, text='●', bg=_BG, fg='#555555',
+                                  font=('Helvetica', 25))
+        self._led_ftms.grid(row=0, column=4, padx=(0, 3))
+        self._lbl_ftms = tk.Label(g_ble, text='FTMS', bg=_BG, fg='#aaaacc',
+                                  font=('Helvetica', 8))
+        self._lbl_ftms.grid(row=0, column=5)
+        self._lbl_ftms_hz = tk.Label(g_ble, text='', bg=_BG, fg='#aaaacc',
+                                     font=('Helvetica', 8))
+        self._lbl_ftms_hz.grid(row=1, column=4, columnspan=2,
+                               padx=(3, 0), pady=(0, 1))
+
+        self._sep(3)
+
+        # ── col 4-6: Lorenz, Banco, COM ───────────────────────────────────────
+        for col, label, attr in [(4, 'Lorenz', '_led_lorenz'),
+                                 (5, 'Banco',  '_led_banco'),
+                                 (6, 'COM',    '_led_com')]:
+            g = tk.Frame(self, bg=_BG)
+            g.grid(row=0, column=col, padx=8)
+            led = tk.Label(g, text='●', bg=_BG, fg='#555555',
+                           font=('Helvetica', 25))
+            led.grid(row=0, column=0, padx=(0, 3))
+            self._led_label(g, label, col=1)
+            setattr(self, attr, led)
+
+        self._sep(7)
+
+        # ── col 8: Auto ───────────────────────────────────────────────────────
         g_auto = tk.Frame(self, bg=_BG)
-        g_auto.grid(row=0, column=9, padx=10)
+        g_auto.grid(row=0, column=8, padx=10)
         self._led_auto = tk.Label(g_auto, text='●', bg=_BG, fg='#555555',
                                   font=('Helvetica', 25))
         self._led_auto.grid(row=0, column=0, padx=(0, 3))
-        self._lbl_auto = tk.Label(g_auto, text='Auto: OFF', bg=_BG, fg='#aaaacc',
-                                  font=('Helvetica', 8))
-        self._lbl_auto.grid(row=0, column=1)
-        self._sep(10)
+        self._lbl_auto = self._led_label(g_auto, 'Auto: OFF', col=1)
+        self._sep(9)
 
-        # REC
+        # ── col 10: REC ───────────────────────────────────────────────────────
         g_rec = tk.Frame(self, bg=_BG)
-        g_rec.grid(row=0, column=11, padx=10)
+        g_rec.grid(row=0, column=10, padx=10)
         self._led_rec = tk.Label(g_rec, text='●', bg=_BG, fg='#555555',
                                  font=('Helvetica', 25))
         self._led_rec.grid(row=0, column=0, padx=(0, 3))
-        self._lbl_rec = tk.Label(g_rec, text='REC', bg=_BG, fg='#aaaacc',
-                                 font=('Helvetica', 8))
-        self._lbl_rec.grid(row=0, column=1)
-        self._rec_phase = False
-
-    def _ble_extra(self, g):
-        self._lbl_device = tk.Label(g, text='—', bg=_BG, fg='#666688',
-                                    font=('Helvetica', 8), anchor='w')
-        self._lbl_device.grid(row=0, column=2, padx=(6, 0))
-        self._lbl_address = tk.Label(g, text='', bg=_BG, fg='#555577',
-                                     font=('Helvetica', 8), anchor='w')
-        self._lbl_address.grid(row=1, column=1, columnspan=2, padx=(3, 0), pady=(0, 1))
+        self._lbl_rec = self._led_label(g_rec, 'REC', col=1)
 
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def pulse_ui(self):
         """Chiamato dal main thread ogni ~500 ms. Fa battere LED UI e LED REC."""
-        _PULSE_UI  = ("#00cc44", "#006622")
-        _PULSE_REC = ("#cc2222", "#880000")
+        _PULSE_UI  = ('#00cc44', '#006622')
+        _PULSE_REC = ('#cc2222', '#880000')
         self._ui_phase  = not self._ui_phase
         self._rec_phase = not self._rec_phase
         self._ui_tick   = (self._ui_tick + 1) % 10000
         self._led_ui.config(fg=_PULSE_UI[self._ui_phase])
-        self._lbl_ui_tick.config(text=f"UI  {self._ui_tick}")
-        if self._led_rec.cget("fg") != "#555555":
+        self._lbl_ui_tick.config(text=f'APP  {self._ui_tick}')
+        if self._led_rec.cget('fg') != '#555555':
             self._led_rec.config(fg=_PULSE_REC[self._rec_phase])
-
-    def set_rec(self, recording: bool):
-        """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""
-        if not recording:
-            self._led_rec.config(fg="#555555")
-            self._lbl_rec.config(text="REC", fg="#aaaacc")
-        else:
-            self._rec_phase = False
-            self._led_rec.config(fg="#cc2222")
-            self._lbl_rec.config(text="REC ●", fg="#ff6666")
-
 
     def set_ble(self, state: str):
         self._led_ble.config(fg=_LED_COLORS.get(state, '#555555'))
@@ -140,16 +139,39 @@ class StatusBar(tk.Frame):
             self._lbl_device.config(text='—', fg='#666688')
             self._lbl_address.config(text='')
 
-    def set_heartbeat(self, hz=None):
-        """hz=None → LED spento; hz=float → LED verde + frequenza."""
+    def set_ftms(self, hz=None):
+        """
+        None     → FTMS disabilitato (LED spento)
+        0        → FTMS abilitato, nessun pacchetto ancora (LED verde fisso)
+        float>0  → pacchetti in arrivo (LED verde + Hz)
+        """
         if hz is None:
-            self._led_heartbeat.config(fg='#555555')
-            self._lbl_hz.config(text='-- Hz')
+            self._led_ftms.config(fg='#555555')
+            self._lbl_ftms.config(fg='#aaaacc')
+            self._lbl_ftms_hz.config(text='')
+        elif hz == 0:
+            self._led_ftms.config(fg='#00cc44')
+            self._lbl_ftms.config(fg='#88ffaa')
+            self._lbl_ftms_hz.config(text='-- Hz')
         else:
-            self._led_heartbeat.config(fg='#00cc44')
-            self._lbl_hz.config(text=f'{hz:.1f} Hz')
+            self._led_ftms.config(fg='#00cc44')
+            self._lbl_ftms.config(fg='#88ffaa')
+            self._lbl_ftms_hz.config(text=f'{hz:.1f} Hz')
+
+    # set_heartbeat mantenuto come alias per retrocompatibilità
+    def set_heartbeat(self, hz=None):
+        self.set_ftms(hz)
+
+    def set_rec(self, recording: bool):
+        """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""
+        if not recording:
+            self._led_rec.config(fg='#555555')
+            self._lbl_rec.config(text='REC', fg='#aaaacc')
+        else:
+            self._rec_phase = False
+            self._led_rec.config(fg='#cc2222')
+            self._lbl_rec.config(text='REC', fg='#ff6666')
 
     def set_auto(self, state: str, label: str):
-        """Aggiorna LED + testo del pannello auto (es. 'ok', 'Auto: ON')."""
         self._led_auto.config(fg=_LED_COLORS.get(state, '#555555'))
         self._lbl_auto.config(text=label)

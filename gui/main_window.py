@@ -282,8 +282,8 @@ class MainWindow(tk.Tk):
         if self._live_panel.is_ftms_enabled():
             self._live_panel.set_ftms_button(False)
             self._live_panel.clear_ble()
-            self._status_bar.set_heartbeat(None)
             logging.getLogger().warning("    Notifiche FTMS disabilitate automaticamente.")
+        self._reset_ftms_state()
 
     def _check_lorenz(self):
         connected = self.lorenz_reader.connected
@@ -390,8 +390,8 @@ class MainWindow(tk.Tk):
                     if self._live_panel.is_ftms_enabled():
                         self._live_panel.set_ftms_button(False)
                         self._live_panel.clear_ble()
-                        self._status_bar.set_heartbeat(None)
                         logging.getLogger().info("Notifiche FTMS disabilitate.")
+                    self._reset_ftms_state()
                     logging.getLogger().info("BLE disconnesso.")
                 else:
                     logging.getLogger().warning("Disconnessione BLE non riuscita o già disconnesso.")
@@ -458,19 +458,28 @@ class MainWindow(tk.Tk):
 
     # ── FTMS notifications ────────────────────────────────────────────────────
 
+    def _reset_ftms_state(self):
+        """Cancella il timer heartbeat e spegne il LED FTMS. Da chiamare su ogni disconnessione."""
+        if self._heartbeat_reset_id:
+            self.after_cancel(self._heartbeat_reset_id)
+            self._heartbeat_reset_id = None
+        self._last_packet_time = None
+        self._status_bar.set_ftms(None)
+
     def _toggle_ftms(self):
         if not self._live_panel.is_ftms_enabled():
             if self.ble_manager.get_connection_status():
                 self._live_panel.set_ftms_button(True)
                 logging.getLogger().info("Abilitate notifiche FTMS")
+                self._status_bar.set_ftms(0)
                 self.executor.submit(self._enable_ftms_worker)
             else:
                 logging.getLogger().info("Nessun dispositivo connesso, FTMS non abilitabile")
         else:
             self._live_panel.set_ftms_button(False)
             self._live_panel.clear_ble()
-            self._status_bar.set_heartbeat(None)
             logging.getLogger().info("Disabilitate notifiche FTMS")
+            self._reset_ftms_state()
             self.executor.submit(self._disable_ftms_worker)
 
     def _enable_ftms_worker(self):
@@ -500,11 +509,11 @@ class MainWindow(tk.Tk):
         if self._last_packet_time is not None:
             dt = now - self._last_packet_time
             if dt > 0:
-                self._status_bar.set_heartbeat(1.0 / dt)
+                self._status_bar.set_ftms(1.0 / dt)
         self._last_packet_time = now
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id)
-        self._heartbeat_reset_id = self.after(2000, lambda: self._status_bar.set_heartbeat(None))
+        self._heartbeat_reset_id = self.after(2000, lambda: self._status_bar.set_ftms(0))
 
         # Aggiorna live panel e ottieni speed/power per ComparePanel
         self._live_panel.update_ble(bike_data)
@@ -906,17 +915,18 @@ class MainWindow(tk.Tk):
         ttk.Label(win, text="Frequenza registrazione",
                   font=('Helvetica', 9, 'bold')).grid(
             row=11, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
-        ttk.Label(win, text="Hz").grid(row=12, column=0, sticky='e', **pad)
+        ttk.Label(win, text="Frequenza [Hz]:").grid(row=12, column=0, sticky='e', **pad)
         rec_hz_cb = ttk.Combobox(win, values=['1', '2', '4', '10'], width=6,
                                  justify='right', state='readonly')
         rec_hz_cb.set(str(self._rec_hz))
         rec_hz_cb.grid(row=12, column=1, **pad)
-        ttk.Label(win, text="(1=default)").grid(row=12, column=2, sticky='w', padx=(0,12))
+        ttk.Label(win, text="default: 1").grid(row=13, column=0, columnspan=3,
+                                               sticky='w', padx=24, pady=(0, 4))
 
         err_var = tk.StringVar()
         ttk.Label(win, textvariable=err_var, foreground='#CC0000',
                   font=('Helvetica', 8)).grid(
-            row=10, column=0, columnspan=3, padx=12, pady=(2, 0))
+            row=14, column=0, columnspan=3, padx=12, pady=(2, 0))
 
         def _apply():
             try:
@@ -949,7 +959,7 @@ class MainWindow(tk.Tk):
                 f"Settings updated - spd ({s1},{s2}) km/h | pwr ({p1},{p2})% | N={n} | REC {hz}Hz")
 
         bf = ttk.Frame(win)
-        bf.grid(row=11, column=0, columnspan=3, pady=(8, 14))
+        bf.grid(row=15, column=0, columnspan=3, pady=(8, 14))
         ttk.Button(bf, text="Applica", command=_apply).grid(
             row=0, column=0, padx=6)
         ttk.Button(bf, text="Annulla", command=win.destroy).grid(
@@ -1139,6 +1149,8 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._ui_pulse_id);       self._ui_pulse_id = None
         if self._rec_timer_id:
             self.after_cancel(self._rec_timer_id);      self._rec_timer_id = None
+        if self._heartbeat_reset_id:
+            self.after_cancel(self._heartbeat_reset_id); self._heartbeat_reset_id = None
         self._stop_serial_update()
         self._csv_panel.stop()
 
@@ -1215,18 +1227,40 @@ class MainWindow(tk.Tk):
     def _graceful_shutdown(self):
         logging.getLogger().info("Spegnimento controllato in corso...")
         try:
+            # 1. Ferma la registrazione dati subito — niente più scritture
             self.data_processor.close()
+
+            # 2. Disabilita notifiche FTMS prima di disconnettere BLE.
+            #    Senza questo passo, disconnect_device() si blocca in attesa
+            #    che Bleak chiuda il canale delle notifiche.
+            if self.ble_manager.get_connection_status():
+                if self.ble_manager.indoor_bike_data_notifications_enabled:
+                    try:
+                        self._run_ble(
+                            self.ble_manager.disable_indoor_bike_data_notifications()
+                        ).result(timeout=5)
+                        logging.getLogger().info("Notifiche FTMS disabilitate (shutdown).")
+                    except Exception as e:
+                        logging.getLogger().warning(
+                            f"Impossibile disabilitare notifiche FTMS: {e}")
+
+            # 3. Disconnetti BLE — ora può uscire senza bloccarsi
+            if self.ble_manager.get_connection_status():
+                try:
+                    self._run_ble(
+                        self.ble_manager.disconnect_device()
+                    ).result(timeout=10)
+                except Exception as e:
+                    logging.getLogger().error(f"Errore disconnessione BLE in shutdown: {e}")
+
+            # 4. Chiudi gli altri dispositivi
             if self.lorenz_reader.connected:
                 self.lorenz_reader.close_connection()
             if self.serial_reader.connected:
                 self.serial_reader.close_connection()
             if self.modbus.is_connesso():
                 self.modbus.disconnetti()
-            if self.ble_manager.get_connection_status():
-                try:
-                    self._run_ble(self.ble_manager.disconnect_device()).result(timeout=10)
-                except Exception as e:
-                    logging.getLogger().error(f"Errore disconnessione BLE in shutdown: {e}")
+
         except Exception as e:
             logging.getLogger().error(f"Errore durante lo spegnimento: {e}")
         finally:
