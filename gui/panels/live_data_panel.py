@@ -64,7 +64,6 @@ class LiveDataPanel(ttk.Frame):
         self.grid_rowconfigure(0, weight=1)
 
         self._build_main_panel()
-        self._build_com_box()
 
     # ── Costruzione ───────────────────────────────────────────────────────────
 
@@ -172,21 +171,6 @@ class LiveDataPanel(ttk.Frame):
             command=self._on_toggle_ftms, style='Data.Disabled.TButton')
         self._btn_toggle.grid(row=9, column=0, columnspan=2,
                               padx=(8, 2), pady=(6, 6), sticky='ew')
-
-    # ── COM box ───────────────────────────────────────────────────────────────
-
-    def _build_com_box(self):
-        self._com_frame = ttk.LabelFrame(self, text="Dati COM")
-        self._com_frame.grid_columnconfigure(1, weight=1)
-        self._com = []
-        for i in range(4):
-            tk.Label(self._com_frame, text=f"Valore {i+1}", font=_F_VAL_S,
-                     anchor='e', width=8).grid(row=i, column=0, sticky='e',
-                                               padx=(8, 4), pady=3)
-            e = ttk.Entry(self._com_frame, state='readonly', justify='right',
-                          width=8, font=_F_VAL_S)
-            e.grid(row=i, column=1, sticky='ew', padx=(0, 8), pady=3)
-            self._com.append(e)
 
     # ── Smoothing & delta ─────────────────────────────────────────────────────
 
@@ -316,13 +300,3 @@ class LiveDataPanel(ttk.Frame):
         self._speed_hist = deque(list(self._speed_hist)[-n:], maxlen=n)
         self._power_hist = deque(list(self._power_hist)[-n:], maxlen=n)
         self._refresh_delta()
-
-    def set_com_visible(self, visible: bool):
-        if visible:
-            self.grid_columnconfigure(0, weight=3)
-            self.grid_columnconfigure(1, weight=1)
-            self._com_frame.grid(row=0, column=1, sticky='nsew', padx=(4, 0))
-        else:
-            self._com_frame.grid_remove()
-            self.grid_columnconfigure(0, weight=1)
-            self.grid_columnconfigure(1, weight=0, minsize=0)

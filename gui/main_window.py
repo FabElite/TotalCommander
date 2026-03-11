@@ -28,13 +28,14 @@ from gui.panels.connections_bar import ConnectionsBar
 from gui.panels.csv_panel       import CsvPanel
 from gui.panels.live_data_panel import LiveDataPanel
 from gui.panels.log_panel       import LogPanel
+from gui.panels.sidebar         import CollapsibleSidebar
 
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander IV")
-        self.geometry("1000x730")
+        self.geometry("950x733")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -86,22 +87,26 @@ class MainWindow(tk.Tk):
         self._shutdown_anim_id = None
         self._shutdown_pb      = None
 
-        # ── Layout root ───────────────────────────────────────────────────────
-        self.grid_rowconfigure(0, weight=0)   # status bar
-        self.grid_rowconfigure(1, weight=0)   # connections bar
-        self.grid_rowconfigure(2, weight=1)   # content
-        self.grid_rowconfigure(3, weight=0)   # log
+        # ── Layout root: col 0 = contenuto, col 1 = sidebar ──────────────────
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0)
+
+        # Frame contenitore principale (tutta la UI esistente vive qui)
+        _mf = ttk.Frame(self)
+        _mf.grid(row=0, column=0, sticky="nsew")
+        _mf.grid_rowconfigure(0, weight=0)   # status bar
+        _mf.grid_rowconfigure(1, weight=0)   # connections bar
+        _mf.grid_rowconfigure(2, weight=1)   # content
+        _mf.grid_rowconfigure(3, weight=0)   # log
+        _mf.grid_columnconfigure(0, weight=1)
 
         # ── Pannelli ──────────────────────────────────────────────────────────
-        self._status_bar = StatusBar(self)
+        self._status_bar = StatusBar(_mf)
         self._status_bar.grid(row=0, column=0, sticky="ew")
 
         self._conn_bar = ConnectionsBar(
-            self, self.lorenz_reader,
-            on_rec_start         = self._rec_start_dialog,
-            on_rec_stop          = self._rec_stop,
-            on_open_output       = self._open_output_dir,
+            _mf, self.lorenz_reader,
             on_ble_search        = self._ble_search,
             on_ble_connect       = self._ble_connect,
             on_ble_disconnect    = self._ble_disconnect,
@@ -112,14 +117,11 @@ class MainWindow(tk.Tk):
             on_lorenz_invert     = self._lorenz_invert_speed,
             on_banco_connect     = self._banco_connect,
             on_banco_disconnect  = self._banco_disconnect,
-            on_serial_connect    = self._serial_connect,
-            on_serial_disconnect = self._serial_disconnect,
-            on_com_toggle        = self._on_com_toggle,
         )
         self._conn_bar.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 2))
 
         # Content area (2 colonne)
-        content = ttk.Frame(self)
+        content = ttk.Frame(_mf)
         content.grid(row=2, column=0, sticky="nsew", padx=6, pady=(0, 4))
         content.grid_columnconfigure(0, weight=0)
         content.grid_columnconfigure(1, weight=1)
@@ -147,9 +149,17 @@ class MainWindow(tk.Tk):
         )
         self._live_panel.grid(row=0, column=1, sticky="nsew")
 
-        self._log_panel = LogPanel(self)
+        self._log_panel = LogPanel(_mf)
         self._log_panel.grid(row=3, column=0, sticky="nsew", padx=6, pady=(0, 6))
         self.log_queue = self._log_panel.log_queue   # esposto per main.py
+
+        # ── Sidebar collassabile (destra) ─────────────────────────────────────
+        self._sidebar = CollapsibleSidebar(
+            self,
+            on_serial_connect    = self._serial_connect,
+            on_serial_disconnect = self._serial_disconnect,
+        )
+        self._sidebar.grid(row=0, column=1, sticky="ns")
 
         # Aggiorna offset al primo avvio
         self._conn_bar.set_offset(self.lorenz_reader.offset)
@@ -652,11 +662,6 @@ class MainWindow(tk.Tk):
 
     # ── Serial (COM sensor) ───────────────────────────────────────────────────
 
-
-    def _on_com_toggle(self, visible: bool):
-        """Sincronizza visibilità COM tra ConnectionsBar e LiveDataPanel."""
-        self._live_panel.set_com_visible(visible)
-
     def _serial_connect(self, port: str):
         if not port:
             logging.getLogger().warning("Seleziona una COM port prima di connettere.")
@@ -679,7 +684,7 @@ class MainWindow(tk.Tk):
     def _serial_update_tick(self):
         data = self.serial_reader.get_data()
         self._latest_data.update(data)
-        self._live_panel.update_serial(data)
+        self._sidebar.update_serial(data)
         self.serial_update_id = self.after(500, self._serial_update_tick)
 
     def _stop_serial_update(self):
@@ -830,7 +835,7 @@ class MainWindow(tk.Tk):
         view_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Visualizza", menu=view_menu)
         view_menu.add_command(label="Mostra/Nascondi pannello COM",
-                              command=self._menu_toggle_com)
+                              command=self._sidebar.toggle)
 
         # ── Info ─────────────────────────────────────────────────────────────
         info_menu = tk.Menu(menubar, tearoff=0)
@@ -988,13 +993,6 @@ class MainWindow(tk.Tk):
             row=0, column=0, padx=6)
         ttk.Button(bf, text="Annulla", command=win.destroy).grid(
             row=0, column=1, padx=6)
-
-    # ── Azioni menu Visualizza ────────────────────────────────────────────────
-
-    def _menu_toggle_com(self):
-        new_state = not self._conn_bar._com_visible
-        self._conn_bar.set_com_visible(new_state)
-        self._on_com_toggle(new_state)
 
     # ── Azioni menu Info ──────────────────────────────────────────────────────
 
