@@ -137,6 +137,11 @@ class CsvPanel(ttk.Frame):
         self._table.tag_configure('evenrow',    background='white')
         self._table.tag_configure('currentrow', background='yellow')
 
+        self._autoscroll_table = tk.BooleanVar(value=True)
+        ttk.Checkbutton(wrap, text='Auto-scroll',
+                        variable=self._autoscroll_table
+                        ).grid(row=1, column=0, sticky='w', pady=(2, 0))
+
     def _build_timebar(self, parent):
         """Righe 3-4: separatore + tempi su 2 righe con larghezza fissa."""
         ttk.Separator(parent, orient='horizontal').grid(
@@ -258,7 +263,7 @@ class CsvPanel(ttk.Frame):
         try:
             self._on_set_banco(float(self._speed_spin.get()))
         except (ValueError, TypeError):
-            self._log.warning(f"Valore velocità non valido: {self._speed_spin.get()}")
+            self._log.error(f"Valore velocità non valido: {self._speed_spin.get()}")
 
     def _on_cycles_changed(self):
         if self._csv_single_cycle_seconds == 0:
@@ -333,7 +338,7 @@ class CsvPanel(ttk.Frame):
 
         self._csv_single_cycle_seconds = single_cycle_s
         self._on_cycles_changed()
-        self._log.debug(
+        self._log.info(
             f"Caricati {len(commands)} comandi. Durata 1 ciclo: {_fmt(single_cycle_s)}")
 
     def start(self):
@@ -378,6 +383,8 @@ class CsvPanel(ttk.Frame):
                     self._table.item(command_items[prev],
                                      tags=('evenrow' if prev % 2 == 0 else 'oddrow',))
                 self._table.item(command_items[index], tags=('currentrow',))
+                if self._autoscroll_table.get():
+                    self._table.see(command_items[index])
                 self._on_auto_status('ok', 'Auto: ON')
                 self._on_dispatch(command_type, value, speed_banco)
 
@@ -428,7 +435,7 @@ class CsvPanel(ttk.Frame):
                     self._table.item(item, tags=('evenrow' if idx % 2 == 0 else 'oddrow',))
                     break
         else:
-            self._log.debug("Stop richiesto: nessun comando automatico attivo.")
+            self._log.info("Non ci sono comandi automatici attivi")
             self._lbl_remaining.config(text="--:--:--")
             self._lbl_total.config(text="--:--:--")
             self.total_test_duration_seconds = 0
