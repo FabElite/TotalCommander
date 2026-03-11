@@ -175,50 +175,65 @@ class CsvPanel(ttk.Frame):
         col_b.grid(row=0, column=1, sticky="new")
         col_b.grid_columnconfigure(0, weight=1)
 
-        self._build_manual_commands(col_b)
-        self._build_banco_control(col_b)
+        # Un unico LabelFrame con griglia condivisa → tutto allineato
+        f = ttk.LabelFrame(col_b, text="Comandi")
+        f.grid(row=0, column=0, sticky="ew")
 
-    def _build_manual_commands(self, parent):
-        f = ttk.LabelFrame(parent, text="Comandi manuali BLE")
-        f.grid(row=0, column=0, sticky="ew", pady=(0, 6))
-        f.grid_columnconfigure(0, weight=2)
+        _W_LBL  = 13   # larghezza fissa label → colonna stabile
+        _W_SPIN = 8    # larghezza spinbox
+        _W_BTN  = 6    # larghezza pulsante
+        _PX = 5
+        _PY = 3
+
+        f.grid_columnconfigure(0, weight=0)
         f.grid_columnconfigure(1, weight=1)
-        f.grid_columnconfigure(2, weight=1)
+        f.grid_columnconfigure(2, weight=0)
+
+        # ── Sezione BLE ───────────────────────────────────────────────────────
+        ttk.Label(f, text="BLE", font=('Helvetica', 8, 'bold'),
+                  foreground='#1565C0').grid(
+            row=0, column=0, columnspan=3, sticky='w', padx=_PX, pady=(6, 2))
 
         specs = [
-            ("Livello [/200]",  self._on_send_level,       0,       200,    1,    None,   'livello'),
-            ("Potenza [W]",     self._on_send_power,        0,      5000,    1,    None,   'potenza'),
-            ("Simulazione [%]", self._on_send_simulation, -999999, 999999, 0.1, "%.1f",  'simulazione'),
+            ("Livello [/200]",  self._on_send_level,       0,       200,    1,    None,    'livello'),
+            ("Potenza [W]",     self._on_send_power,        0,      5000,    1,    None,    'potenza'),
+            ("Simulaz. [%]",    self._on_send_simulation, -999999, 999999, 0.1,  "%.1f",   'simulazione'),
         ]
         self._manual_entries = {}
-        for i, (label, cmd, lo, hi, inc, fmt, key) in enumerate(specs):
-            ttk.Label(f, text=label).grid(row=i, column=0, padx=5, pady=3, sticky="ew")
-            kw = dict(from_=lo, to=hi, increment=inc, width=10)
+        for i, (label, cmd, lo, hi, inc, fmt, key) in enumerate(specs, start=1):
+            ttk.Label(f, text=label, width=_W_LBL, anchor='w').grid(
+                row=i, column=0, padx=(_PX, 2), pady=_PY, sticky='w')
+            kw = dict(from_=lo, to=hi, increment=inc, width=_W_SPIN)
             if fmt:
                 kw['format'] = fmt
             spin = ttk.Spinbox(f, **kw)
-            spin.set(0 if fmt is None else 0.0)
-            spin.grid(row=i, column=1, padx=4, pady=3, sticky="ew")
+            spin.set(0 if fmt is None else "0.0")
+            spin.grid(row=i, column=1, padx=2, pady=_PY, sticky='ew')
             self._manual_entries[key] = spin
-            ttk.Button(f, text="Invia",
+            ttk.Button(f, text="Invia", width=_W_BTN,
                        command=lambda c=cmd, k=key: c(self._manual_entries[k].get())
-                       ).grid(row=i, column=2, padx=(0, 5), pady=3, sticky="ew")
+                       ).grid(row=i, column=2, padx=(2, _PX), pady=_PY, sticky='ew')
 
-    def _build_banco_control(self, parent):
-        f = ttk.LabelFrame(parent, text="Controllo Banco")
-        f.grid(row=1, column=0, sticky="ew")
-        f.grid_columnconfigure(0, weight=1)
+        # ── Separatore ────────────────────────────────────────────────────────
+        ttk.Separator(f, orient='horizontal').grid(
+            row=4, column=0, columnspan=3, sticky='ew', padx=_PX, pady=(6, 4))
 
-        vel = ttk.Frame(f)
-        vel.grid(row=0, column=0, sticky="ew", padx=6, pady=(8, 4))
-        ttk.Label(vel, text="Vel [km/h]:").grid(row=0, column=0, sticky="e", padx=(0, 4))
-        self._speed_spin = ttk.Spinbox(vel, from_=0.0, to=100.0, increment=0.1,
-                                       format="%.1f", width=8)
-        self._speed_spin.set(0.0)
-        self._speed_spin.grid(row=0, column=1, padx=(0, 4))
-        ttk.Button(vel, text="Set",
-                   command=self._clicked_set_speed).grid(row=0, column=2)
+        # ── Sezione Banco ─────────────────────────────────────────────────────
+        ttk.Label(f, text="Banco", font=('Helvetica', 8, 'bold'),
+                  foreground='#444444').grid(
+            row=5, column=0, columnspan=3, sticky='w', padx=_PX, pady=(0, 2))
 
+        ttk.Label(f, text="Vel [km/h]", width=_W_LBL, anchor='w').grid(
+            row=6, column=0, padx=(_PX, 2), pady=_PY, sticky='w')
+        self._speed_spin = ttk.Spinbox(f, from_=0.0, to=100.0, increment=0.1,
+                                       format="%.1f", width=_W_SPIN)
+        self._speed_spin.set("0.0")
+        self._speed_spin.grid(row=6, column=1, padx=2, pady=_PY, sticky='ew')
+        ttk.Button(f, text="Set", width=_W_BTN,
+                   command=self._clicked_set_speed).grid(
+            row=6, column=2, padx=(2, _PX), pady=_PY, sticky='ew')
+
+        # ── STOP BANCO ────────────────────────────────────────────────────────
         btn_stop = tk.Button(
             f, text="⏹  STOP BANCO",
             command=self._on_emergency_stop,
@@ -227,7 +242,8 @@ class CsvPanel(ttk.Frame):
             activebackground="#B00000", activeforeground="white",
             relief='raised', bd=3, cursor='hand2', height=2,
         )
-        btn_stop.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 8))
+        btn_stop.grid(row=7, column=0, columnspan=3,
+                      sticky="ew", padx=_PX, pady=(8, 8))
         try:
             btn_stop.config(highlightthickness=2,
                             highlightbackground="#660000",

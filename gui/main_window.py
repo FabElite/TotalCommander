@@ -34,7 +34,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander IV")
-        self.geometry("1150x850")
+        self.geometry("1000x730")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -254,7 +254,7 @@ class MainWindow(tk.Tk):
         elif connected:
             self._status_bar.set_ble('ok')
             if not self._ble_was_connected:
-                self.after(3000, self._auto_enable_ftms)
+                self.after(4000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
@@ -489,6 +489,15 @@ class MainWindow(tk.Tk):
             ).result()
         except Exception as e:
             logging.getLogger().error(f"Errore abilitazione FTMS: {e}")
+            # Ripristina lo stato del pulsante: il canale non è attivo
+            self.after(0, self._ftms_enable_failed)
+
+    def _ftms_enable_failed(self):
+        """Chiamato sul main thread se enable_indoor_bike_data_notifications fallisce."""
+        self._live_panel.set_ftms_button(False)
+        self._live_panel.clear_ble()
+        self._reset_ftms_state()
+        logging.getLogger().warning("Abilitazione FTMS fallita: pulsante ripristinato a 'Abilita dati'.")
 
     def _disable_ftms_worker(self):
         try:
