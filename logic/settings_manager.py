@@ -30,7 +30,7 @@ def load(filepath: str) -> dict:
                 data = json.load(f)
             _log.info(f"Impostazioni caricate da {filepath}")
             return data
-        _log.info("File impostazioni non trovato, verranno usati i valori di default.")
+        _log.debug("File impostazioni non trovato: uso valori di default.")
     except (json.JSONDecodeError, TypeError, ValueError, OSError) as e:
         _log.error(f"Errore nel caricare le impostazioni: {e}. Uso valori di default.")
     return {}
@@ -41,6 +41,6 @@ def save(filepath: str, data: dict) -> None:
     try:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=4)
-        _log.info(f"Impostazioni salvate in {filepath}")
+        _log.debug(f"Impostazioni salvate in {filepath}")
     except IOError as e:
         _log.error(f"Errore nel salvare le impostazioni: {e}")

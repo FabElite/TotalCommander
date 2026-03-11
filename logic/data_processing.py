@@ -68,7 +68,7 @@ class DataProcessor:
         Nome file: YYYYMMDD_HHMMSS_<session_name>_bike_data.xlsx
         """
         if self._recording:
-            self.log.info("Sessione precedente in corso, chiusura automatica.")
+            self.log.debug("Sessione precedente in corso: chiusura automatica.")
             self.stop_session()
 
         self._file_index = 1
@@ -113,7 +113,7 @@ class DataProcessor:
         with self._lock:
             pending = len(self._buffer)
             if pending:
-                self.log.info(f"Flush finale: {pending} righe rimaste nel buffer.")
+                self.log.debug(f"Flush finale: {pending} righe scritte.")
             self._flush_buffer()
 
         self.log.info(f"Sessione terminata. File: {self.xlsx_filename}")
@@ -143,7 +143,7 @@ class DataProcessor:
             ws.title = "Bike Data"
             ws.append(self.HEADERS)
             wb.save(filename)
-            self.log.info(f"File inizializzato: {filename}")
+            self.log.debug(f"File xlsx inizializzato: {filename}")
         except Exception as e:
             self.log.error(f"Errore nella creazione del file Excel '{filename}': {e}")
             raise
@@ -254,7 +254,7 @@ class DataProcessor:
                 break
             with self._lock:
                 if self._buffer:
-                    self.log.info(f"Flush periodico: {len(self._buffer)} righe in coda.")
+                    self.log.debug(f"Flush periodico: {len(self._buffer)} righe in coda.")
                     self._flush_buffer()
 
     # ------------------------------------------------------------------

@@ -151,7 +151,8 @@ class MainWindow(tk.Tk):
 
         self._log_panel = LogPanel(_mf)
         self._log_panel.grid(row=3, column=0, sticky="nsew", padx=6, pady=(0, 6))
-        self.log_queue = self._log_panel.log_queue   # esposto per main.py
+        self.log_queue  = self._log_panel.log_queue   # esposto per main.py
+        self.log_panel  = self._log_panel                   # esposto per main.py
 
         # ── Sidebar collassabile (destra) ─────────────────────────────────────
         self._sidebar = CollapsibleSidebar(
@@ -274,7 +275,7 @@ class MainWindow(tk.Tk):
 
     def _auto_enable_ftms(self):
         if self.ble_manager.get_connection_status() and not self._live_panel.is_ftms_enabled():
-            logging.getLogger().info("BLE connesso — abilito notifiche FTMS automaticamente.")
+            logging.getLogger().debug("BLE connesso — avvio abilitazione automatica FTMS.")
             self._toggle_ftms()
 
     def _on_ble_unexpected_disconnect(self):
@@ -324,7 +325,7 @@ class MainWindow(tk.Tk):
         self._status_bar.set_banco('ok' if connected else 'err')
         if connected:
             if not self._modbus_was_connected:
-                logging.getLogger().info("Modbus connesso.")
+                logging.getLogger().debug("Modbus: connessione attiva (check periodico).")
             self._modbus_was_connected = True
         else:
             if self._modbus_was_connected:
@@ -332,7 +333,7 @@ class MainWindow(tk.Tk):
                 logging.getLogger().warning("*** DISCONNESSIONE MODBUS - connessione persa ***")
                 logging.getLogger().warning("=" * 55)
             elif from_user_action:
-                logging.getLogger().warning("Modbus: nessuna connessione attiva da chiudere.")
+                logging.getLogger().debug("Modbus: nessuna connessione attiva da chiudere.")
             self._modbus_was_connected = False
 
     # ── BLE: scan / connect / disconnect ─────────────────────────────────────
@@ -374,10 +375,10 @@ class MainWindow(tk.Tk):
 
     def _ble_disconnect(self):
         if not self.ble_manager.get_connection_status():
-            logging.getLogger().info("Nessun dispositivo BLE connesso.")
+            logging.getLogger().debug("Disconnessione BLE: nessun dispositivo connesso.")
             return
         self._conn_bar.set_progress(True)
-        logging.getLogger().info("Disconnessione BLE...")
+        logging.getLogger().debug("Disconnessione BLE in corso...")
         self.executor.submit(self._ble_disconnect_worker)
 
     def _ble_disconnect_worker(self):
@@ -389,7 +390,7 @@ class MainWindow(tk.Tk):
         finally:
             if ok:
                 self.data_processor.flush()
-                logging.getLogger().info("Flush dati eseguito dopo disconnessione BLE.")
+                logging.getLogger().debug("Flush dati eseguito dopo disconnessione BLE.")
             def _ui():
                 self._conn_bar.set_progress(False)
                 if ok:
@@ -417,7 +418,7 @@ class MainWindow(tk.Tk):
             level = int(float(value))
         except ValueError:
             logging.getLogger().error(f"Valore livello non valido: {value}"); return
-        logging.getLogger().info(f"Invio livello: {level}/200")
+        logging.getLogger().debug(f"Invio livello: {level}/200")
         try:
             self._run_ble(self.ble_manager.set_brake_percentage(level)).result()
         except Exception as e:
@@ -431,7 +432,7 @@ class MainWindow(tk.Tk):
             power = int(float(value))
         except ValueError:
             logging.getLogger().error(f"Valore potenza non valido: {value}"); return
-        logging.getLogger().info(f"Invio potenza: {power}W")
+        logging.getLogger().debug(f"Invio potenza: {power}W")
         try:
             self._run_ble(self.ble_manager.set_brake_power(power)).result()
         except Exception as e:
@@ -441,7 +442,7 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._send_simulation_worker, value)
 
     def _send_simulation_worker(self, value):
-        logging.getLogger().info(f"Invio simulazione: {value}%")
+        logging.getLogger().debug(f"Invio simulazione: {value}%")
         try:
             self._run_ble(self.ble_manager.set_brake_simulation(grade=int(float(value)))).result()
         except Exception as e:
@@ -463,7 +464,7 @@ class MainWindow(tk.Tk):
     def _on_auto_commands_completed(self):
         """Chiamato da CsvPanel al termine di tutti i cicli."""
         if self._live_panel.is_ftms_enabled():
-            logging.getLogger().info("Comandi automatici terminati, disabilito le notifiche dati.")
+            logging.getLogger().debug("Comandi automatici terminati — notifiche dati disabilitate.")
             self._toggle_ftms()
 
     # ── FTMS notifications ────────────────────────────────────────────────────
@@ -484,7 +485,7 @@ class MainWindow(tk.Tk):
                 self._status_bar.set_ftms(0)
                 self.executor.submit(self._enable_ftms_worker)
             else:
-                logging.getLogger().info("Nessun dispositivo connesso, FTMS non abilitabile")
+                logging.getLogger().debug("Nessun dispositivo connesso: FTMS non abilitabile.")
         else:
             self._live_panel.set_ftms_button(False)
             self._live_panel.clear_ble()
@@ -513,7 +514,7 @@ class MainWindow(tk.Tk):
         try:
             self._run_ble(self.ble_manager.disable_indoor_bike_data_notifications()).result()
             self.data_processor.flush()
-            logging.getLogger().info("Flush dati eseguito dopo disabilitazione FTMS.")
+            logging.getLogger().debug("Flush dati eseguito dopo disabilitazione FTMS.")
         except Exception as e:
             logging.getLogger().error(f"Errore disabilitazione FTMS: {e}")
 
@@ -541,7 +542,7 @@ class MainWindow(tk.Tk):
     # ── Lorenz ────────────────────────────────────────────────────────────────
 
     def _lorenz_connect(self):
-        logging.getLogger().info("Connessione Lorenz...")
+        logging.getLogger().debug("Connessione Lorenz in corso...")
         self.executor.submit(self._lorenz_connect_worker)
 
     def _lorenz_connect_worker(self):
@@ -580,7 +581,7 @@ class MainWindow(tk.Tk):
             self.lorenz_update_id = None
 
     def _lorenz_disconnect(self):
-        logging.getLogger().info("Disconnessione Lorenz...")
+        logging.getLogger().debug("Disconnessione Lorenz in corso...")
         self._lorenz_was_connected = False
         self._stop_lorenz_update()
         self.executor.submit(self._lorenz_disconnect_worker)
@@ -592,7 +593,7 @@ class MainWindow(tk.Tk):
 
     def _lorenz_read_offset(self):
         self.lorenz_reader.read_offset()
-        logging.getLogger().info(f"Offset letto: {self.lorenz_reader.offset}")
+        logging.getLogger().debug(f"Offset Lorenz: {self.lorenz_reader.offset:.4f}")
         self._conn_bar.set_offset(self.lorenz_reader.offset)
         self._save_settings()
 
@@ -601,7 +602,7 @@ class MainWindow(tk.Tk):
             new_avg = int(value_str)
             if new_avg > 0 and self.lorenz_reader.avg_dim != new_avg:
                 self.lorenz_reader.avg_dim = new_avg
-                logging.getLogger().info(f"Media Lorenz impostata a: {new_avg}")
+                logging.getLogger().debug(f"Media Lorenz impostata a {new_avg} campioni.")
                 self._conn_bar.set_avg(new_avg)
                 self._save_settings()
             elif new_avg <= 0:
@@ -613,7 +614,7 @@ class MainWindow(tk.Tk):
 
     def _lorenz_invert_speed(self, inverted: bool):
         self.lorenz_reader.invert_speed = inverted
-        logging.getLogger().info(f"Inversione velocità Lorenz: {'Attiva' if inverted else 'Disattiva'}")
+        logging.getLogger().debug(f"Inversione velocità Lorenz: {'Attiva' if inverted else 'Disattiva'}")
         self._save_settings()
 
     # ── Modbus / Banco ────────────────────────────────────────────────────────
@@ -631,7 +632,7 @@ class MainWindow(tk.Tk):
             self.after(0, self._check_modbus, True)
 
     def _banco_disconnect(self):
-        logging.getLogger().info("Disconnessione Banco...")
+        logging.getLogger().debug("Disconnessione Banco in corso...")
         self.executor.submit(self._banco_disconnect_worker)
 
     def _banco_disconnect_worker(self):
@@ -644,7 +645,7 @@ class MainWindow(tk.Tk):
             self.after(0, self._check_modbus, True)
 
     def _set_banco_speed(self, speedkmh):
-        logging.getLogger().info(f"Velocità banco: {speedkmh} km/h")
+        logging.getLogger().debug(f"Velocità banco: {speedkmh} km/h (invio in corso...)")
         self.executor.submit(self._set_banco_speed_worker, speedkmh)
 
     def _set_banco_speed_worker(self, speedkmh):
@@ -666,7 +667,7 @@ class MainWindow(tk.Tk):
         if not port:
             logging.getLogger().warning("Seleziona una COM port prima di connettere.")
             return
-        logging.getLogger().info(f"Connessione sensore su {port}...")
+        logging.getLogger().debug(f"Connessione sensore seriale su {port}...")
         self.executor.submit(self._serial_connect_worker, port)
 
     def _serial_connect_worker(self, port):
@@ -693,7 +694,7 @@ class MainWindow(tk.Tk):
             self.serial_update_id = None
 
     def _serial_disconnect(self):
-        logging.getLogger().info("Disconnessione sensore seriale...")
+        logging.getLogger().debug("Disconnessione sensore seriale in corso...")
         self._serial_was_connected = False
         self._stop_serial_update()
         self.executor.submit(self._serial_disconnect_worker)
@@ -847,10 +848,10 @@ class MainWindow(tk.Tk):
 
     def _menu_flush_data(self):
         if not self.data_processor.is_recording:
-            logging.getLogger().warning("Nessuna sessione attiva — flush non necessario.")
+            logging.getLogger().debug("Flush richiesto: nessuna sessione attiva.")
             return
         self.data_processor.flush()
-        logging.getLogger().info("Flush manuale dati eseguito.")
+        logging.getLogger().debug("Flush manuale dati eseguito.")
 
     def _menu_show_current_file(self):
         if not self.data_processor.xlsx_filename:
