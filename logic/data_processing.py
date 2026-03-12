@@ -304,7 +304,7 @@ class DataProcessor:
                         wait_time = int(row[0].strip())
                         speed_banco = None
                         if len(row) >= 5 and row[4].strip():
-                            speed_banco = int(row[4].strip())
+                            speed_banco = float(row[4].strip())
 
                         brake_commands.append((command_type, value, wait_time, speed_banco))
 
