@@ -971,8 +971,6 @@ class MainWindow(tk.Tk):
                                  justify='right', state='readonly')
         rec_hz_cb.set(str(self._rec_hz))
         rec_hz_cb.grid(row=12, column=1, **pad)
-        ttk.Label(win, text="default: 1").grid(row=13, column=0, columnspan=3,
-                                               sticky='w', padx=24, pady=(0, 4))
 
         err_var = tk.StringVar()
         ttk.Label(win, textvariable=err_var, foreground='#CC0000',
@@ -1080,26 +1078,32 @@ class MainWindow(tk.Tk):
         # ── Contenuto ─────────────────────────────────────────────────────
         h1("● Barra di Stato — LED")
 
-        h2("UI  (primo LED a sinistra)")
-        body("Pulsa ogni 500 ms. Finché alterna colore e il contatore sale, "
-             "l'interfaccia è attiva e risponde. Se si blocca su un colore fisso "
-             "significa che il programma è congelato.")
+        h2("STATO  (primo LED a sinistra)")
+        body("Indicatore per capire se il programma si è congelato. Fino a quanto lampeggia tutto ok")
 
         h2("BLE / Lorenz / Banco / COM")
-        body("Verde = dispositivo connesso e raggiungibile. "
-             "Rosso = non connesso o connessione persa. "
-             "La perdita improvvisa viene segnalata anche nel log.")
+        body("Verde = dispositivo connesso e raggiungibile.\n"
+             "Rosso = non connesso o connessione persa. ")
 
-        h2("HB — Heartbeat dati")
+        h2("FTMS — frequenza dati")
         body("Mostra la frequenza (Hz) con cui arrivano i pacchetti dati dal "
              "trainer BLE. Attivo solo quando le notifiche FTMS sono abilitate. "
              "Si spegne automaticamente se i dati si interrompono per più di 2 secondi.")
 
         h2("Auto")
-        body("Verde = sequenza automatica da CSV in esecuzione. "
+        body("Verde = sequenza automatica da CSV in esecuzione.\n"
              "Spento = nessuna sequenza attiva.")
 
+        h2("REC")
+        body("Rosso lampeggiante = la sessione è in registrazione.\n"
+             "Spento = nessuna registazione in corso")
+
         h1("● Barra Connessioni")
+
+        h2("REC")
+        body("Avvia o ferma la registrazione dei dati. Vengono registrati tutti i dati disponibili in quel momento. "
+             "La cartella di Output serve ad aprire dove sono i risultati. "
+             "In caso di superamento dei 100 MB di dimensioni del file verrà creato un nuovo file.")
 
         h2("BLE")
         body("Cerca i dispositivi Bluetooth nelle vicinanze, seleziona il trainer "
@@ -1141,13 +1145,18 @@ class MainWindow(tk.Tk):
         body("Ferma immediatamente la sequenza automatica e imposta la velocità "
              "del banco a 0. Usare in caso di necessità.")
 
-        h1("● Dati Live e Pannello Δ")
+        h1("● Dati Live e Pannello Misure")
 
-        body("Il pannello mostra in tempo reale i valori ricevuti dal trainer BLE "
-             "e dal sensore Lorenz affiancati. Il Δ centrale indica la differenza "
-             "tra le due sorgenti: verde se rientra nella soglia, arancione se "
-             "moderato, rosso se elevato. Le soglie e la finestra di smoothing "
-             "sono configurabili da Impostazioni → Parametri delta.")
+        body("Il pannello è organizzato in quattro colonne: Misura | BLE | Lorenz | Scarto. "
+             "Le righe Power [W] e Speed [km/h] mostrano i valori di entrambe le sorgenti "
+             "e calcolano lo scarto percentuale (potenza) o assoluto (velocità) nella colonna destra: "
+             "verde se rientra nella soglia, arancione se moderato, rosso se elevato. "
+             "Lo scarto viene calcolato su una media mobile configurabile.")
+        body("Le righe inferiori (Resistance, Cadence, Tot.Dist, Elapsed) mostrano solo i dati BLE; "
+             "la riga Torque [Nm] mostra solo i dati Lorenz. "
+             "Il pulsante 'Abilita Dati BLE' in basso abilita o disabilita le notifiche FTMS. "
+             "Le soglie di scarto e la finestra di smoothing sono configurabili da "
+             "Impostazioni → Parametri delta.")
 
         h1("● Salvataggio Dati")
 

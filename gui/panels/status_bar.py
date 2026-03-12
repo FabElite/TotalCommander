@@ -16,7 +16,6 @@ class StatusBar(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=_BG, pady=5, **kwargs)
         self.grid_columnconfigure(99, weight=1)
-        self._ui_tick  = 0
         self._ui_phase = False
         self._rec_phase = False
         self._build()
@@ -39,7 +38,7 @@ class StatusBar(tk.Frame):
         self._led_ui = tk.Label(g_ui, text='●', bg=_BG, fg='#555555',
                                 font=('Helvetica', 25))
         self._led_ui.grid(row=0, column=0, padx=(0, 3))
-        self._lbl_ui_tick = self._led_label(g_ui, 'APP  0', col=1)
+        self._led_label(g_ui, '', col=1)
         self._sep(1)
 
         # ── col 2: BLE + FTMS (stesso gruppo visivo) ──────────────────────────
@@ -113,9 +112,7 @@ class StatusBar(tk.Frame):
         _PULSE_REC = ('#cc2222', '#880000')
         self._ui_phase  = not self._ui_phase
         self._rec_phase = not self._rec_phase
-        self._ui_tick   = (self._ui_tick + 1) % 10000
         self._led_ui.config(fg=_PULSE_UI[self._ui_phase])
-        self._lbl_ui_tick.config(text=f'APP  {self._ui_tick}')
         if self._led_rec.cget('fg') != '#555555':
             self._led_rec.config(fg=_PULSE_REC[self._rec_phase])
 

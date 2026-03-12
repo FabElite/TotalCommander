@@ -9,10 +9,10 @@ from openpyxl import load_workbook, Workbook
 
 
 # Intervallo di flush automatico su disco (secondi)
-FLUSH_INTERVAL_SECONDS = 30
+FLUSH_INTERVAL_SECONDS = 60
 
 # Dimensione massima del file xlsx prima della rotazione. Default: 100 MB
-MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 
 class DataProcessor:
