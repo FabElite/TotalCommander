@@ -1101,7 +1101,7 @@ class MainWindow(tk.Tk):
         body("Cerca i dispositivi Bluetooth nelle vicinanze, seleziona il trainer "
              "dalla lista e premi Connetti. La barra di avanzamento indica che "
              "un'operazione è in corso. Una volta connesso, le notifiche FTMS "
-             "vengono abilitate automaticamente dopo 3 secondi.")
+             "vengono abilitate automaticamente dopo 4 secondi.")
 
         h2("Lorenz")
         body("Connette il sensore di coppia/potenza esterno sulla porta USB dedicata. "
@@ -1129,8 +1129,9 @@ class MainWindow(tk.Tk):
         body("Carica un file CSV con colonne: tempo_attesa; livello; potenza; "
              "simulazione; velocità_banco. Una sola colonna per riga deve essere "
              "valorizzata. Il programma esegue i comandi nell'ordine, aspettando "
-             "il tempo indicato tra uno e l'altro. Al termine, le notifiche FTMS "
-             "vengono disabilitate automaticamente.")
+             "il tempo indicato tra uno e l'altro. Al termine di tutti i cicli, "
+             "vengono inviati automaticamente freno=0 e velocità banco=0 per sicurezza. "
+             "Le notifiche FTMS restano attive e vanno disabilitate manualmente se necessario.")
 
         h2("Emergency Stop")
         body("Ferma immediatamente la sequenza automatica e imposta la velocità "
@@ -1147,9 +1148,9 @@ class MainWindow(tk.Tk):
         h1("● Salvataggio Dati")
 
         body("Per avviare la registrazione premere ⏺ REC: verrà chiesto un nome "
-             "opzionale per la sessione. Il file verrà creato nella cartella 'output/' "
-             "con nome YYYYMMDD_HHMMSS_nome_bike_data.xlsx, ordinato cronologicamente "
-             "in automatico. Premere ⏹ STOP per terminare la sessione con flush finale garantito. "
+             "opzionale per la sessione. Senza nome il file sarà YYYYMMDD_HHMMSS_bike_data.xlsx; "
+             "con nome personalizzato sarà YYYYMMDD_HHMMSS_nome.xlsx (senza suffisso _bike_data). "
+             "Premere ⏹ STOP per terminare la sessione con flush finale garantito. "
              "È possibile avviare più sessioni consecutive senza riavviare il programma.")
         body("Il salvataggio avviene automaticamente ogni 30 secondi. Se il file supera "
              "100 MB viene creato un nuovo file (_part02, _part03…) con la stessa intestazione. "
