@@ -51,7 +51,6 @@ class ConnectionsBar(ttk.Frame):
         self._build_banco()
 
     def _build_rec(self):
-        import tkinter as tk
         f = ttk.LabelFrame(self, text="Registrazione")
         f.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=2)
         f.grid_columnconfigure(0, weight=1)

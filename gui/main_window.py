@@ -74,7 +74,7 @@ class MainWindow(tk.Tk):
         self._ble_loop_ready  = threading.Event()
         self._init_ble_loop()
 
-        # ── Timer ids ─────────────────────────────────────────────────────────
+        # Timer ids ─────────────────────────────────────────────────────────────
         self.periodic_check_id = None
         self.lorenz_update_id  = None
         self.serial_update_id  = None
@@ -82,6 +82,7 @@ class MainWindow(tk.Tk):
         self._last_packet_time   = None
         self._ui_pulse_id    = None
         self._rec_timer_id   = None
+        self._auto_enable_ftms_id = None   # after(4000,...) per auto-abilitazione FTMS
         self._latest_data    = {}
         self._shutdown_win    = None
         self._shutdown_anim_id = None
@@ -271,7 +272,9 @@ class MainWindow(tk.Tk):
         elif connected:
             self._status_bar.set_ble('ok')
             if not self._ble_was_connected:
-                self.after(4000, self._auto_enable_ftms)
+                if self._auto_enable_ftms_id:
+                    self.after_cancel(self._auto_enable_ftms_id)
+                self._auto_enable_ftms_id = self.after(4000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
@@ -525,11 +528,15 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore disabilitazione FTMS: {e}")
 
     def _on_ble_data(self, bike_data: dict):
-        """Callback invocata dal loop BLE ad ogni pacchetto FTMS."""
-        self._latest_data.update(bike_data)
+        """Callback invocata dal loop BLE ad ogni pacchetto FTMS.
+        Chiamata dal thread asyncio BLE: NON accedere a _latest_data qui.
+        L'aggiornamento avviene in _update_ble_ui, sul main thread."""
         self.after(0, self._update_ble_ui, bike_data)
 
     def _update_ble_ui(self, bike_data: dict):
+        # Aggiorna _latest_data sul main thread (evita race con _rec_tick)
+        self._latest_data.update(bike_data)
+
         # Heartbeat
         now = time.monotonic()
         if self._last_packet_time is not None:
@@ -1190,6 +1197,8 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._rec_timer_id);      self._rec_timer_id = None
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id); self._heartbeat_reset_id = None
+        if self._auto_enable_ftms_id:
+            self.after_cancel(self._auto_enable_ftms_id); self._auto_enable_ftms_id = None
         self._stop_serial_update()
         self._csv_panel.stop()
 
