@@ -387,7 +387,7 @@ class MainWindow(tk.Tk):
             logging.getLogger().debug("Disconnessione BLE: nessun dispositivo connesso.")
             return
         self._conn_bar.set_progress(True)
-        logging.getLogger().debug("Disconnessione BLE in corso...")
+        logging.getLogger().info("Disconnessione BLE in corso...")
         self.executor.submit(self._ble_disconnect_worker)
 
     def _ble_disconnect_worker(self):
@@ -549,7 +549,7 @@ class MainWindow(tk.Tk):
     # ── Lorenz ────────────────────────────────────────────────────────────────
 
     def _lorenz_connect(self):
-        logging.getLogger().debug("Connessione Lorenz in corso...")
+        logging.getLogger().info("Connessione Lorenz in corso...")
         self.executor.submit(self._lorenz_connect_worker)
 
     def _lorenz_connect_worker(self):
@@ -592,7 +592,7 @@ class MainWindow(tk.Tk):
             self.lorenz_update_id = None
 
     def _lorenz_disconnect(self):
-        logging.getLogger().debug("Disconnessione Lorenz in corso...")
+        logging.getLogger().info("Disconnessione Lorenz in corso...")
         self._lorenz_was_connected = False
         self._stop_lorenz_update()
         self.executor.submit(self._lorenz_disconnect_worker)
@@ -637,19 +637,24 @@ class MainWindow(tk.Tk):
     def _banco_connect_worker(self, ip):
         try:
             self.modbus.connetti(ip, 502)
+            if self.modbus.is_connesso():
+                logging.getLogger().info(f"Banco connesso: {ip}")
+            else:
+                logging.getLogger().warning(f"Connessione Banco fallita: {ip} non raggiungibile.")
         except Exception as e:
             logging.getLogger().error(f"Errore connessione Banco: {e}")
         finally:
             self.after(0, self._check_modbus, True)
 
     def _banco_disconnect(self):
-        logging.getLogger().debug("Disconnessione Banco in corso...")
+        logging.getLogger().info("Disconnessione Banco in corso...")
         self.executor.submit(self._banco_disconnect_worker)
 
     def _banco_disconnect_worker(self):
         try:
             self._modbus_was_connected = False
             self.modbus.disconnetti()
+            logging.getLogger().info("Banco disconnesso.")
         except Exception as e:
             logging.getLogger().error(f"Errore disconnessione Banco: {e}")
         finally:
@@ -678,7 +683,7 @@ class MainWindow(tk.Tk):
         if not port:
             logging.getLogger().warning("Seleziona una COM port prima di connettere.")
             return
-        logging.getLogger().debug(f"Connessione sensore seriale su {port}...")
+        logging.getLogger().info(f"Connessione sensore seriale su {port}...")
         self.executor.submit(self._serial_connect_worker, port)
 
     def _serial_connect_worker(self, port):
@@ -705,7 +710,7 @@ class MainWindow(tk.Tk):
             self.serial_update_id = None
 
     def _serial_disconnect(self):
-        logging.getLogger().debug("Disconnessione sensore seriale in corso...")
+        logging.getLogger().info("Disconnessione sensore seriale in corso...")
         self._serial_was_connected = False
         self._stop_serial_update()
         self.executor.submit(self._serial_disconnect_worker)
@@ -772,7 +777,6 @@ class MainWindow(tk.Tk):
 
         name_entry.bind('<KeyRelease>', _update_preview)
 
-        err_var = tk.StringVar()
         err_var = tk.StringVar()
         ttk.Label(win, textvariable=err_var, foreground='#CC0000',
                   font=('Helvetica', 8)
