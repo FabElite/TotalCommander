@@ -16,7 +16,6 @@ Pannello dati live — layout affiancato BLE|Lorenz con scarto a destra.
 """
 import tkinter as tk
 from tkinter import ttk
-import math
 from collections import deque
 from logic.delta_logic import (
     compute_speed_delta, compute_power_delta_pct, mean_or_none,
@@ -260,19 +259,6 @@ class LiveDataPanel(ttk.Frame):
             self._last_lrz_speed = float(s)
         self._set_lbl(self._lrz_torque, f"{t:.2f}" if t is not None else "N/A")
         self._refresh_delta()
-
-    def update_serial(self, data: dict):
-        def fmt(v):
-            return f"{v:.2f}" if (v is not None and not math.isnan(v)) else 'N/A'
-        for i, key in enumerate(['Valore1', 'Valore2', 'Valore3', 'Valore4']):
-            self._set_ro_entry(self._com[i], fmt(data.get(key)))
-
-    @staticmethod
-    def _set_ro_entry(entry, text):
-        entry.config(state='normal')
-        entry.delete(0, tk.END)
-        entry.insert(0, text)
-        entry.config(state='readonly')
 
     # ── API pubblica ──────────────────────────────────────────────────────────
 

@@ -192,7 +192,7 @@ class DataProcessor:
         """
         Appende le righe del buffer al file corrente, svuota il buffer,
         poi verifica se occorre ruotare il file.
-        DEVE essere chiamato con self._lock gia' acquisito.
+        INTERNAL: deve essere chiamato con self._lock già acquisito dal chiamante.
         """
         if not self._buffer or self.xlsx_filename is None:
             return

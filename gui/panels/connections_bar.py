@@ -189,6 +189,8 @@ class ConnectionsBar(ttk.Frame):
         self.device_list.delete(0, tk.END)
         for address, (name, rssi) in devices.items():
             self.device_list.insert(tk.END, f"{name} - {address} - RSSI: {rssi}")
+            # Evidenzia in rosso i dispositivi con segnale molto forte (> -50 dBm = molto vicini):
+            # utile per identificare rapidamente il trainer in uso in ambienti affollati di BLE.
             if rssi > -50:
                 try:
                     self.device_list.itemconfig(tk.END, {'bg': 'lightcoral'})

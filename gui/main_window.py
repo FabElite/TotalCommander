@@ -191,7 +191,10 @@ class MainWindow(tk.Tk):
             self.delta_smoothing_window = max(1, int(data.get('delta_smoothing_window', d['delta_smoothing_window'])))
         except Exception:
             self.delta_smoothing_window = 5
-        self._rec_hz = 1
+        try:
+            self._rec_hz = max(1, int(data.get('rec_hz', d['rec_hz'])))
+        except Exception:
+            self._rec_hz = 1
         if not data:
             self._save_settings()
 
@@ -550,9 +553,13 @@ class MainWindow(tk.Tk):
 
     def _lorenz_connect_worker(self):
         try:
+            import re
             port = trova_porta_usb_serial("Lorenz USB sensor interface Port")
             if port:
-                ok = self.lorenz_reader.open_connection(int(port.split("COM")[-1]))
+                match = re.search(r'(\d+)$', port)
+                if not match:
+                    raise ValueError(f"Impossibile estrarre il numero di porta da: {port!r}")
+                ok = self.lorenz_reader.open_connection(int(match.group(1)))
                 self.after(0, self._on_lorenz_connect_result, ok)
             else:
                 self.after(0, self._on_lorenz_connect_result, False)
@@ -1030,6 +1037,12 @@ class MainWindow(tk.Tk):
                         lambda e: canvas.yview_scroll(
                             int(-1 * (e.delta / 120)), 'units'))
 
+        def _on_info_close():
+            canvas.unbind_all('<MouseWheel>')
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", _on_info_close)
+
         _BG  = 'white'
         _H1  = ('Helvetica', 11, 'bold')
         _H2  = ('Helvetica', 10, 'bold')
@@ -1138,7 +1151,7 @@ class MainWindow(tk.Tk):
              "Impostazioni → Parametri delta.")
 
         # ── Pulsante chiudi ────────────────────────────────────────────────
-        ttk.Button(win, text="Chiudi", command=win.destroy
+        ttk.Button(win, text="Chiudi", command=_on_info_close
                    ).pack(pady=10)
 
 
