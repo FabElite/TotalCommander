@@ -367,13 +367,16 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._ble_connect_worker, address, name)
 
     def _ble_connect_worker(self, address, name=""):
-        logging.getLogger().info(f"Connessione BLE a {address}...")
+        logging.getLogger().info(f"Connessione BLE a {name or address}...")
         fut = self._run_ble(self.ble_manager.connect_to_device(address, connection_timeout=15.0))
         try:
             if fut.result():
                 self._connected_device_name    = name
                 self._connected_device_address = address
                 self.after(0, self._status_bar.set_device_info, name, address)
+                logging.getLogger().info(f"BLE connesso: {name} [{address}]")
+            else:
+                logging.getLogger().warning(f"Connessione BLE fallita: {name or address} non ha risposto.")
         except Exception as e:
             logging.getLogger().error(f"Errore connessione BLE: {e}")
         finally:
