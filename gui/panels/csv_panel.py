@@ -399,6 +399,9 @@ class CsvPanel(ttk.Frame):
                     text=datetime.datetime.now().strftime("%H:%M:%S"),
                     fg='#005500')
                 self._log.info(f"Comandi automatici completati ({num_cycles} ciclo/i)")
+                # Sicurezza: freno a 0 e banco a 0 al termine di tutti i cicli
+                self._log.info("Fine sequenza — invio freno=0 e velocità banco=0 (sicurezza)")
+                self._on_send_level(0)
                 self._on_set_banco(0)
                 self._reset_table_highlights()
                 self._on_auto_completed()

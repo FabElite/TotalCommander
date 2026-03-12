@@ -65,7 +65,9 @@ class DataProcessor:
         """
         Avvia una nuova sessione di registrazione.
         Se una sessione e' gia' attiva, la chiude prima con flush finale.
-        Nome file: YYYYMMDD_HHMMSS_<session_name>_bike_data.xlsx
+        Nome file:
+          - senza nome personalizzato: YYYYMMDD_HHMMSS_bike_data.xlsx
+          - con nome personalizzato:   YYYYMMDD_HHMMSS_<nome>.xlsx
         """
         if self._recording:
             self.log.debug("Sessione precedente in corso: chiusura automatica.")
@@ -74,7 +76,10 @@ class DataProcessor:
         self._file_index = 1
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         safe = session_name.strip().replace(' ', '_') if session_name.strip() else ""
-        self._base_name = f"{ts}_{safe}" if safe else ts
+        # Con nome custom: YYYYMMDD_HHMMSS_nome (il suffisso _bike_data non serve)
+        # Senza nome:      YYYYMMDD_HHMMSS_bike_data
+        self._base_name = f"{ts}_{safe}" if safe else f"{ts}_bike_data"
+        self._has_custom_name = bool(safe)
         self.start_time = time.time()
 
         with self._lock:
@@ -126,7 +131,7 @@ class DataProcessor:
         suffix = f"_part{index:02d}" if index > 1 else ""
         return os.path.join(
             self.output_dir,
-            f"{self._base_name}_bike_data{suffix}.xlsx"
+            f"{self._base_name}{suffix}.xlsx"
         )
 
     def _create_output_dir(self):

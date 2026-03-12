@@ -74,7 +74,7 @@ class MainWindow(tk.Tk):
         self._ble_loop_ready  = threading.Event()
         self._init_ble_loop()
 
-        # Timer ids ─────────────────────────────────────────────────────────────
+        # ── Timer ids ─────────────────────────────────────────────────────────
         self.periodic_check_id = None
         self.lorenz_update_id  = None
         self.serial_update_id  = None
@@ -82,7 +82,6 @@ class MainWindow(tk.Tk):
         self._last_packet_time   = None
         self._ui_pulse_id    = None
         self._rec_timer_id   = None
-        self._auto_enable_ftms_id = None   # after(4000,...) per auto-abilitazione FTMS
         self._latest_data    = {}
         self._shutdown_win    = None
         self._shutdown_anim_id = None
@@ -272,9 +271,7 @@ class MainWindow(tk.Tk):
         elif connected:
             self._status_bar.set_ble('ok')
             if not self._ble_was_connected:
-                if self._auto_enable_ftms_id:
-                    self.after_cancel(self._auto_enable_ftms_id)
-                self._auto_enable_ftms_id = self.after(4000, self._auto_enable_ftms)
+                self.after(4000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
@@ -472,9 +469,7 @@ class MainWindow(tk.Tk):
 
     def _on_auto_commands_completed(self):
         """Chiamato da CsvPanel al termine di tutti i cicli."""
-        if self._live_panel.is_ftms_enabled():
-            logging.getLogger().debug("Comandi automatici terminati — notifiche dati disabilitate.")
-            self._toggle_ftms()
+        pass  # Le notifiche FTMS rimangono attive — l'utente le gestisce manualmente.
 
     # ── FTMS notifications ────────────────────────────────────────────────────
 
@@ -528,15 +523,11 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore disabilitazione FTMS: {e}")
 
     def _on_ble_data(self, bike_data: dict):
-        """Callback invocata dal loop BLE ad ogni pacchetto FTMS.
-        Chiamata dal thread asyncio BLE: NON accedere a _latest_data qui.
-        L'aggiornamento avviene in _update_ble_ui, sul main thread."""
+        """Callback invocata dal loop BLE ad ogni pacchetto FTMS."""
+        self._latest_data.update(bike_data)
         self.after(0, self._update_ble_ui, bike_data)
 
     def _update_ble_ui(self, bike_data: dict):
-        # Aggiorna _latest_data sul main thread (evita race con _rec_tick)
-        self._latest_data.update(bike_data)
-
         # Heartbeat
         now = time.monotonic()
         if self._last_packet_time is not None:
@@ -764,19 +755,25 @@ class MainWindow(tk.Tk):
         ttk.Label(win, textvariable=preview_var, foreground='#0055aa',
                   font=('Helvetica', 8)
                   ).grid(row=2, column=1, padx=(0, 16), pady=(4, 2), sticky='w')
+        # Nota esplicativa sotto la preview — tk.Label per supportare fg
+        tk.Label(win, text="(senza nome → aggiunge _bike_data)",
+                 font=('Helvetica', 7), fg='#888888'
+                 ).grid(row=3, column=0, columnspan=2, padx=16, pady=(0, 2))
 
         def _update_preview(*_):
             ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
             raw = name_entry.get().strip().replace(' ', '_')
-            fname = f"{ts}_{raw}_bike_data.xlsx" if raw else f"{ts}_bike_data.xlsx"
+            # Con nome: YYYYMMDD_HHMMSS_nome.xlsx — Senza: YYYYMMDD_HHMMSS_bike_data.xlsx
+            fname = f"{ts}_{raw}.xlsx" if raw else f"{ts}_bike_data.xlsx"
             preview_var.set(fname)
 
         name_entry.bind('<KeyRelease>', _update_preview)
 
         err_var = tk.StringVar()
+        err_var = tk.StringVar()
         ttk.Label(win, textvariable=err_var, foreground='#CC0000',
                   font=('Helvetica', 8)
-                  ).grid(row=3, column=0, columnspan=2, padx=16, pady=(2, 0))
+                  ).grid(row=4, column=0, columnspan=2, padx=16, pady=(2, 0))
 
         def _start():
             try:
@@ -792,7 +789,7 @@ class MainWindow(tk.Tk):
             win.destroy()
 
         bf = ttk.Frame(win)
-        bf.grid(row=4, column=0, columnspan=2, pady=(8, 14))
+        bf.grid(row=5, column=0, columnspan=2, pady=(8, 14))
         ttk.Button(bf, text="Avvia", command=_start).grid(row=0, column=0, padx=6)
         ttk.Button(bf, text="Annulla", command=win.destroy).grid(row=0, column=1, padx=6)
         win.bind('<Return>', lambda e: _start())
@@ -1197,8 +1194,6 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._rec_timer_id);      self._rec_timer_id = None
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id); self._heartbeat_reset_id = None
-        if self._auto_enable_ftms_id:
-            self.after_cancel(self._auto_enable_ftms_id); self._auto_enable_ftms_id = None
         self._stop_serial_update()
         self._csv_panel.stop()
 
