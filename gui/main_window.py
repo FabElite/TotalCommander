@@ -35,7 +35,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander IV")
-        self.geometry("965x733")
+        self.geometry("965x750")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -66,6 +66,7 @@ class MainWindow(tk.Tk):
         self.delta_power_thresholds_pct = (2.0, 5.0)
         self.delta_smoothing_window = 5
         self._rec_hz = 1
+        self._stop_rec_on_auto_end = False
         self._load_settings()
 
         # ── Loop asyncio BLE persistente ──────────────────────────────────────
@@ -140,6 +141,9 @@ class MainWindow(tk.Tk):
             on_send_power        = self._send_power,
             on_send_simulation   = self._send_simulation,
             on_emergency_stop    = self._emergency_stop,
+            on_before_auto_start = self._on_before_auto_start,
+            stop_rec_on_auto_end = self._stop_rec_on_auto_end,
+            on_stop_rec_changed  = self._on_stop_rec_changed,
         )
         self._csv_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
@@ -195,6 +199,8 @@ class MainWindow(tk.Tk):
             self._rec_hz = max(1, int(data.get('rec_hz', d['rec_hz'])))
         except Exception:
             self._rec_hz = 1
+        self._stop_rec_on_auto_end = bool(
+            data.get('stop_rec_on_auto_end', d['stop_rec_on_auto_end']))
         if not data:
             self._save_settings()
 
@@ -207,6 +213,7 @@ class MainWindow(tk.Tk):
             'delta_power_thresholds_pct': list(self.delta_power_thresholds_pct),
             'delta_smoothing_window':     int(self.delta_smoothing_window),
             'rec_hz':                     int(self._rec_hz),
+            'stop_rec_on_auto_end':       bool(self._stop_rec_on_auto_end),
         })
 
     # ── Loop asyncio BLE ─────────────────────────────────────────────────────
@@ -472,7 +479,45 @@ class MainWindow(tk.Tk):
 
     def _on_auto_commands_completed(self):
         """Chiamato da CsvPanel al termine di tutti i cicli."""
-        pass  # Le notifiche FTMS rimangono attive — l'utente le gestisce manualmente.
+        if self._csv_panel.stop_rec_on_auto_end and self.data_processor.is_recording:
+            logging.getLogger().info(
+                "Fine sequenza automatica — interruzione registrazione automatica.")
+            self._rec_stop()
+
+    def _on_stop_rec_changed(self, value: bool):
+        """Chiamato quando l'utente toglia il checkbox Stop REC nel pannello CSV."""
+        self._stop_rec_on_auto_end = value
+        self._save_settings()
+
+    def _on_before_auto_start(self) -> bool:
+        """
+        Chiamato da CsvPanel prima di avviare la sequenza automatica.
+        Se la registrazione non è attiva mostra un popup:
+          Sì      → apre il dialogo REC (bloccante), poi prosegue solo se
+                    la sessione è stata effettivamente avviata.
+          No      → prosegue senza registrare (l'utente è stato avvisato).
+          Annulla → annulla l'avvio della sequenza.
+        Restituisce True per procedere, False per annullare.
+        """
+        if self.data_processor.is_recording:
+            return True
+
+        from tkinter import messagebox
+        ans = messagebox.askyesnocancel(
+            "Registrazione non attiva",
+            "La registrazione dati non è attiva.\n\n"
+            "Sì      →  avvia la registrazione e poi la sequenza\n"
+            "No      →  avvia solo la sequenza (nessun dato salvato)\n"
+            "Annulla →  non avviare",
+            default=messagebox.YES,
+        )
+        if ans is None:   # Annulla
+            return False
+        if ans:           # Sì → apre dialogo REC (bloccante grazie a wait_window)
+            self._rec_start_dialog()
+            if not self.data_processor.is_recording:
+                return False  # utente ha chiuso senza avviare
+        return True
 
     # ── FTMS notifications ────────────────────────────────────────────────────
 
@@ -800,6 +845,7 @@ class MainWindow(tk.Tk):
         ttk.Button(bf, text="Avvia", command=_start).grid(row=0, column=0, padx=6)
         ttk.Button(bf, text="Annulla", command=win.destroy).grid(row=0, column=1, padx=6)
         win.bind('<Return>', lambda e: _start())
+        win.wait_window(win)
 
     def _rec_stop(self):
         self.executor.submit(self._rec_stop_worker)
@@ -1078,8 +1124,8 @@ class MainWindow(tk.Tk):
         # ── Contenuto ─────────────────────────────────────────────────────
         h1("● Barra di Stato — LED")
 
-        h2("STATO  (primo LED a sinistra)")
-        body("Indicatore per capire se il programma si è congelato. Fino a quanto lampeggia tutto ok")
+        h2("APP  (primo LED a sinistra)")
+        body("Indicatore per capire se il programma si è congelato. Fino a quanto lampeggia e il contatore incrementa tutto ok")
 
         h2("BLE / Lorenz / Banco / COM")
         body("Verde = dispositivo connesso e raggiungibile.\n"
@@ -1103,7 +1149,7 @@ class MainWindow(tk.Tk):
         h2("REC")
         body("Avvia o ferma la registrazione dei dati. Vengono registrati tutti i dati disponibili in quel momento. "
              "La cartella di Output serve ad aprire dove sono i risultati. "
-             "In caso di superamento dei 100 MB di dimensioni del file verrà creato un nuovo file.")
+             "In caso di superamento dei 50 Mega di dimensioni del file verrà creato un nuovo file")
 
         h2("BLE")
         body("Cerca i dispositivi Bluetooth nelle vicinanze, seleziona il trainer "
@@ -1145,18 +1191,13 @@ class MainWindow(tk.Tk):
         body("Ferma immediatamente la sequenza automatica e imposta la velocità "
              "del banco a 0. Usare in caso di necessità.")
 
-        h1("● Dati Live e Pannello Misure")
+        h1("● Dati Live e Pannello Δ")
 
-        body("Il pannello è organizzato in quattro colonne: Misura | BLE | Lorenz | Scarto. "
-             "Le righe Power [W] e Speed [km/h] mostrano i valori di entrambe le sorgenti "
-             "e calcolano lo scarto percentuale (potenza) o assoluto (velocità) nella colonna destra: "
-             "verde se rientra nella soglia, arancione se moderato, rosso se elevato. "
-             "Lo scarto viene calcolato su una media mobile configurabile.")
-        body("Le righe inferiori (Resistance, Cadence, Tot.Dist, Elapsed) mostrano solo i dati BLE; "
-             "la riga Torque [Nm] mostra solo i dati Lorenz. "
-             "Il pulsante 'Abilita Dati BLE' in basso abilita o disabilita le notifiche FTMS. "
-             "Le soglie di scarto e la finestra di smoothing sono configurabili da "
-             "Impostazioni → Parametri delta.")
+        body("Il pannello mostra in tempo reale i valori ricevuti dal trainer BLE "
+             "e dal sensore Lorenz affiancati. Il Δ centrale indica la differenza "
+             "tra le due sorgenti: verde se rientra nella soglia, arancione se "
+             "moderato, rosso se elevato. Le soglie e la finestra di smoothing "
+             "sono configurabili da Impostazioni → Parametri delta.")
 
         h1("● Salvataggio Dati")
 

@@ -44,6 +44,9 @@ class CsvPanel(ttk.Frame):
                  on_send_power,
                  on_send_simulation,
                  on_emergency_stop,
+                 on_before_auto_start=None,
+                 stop_rec_on_auto_end=True,
+                 on_stop_rec_changed=None,
                  **kwargs):
         super().__init__(parent, **kwargs)
         self._on_dispatch        = on_dispatch
@@ -54,6 +57,9 @@ class CsvPanel(ttk.Frame):
         self._on_send_power      = on_send_power
         self._on_send_simulation = on_send_simulation
         self._on_emergency_stop  = on_emergency_stop
+        self._on_before_auto_start = on_before_auto_start
+        self._on_stop_rec_changed  = on_stop_rec_changed
+        self._stop_rec_var         = tk.BooleanVar(value=stop_rec_on_auto_end)
 
         self._log = logging.getLogger(__name__)
         self.auto_commands_running       = False
@@ -110,6 +116,13 @@ class CsvPanel(ttk.Frame):
         self._cycles_spin.grid(row=0, column=4)
         self._cycles_spin.bind("<FocusOut>", lambda e: self._on_cycles_changed())
         self._cycles_spin.bind("<Return>",   lambda e: self._on_cycles_changed())
+
+        ttk.Checkbutton(
+            tb,
+            text="Auto-Stop REC",
+            variable=self._stop_rec_var,
+            command=self._on_stop_rec_toggle,
+        ).grid(row=1, column=0, sticky='w')
 
     def _build_table(self, parent):
         """Riga 0: Treeview con scrollbar."""
@@ -259,6 +272,14 @@ class CsvPanel(ttk.Frame):
 
     # ── Helpers interni ───────────────────────────────────────────────────────
 
+    @property
+    def stop_rec_on_auto_end(self) -> bool:
+        return self._stop_rec_var.get()
+
+    def _on_stop_rec_toggle(self):
+        if self._on_stop_rec_changed is not None:
+            self._on_stop_rec_changed(self._stop_rec_var.get())
+
     def _clicked_set_speed(self):
         try:
             self._on_set_banco(float(self._speed_spin.get()))
@@ -348,6 +369,11 @@ class CsvPanel(ttk.Frame):
         if not self._table.get_children():
             self._log.info("La tabella dei comandi è vuota.")
             return
+
+        # Controllo pre-avvio (es. registrazione non attiva)
+        if self._on_before_auto_start is not None:
+            if not self._on_before_auto_start():
+                return
 
         try:
             num_cycles = max(1, int(self._cycles_spin.get()))
