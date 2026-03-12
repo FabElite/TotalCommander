@@ -35,7 +35,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Total Commander IV")
-        self.geometry("950x750")
+        self.geometry("950x733")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -107,6 +107,9 @@ class MainWindow(tk.Tk):
 
         self._conn_bar = ConnectionsBar(
             _mf, self.lorenz_reader,
+            on_rec_start         = self._rec_start_dialog,
+            on_rec_stop          = self._rec_stop,
+            on_open_output       = self._open_output_dir,
             on_ble_search        = self._ble_search,
             on_ble_connect       = self._ble_connect,
             on_ble_disconnect    = self._ble_disconnect,
@@ -481,7 +484,7 @@ class MainWindow(tk.Tk):
         if not self._live_panel.is_ftms_enabled():
             if self.ble_manager.get_connection_status():
                 self._live_panel.set_ftms_button(True)
-                logging.getLogger().info("Abilitate notifiche FTMS")
+                logging.getLogger().info("Notifiche FTMS abilitate.")
                 self._status_bar.set_ftms(0)
                 self.executor.submit(self._enable_ftms_worker)
             else:
@@ -489,7 +492,7 @@ class MainWindow(tk.Tk):
         else:
             self._live_panel.set_ftms_button(False)
             self._live_panel.clear_ble()
-            logging.getLogger().info("Disabilitate notifiche FTMS")
+            logging.getLogger().info("Notifiche FTMS disabilitate.")
             self._reset_ftms_state()
             self.executor.submit(self._disable_ftms_worker)
 

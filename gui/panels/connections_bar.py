@@ -10,6 +10,9 @@ class ConnectionsBar(ttk.Frame):
     """Row 1 della finestra principale."""
 
     def __init__(self, parent, lorenz_reader,
+                 on_rec_start,
+                 on_rec_stop,
+                 on_open_output,
                  on_ble_search,
                  on_ble_connect,
                  on_ble_disconnect,
@@ -23,6 +26,9 @@ class ConnectionsBar(ttk.Frame):
                  **kwargs):
         super().__init__(parent, **kwargs)
         self._lorenz_reader        = lorenz_reader
+        self._cb_rec_start         = on_rec_start
+        self._cb_rec_stop          = on_rec_stop
+        self._cb_open_output       = on_open_output
         self._cb_ble_search        = on_ble_search
         self._cb_ble_connect       = on_ble_connect
         self._cb_ble_disconnect    = on_ble_disconnect
@@ -34,19 +40,58 @@ class ConnectionsBar(ttk.Frame):
         self._cb_banco_connect     = on_banco_connect
         self._cb_banco_disconnect  = on_banco_disconnect
 
-        self.grid_columnconfigure(0, weight=3)
-        self.grid_columnconfigure(1, weight=2)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=3)
         self.grid_columnconfigure(2, weight=2)
+        self.grid_columnconfigure(3, weight=2)
 
+        self._build_rec()
         self._build_ble()
         self._build_lorenz()
         self._build_banco()
+
+    def _build_rec(self):
+        import tkinter as tk
+        f = ttk.LabelFrame(self, text="Registrazione")
+        f.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=2)
+        f.grid_columnconfigure(0, weight=1)
+
+        self._btn_rec = tk.Button(
+            f, text="⏺  REC",
+            command=self._cb_rec_start,
+            font=('Helvetica', 10, 'bold'),
+            bg='#cc2222', fg='white',
+            activebackground='#aa0000', activeforeground='white',
+            relief='raised', bd=2, cursor='hand2',
+        )
+        self._btn_rec.grid(row=0, column=0, sticky="ew", padx=6, pady=(8, 2))
+
+        self._btn_rec_stop = tk.Button(
+            f, text="⏹  STOP",
+            command=self._cb_rec_stop,
+            font=('Helvetica', 10, 'bold'),
+            bg='#444444', fg='white',
+            activebackground='#222222', activeforeground='white',
+            relief='raised', bd=2, cursor='hand2',
+            state='disabled',
+        )
+        self._btn_rec_stop.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 4))
+
+        self._rec_name_var = tk.StringVar(value="—")
+        tk.Label(f, textvariable=self._rec_name_var,
+                 font=('Helvetica', 7), fg='#555555',
+                 wraplength=100, justify='center', anchor='center'
+                 ).grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 4))
+
+        ttk.Button(f, text="📁 Output",
+                   command=self._cb_open_output
+                   ).grid(row=3, column=0, sticky="ew", padx=6, pady=(0, 6))
 
     # ── Sezioni sempre visibili ───────────────────────────────────────────────
 
     def _build_ble(self):
         f = ttk.LabelFrame(self, text="BLE")
-        f.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=2)
+        f.grid(row=0, column=1, sticky="nsew", padx=(0, 4), pady=2)
         f.grid_columnconfigure(0, weight=1)
 
         self.device_list = tk.Listbox(f, height=4, font=('Helvetica', 8))
@@ -71,7 +116,7 @@ class ConnectionsBar(ttk.Frame):
 
     def _build_lorenz(self):
         f = ttk.LabelFrame(self, text="Lorenz")
-        f.grid(row=0, column=1, sticky="nsew", padx=4, pady=2)
+        f.grid(row=0, column=2, sticky="nsew", padx=4, pady=2)
         f.grid_columnconfigure(0, weight=1); f.grid_columnconfigure(1, weight=1)
 
         rl = ttk.Frame(f)
@@ -109,7 +154,7 @@ class ConnectionsBar(ttk.Frame):
 
     def _build_banco(self):
         f = ttk.LabelFrame(self, text="Banco")
-        f.grid(row=0, column=2, sticky="nsew", padx=4, pady=2)
+        f.grid(row=0, column=3, sticky="nsew", padx=4, pady=2)
         f.grid_columnconfigure(1, weight=1)
 
         ttk.Label(f, text="IP:").grid(row=0, column=0, sticky="e",
@@ -149,6 +194,16 @@ class ConnectionsBar(ttk.Frame):
                     self.device_list.itemconfig(tk.END, {'bg': 'lightcoral'})
                 except Exception:
                     pass
+
+    def set_rec_state(self, recording: bool, session_name: str = "—"):
+        """Aggiorna pulsanti e label di sessione nella REC box."""
+        self._rec_name_var.set(session_name)
+        if recording:
+            self._btn_rec.config(state='disabled')
+            self._btn_rec_stop.config(state='normal')
+        else:
+            self._btn_rec.config(state='normal')
+            self._btn_rec_stop.config(state='disabled')
 
     def set_progress(self, running: bool):
         self.progress.start() if running else self.progress.stop()
