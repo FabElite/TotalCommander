@@ -14,7 +14,7 @@ DEFAULTS = {
     'delta_power_thresholds_pct': [2.0, 5.0],
     'delta_smoothing_window': 5,
     'rec_hz': 1,
-    'stop_rec_on_auto_end': False,
+    'stop_rec_on_auto_end': True,
 }
 
 _log = logging.getLogger(__name__)

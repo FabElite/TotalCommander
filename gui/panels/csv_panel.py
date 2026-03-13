@@ -44,8 +44,8 @@ class CsvPanel(ttk.Frame):
                  on_send_power,
                  on_send_simulation,
                  on_emergency_stop,
+                 stop_rec_on_auto_end,
                  on_before_auto_start=None,
-                 stop_rec_on_auto_end=True,
                  on_stop_rec_changed=None,
                  **kwargs):
         super().__init__(parent, **kwargs)
