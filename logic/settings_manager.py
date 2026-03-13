@@ -13,7 +13,7 @@ DEFAULTS = {
     'delta_speed_thresholds_kmh': [1.0, 3.0],
     'delta_power_thresholds_pct': [2.0, 5.0],
     'delta_smoothing_window': 5,
-    'rec_hz': 1,
+    'rec_hz': 2,
     'stop_rec_on_auto_end': True,
 }
 

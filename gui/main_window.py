@@ -1217,7 +1217,7 @@ class MainWindow(tk.Tk):
         body("Il salvataggio avviene automaticamente ogni 30 secondi. Se il file supera "
              "100 MB viene creato un nuovo file (_part02, _part03…) con la stessa intestazione. "
              "Per forzare il salvataggio immediato usare File → Forza salvataggio dati. "
-             "La frequenza di registrazione (default 1 Hz) è configurabile da "
+             "La frequenza di registrazione (default 2 Hz) è configurabile da "
              "Impostazioni → Parametri delta.")
 
         # ── Pulsante chiudi ────────────────────────────────────────────────
