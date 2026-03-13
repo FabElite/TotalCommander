@@ -2,10 +2,10 @@
 Entry point dell'applicazione Total Commander IV.
 
 Architettura logging:
-  - File (app.log, rotativo):  DEBUG sempre  → archivio diagnostico completo
-  - Console (stdout):          INFO
-  - Pannello GUI:              INFO di default; filtro blocca DEBUG/INFO da shared_lib.*
-                               Il toggle "Debug" nel pannello log rimuove il filtro
+  - File (logs/app.log, rotativo):  DEBUG sempre  → archivio diagnostico completo
+  - Console (stdout):               INFO
+  - Pannello GUI:                   INFO di default; filtro blocca DEBUG/INFO da shared_lib.*
+                                    Il toggle "Debug" nel pannello log rimuove il filtro
 """
 import logging
 import sys
@@ -20,6 +20,14 @@ def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
+
+
+def _base_dir() -> str:
+    """Cartella base dell'applicazione: accanto all'exe in produzione,
+    cartella del progetto in sviluppo."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 # ── Handler GUI ───────────────────────────────────────────────────────────────
@@ -88,7 +96,9 @@ def _setup_logging():
         root.removeHandler(h)
 
     # File → DEBUG sempre (archivio completo)
-    fh = RotatingFileHandler("app.log", maxBytes=5 * 1024 * 1024,
+    logs_dir = os.path.join(_base_dir(), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    fh = RotatingFileHandler(os.path.join(logs_dir, "app.log"), maxBytes=5 * 1024 * 1024,
                               backupCount=3, encoding='utf-8')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(fmt_full)
