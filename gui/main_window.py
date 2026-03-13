@@ -39,7 +39,7 @@ except ImportError:
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Total Commander IV")
+        self.title(f"Total Commander IV  —  {VERSION}")
         self.geometry("965x750")
 
         # ── Stili ─────────────────────────────────────────────────────────────
