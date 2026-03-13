@@ -5,7 +5,7 @@ a = Analysis(
     ['C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\gui', 'gui'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\logic', 'logic'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\.venv\\Lib\\site-packages\\shared_lib\\LorenzProtokollDll_x64.dll', 'shared_lib'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\justo.ico', '.')],
+    datas=[('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\gui', 'gui'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\logic', 'logic'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\version.py', '.'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\.venv\\Lib\\site-packages\\shared_lib\\LorenzProtokollDll_x64.dll', 'shared_lib'), ('C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\justo.ico', '.')],
     hiddenimports=['winrt.windows.foundation.collections', 'winrt'],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['justo.ico'],
+    icon=['C:\\Users\\fossato\\PycharmProjects\\TotalCommander\\justo.ico'],
 )

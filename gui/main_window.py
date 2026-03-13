@@ -30,6 +30,11 @@ from gui.panels.live_data_panel import LiveDataPanel
 from gui.panels.log_panel       import LogPanel
 from gui.panels.sidebar         import CollapsibleSidebar
 
+try:
+    from version import VERSION
+except ImportError:
+    VERSION = "unknown"
+
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -845,7 +850,6 @@ class MainWindow(tk.Tk):
         ttk.Button(bf, text="Avvia", command=_start).grid(row=0, column=0, padx=6)
         ttk.Button(bf, text="Annulla", command=win.destroy).grid(row=0, column=1, padx=6)
         win.bind('<Return>', lambda e: _start())
-        win.wait_window(win)
 
     def _rec_stop(self):
         self.executor.submit(self._rec_stop_worker)
@@ -910,6 +914,10 @@ class MainWindow(tk.Tk):
         menubar.add_cascade(label="Info", menu=info_menu)
         info_menu.add_command(label="Guida all'uso…",
                               command=self._menu_show_info)
+        info_menu.add_separator()
+        _is_dev = VERSION.endswith("-dev") or "unknown" in VERSION
+        _ver_label = f"Versione: {VERSION}" + ("  ⚠ build di sviluppo" if _is_dev else "")
+        info_menu.add_command(label=_ver_label, state="disabled")
 
     # ── Azioni menu File ──────────────────────────────────────────────────────
 

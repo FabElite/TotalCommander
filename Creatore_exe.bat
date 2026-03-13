@@ -1,28 +1,89 @@
 @echo off
-REM Attiva la virtual environment
-call C:\Users\fossato\PycharmProjects\TotalCommander\.venv\Scripts\activate.bat
+setlocal enabledelayedexpansion
 
-REM Esegui PyInstaller con le opzioni richieste
-pyinstaller --noconfirm --onefile --windowed ^
-  --name=TotalCommander ^
-  --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\gui;gui" ^
-  --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\logic;logic" ^
-  --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\.venv\Lib\site-packages\shared_lib\LorenzProtokollDll_x64.dll;shared_lib" ^
-  --add-data="C:\Users\fossato\PycharmProjects\TotalCommander\justo.ico;." ^
-  --hidden-import=winrt.windows.foundation.collections ^
-  --hidden-import=winrt ^
-  --icon=justo.ico ^
-  "C:\Users\fossato\PycharmProjects\TotalCommander\main.py"
+REM ── Configurazione percorsi ──────────────────────────────────────────────────
+set PROJECT=C:\Users\fossato\PycharmProjects\TotalCommander
+set VENV=%PROJECT%\.venv
 
-IF %ERRORLEVEL% NEQ 0 (
-    echo Si è verificato un errore durante la creazione dell'eseguibile.
-) ELSE (
-    echo EXE creato con successo.
+REM ── Attiva la virtual environment ───────────────────────────────────────────
+call %VENV%\Scripts\activate.bat
+
+REM ── Trova git.exe ────────────────────────────────────────────────────────────
+set GIT_EXE=
+where git >nul 2>&1
+if %ERRORLEVEL%==0 set GIT_EXE=git
+
+if "!GIT_EXE!"=="" (
+    for %%G in (
+        "C:\Program Files\Git\cmd\git.exe"
+        "C:\Program Files (x86)\Git\bin\git.exe"
+    ) do (
+        if exist %%G if "!GIT_EXE!"=="" set GIT_EXE=%%~G
+    )
 )
 
-REM Disattiva la virtual environment (opzionale)
-REM call deactivate
+if "!GIT_EXE!"=="" (
+    echo [ERRORE] git non trovato. Installare Git for Windows.
+    pause & exit /b 1
+)
+
+echo [INFO] git trovato: !GIT_EXE!
+
+REM ── Leggi la versione tramite file temporaneo (più affidabile del for/f) ────
+set TMPVER=%TEMP%\tc_git_version.tmp
+"!GIT_EXE!" -C "%PROJECT%" describe --tags --dirty=-dev > "!TMPVER!" 2>nul
+set /p GIT_VERSION=<"!TMPVER!"
+del "!TMPVER!" >nul 2>&1
+
+if "!GIT_VERSION!"=="" (
+    echo [WARN] Nessun tag trovato nel repository.
+    echo        Creare almeno un tag annotato: git tag -a v1.0.0 -m "Prima release"
+    echo        Uso versione "unknown".
+    set GIT_VERSION=unknown
+) else (
+    echo [INFO] Versione rilevata: !GIT_VERSION!
+)
+
+REM ── Salva copia di backup di version.py prima di sovrascriverlo ──────────────
+copy /Y "%PROJECT%\version.py" "%PROJECT%\version.py.bak" >nul 2>&1
+
+REM ── Scrivi version.py congelato (una sola riga, nessuna logica) ──────────────
+(echo VERSION = "!GIT_VERSION!") > "%PROJECT%\version.py"
+echo [INFO] version.py scritto: VERSION = !GIT_VERSION!
+
+REM ── Esegui PyInstaller ───────────────────────────────────────────────────────
+pyinstaller --noconfirm --onefile --windowed ^
+  --name=TotalCommander ^
+  --add-data="%PROJECT%\gui;gui" ^
+  --add-data="%PROJECT%\logic;logic" ^
+  --add-data="%PROJECT%\version.py;." ^
+  --add-data="%VENV%\Lib\site-packages\shared_lib\LorenzProtokollDll_x64.dll;shared_lib" ^
+  --add-data="%PROJECT%\justo.ico;." ^
+  --hidden-import=winrt.windows.foundation.collections ^
+  --hidden-import=winrt ^
+  --icon="%PROJECT%\justo.ico" ^
+  "%PROJECT%\main.py"
+
+set BUILD_OK=%ERRORLEVEL%
+
+REM ── Ripristina version.py dal backup ─────────────────────────────────────────
+if exist "%PROJECT%\version.py.bak" (
+    copy /Y "%PROJECT%\version.py.bak" "%PROJECT%\version.py" >nul
+    del "%PROJECT%\version.py.bak" >nul
+    echo [INFO] version.py ripristinato dal backup.
+) else (
+    echo [WARN] Backup version.py non trovato, file lasciato congelato.
+)
+
+IF !BUILD_OK! NEQ 0 (
+    echo.
+    echo [ERRORE] Errore durante la creazione dell'eseguibile.
+) ELSE (
+    echo.
+    echo [OK] EXE creato con successo: TotalCommander !GIT_VERSION!
+)
 
 echo.
 echo Operazione completata. Premere un tasto per continuare...
 pause
+endlocal
