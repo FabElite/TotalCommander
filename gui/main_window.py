@@ -890,8 +890,6 @@ class MainWindow(tk.Tk):
         file_menu.add_separator()
         file_menu.add_command(label="Forza salvataggio dati",
                               command=self._menu_flush_data)
-        file_menu.add_command(label="File dati corrente",
-                              command=self._menu_show_current_file)
         file_menu.add_separator()
         file_menu.add_command(label="Apri cartella output",
                               command=lambda: self._open_working_directory(
@@ -927,33 +925,6 @@ class MainWindow(tk.Tk):
             return
         self.data_processor.flush()
         logging.getLogger().debug("Flush manuale dati eseguito.")
-
-    def _menu_show_current_file(self):
-        if not self.data_processor.xlsx_filename:
-            import tkinter.messagebox as mb
-            mb.showinfo("File dati corrente", "Nessuna sessione attiva.")
-            return
-        fname = os.path.basename(self.data_processor.xlsx_filename)
-        fpath = os.path.abspath(self.data_processor.xlsx_filename)
-        win = tk.Toplevel(self)
-        win.title("File dati corrente")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
-        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
-        ttk.Label(win, text="File in uso:", font=('Helvetica', 9, 'bold')
-                  ).pack(padx=20, pady=(16, 4))
-        ttk.Label(win, text=fname, foreground='#0055aa'
-                  ).pack(padx=20, pady=(0, 4))
-        ttk.Label(win, text=fpath, foreground='#555555', font=('Helvetica', 8),
-                  wraplength=420, justify='center'
-                  ).pack(padx=20, pady=(0, 12))
-        ttk.Button(win, text="Chiudi", command=win.destroy
-                   ).pack(pady=(0, 14))
 
     # ── Azioni menu Impostazioni ──────────────────────────────────────────────
 
