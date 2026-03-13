@@ -53,7 +53,7 @@ echo [INFO] version.py scritto: VERSION = !GIT_VERSION!
 
 REM ── Esegui PyInstaller ───────────────────────────────────────────────────────
 pyinstaller --noconfirm --onefile --windowed ^
-  --name=TotalCommander ^
+  --name=TotalCommander_!GIT_VERSION! ^
   --add-data="%PROJECT%\gui;gui" ^
   --add-data="%PROJECT%\logic;logic" ^
   --add-data="%PROJECT%\version.py;." ^
