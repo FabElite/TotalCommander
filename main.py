@@ -2,9 +2,10 @@
 Entry point dell'applicazione Total Commander IV.
 
 Architettura logging:
-  - File (logs/app.log, rotativo):  DEBUG sempre  → archivio diagnostico completo
+  - Root logger:        DEBUG  → non scarta nulla; ogni handler decide
+  - File (logs/app.log, rotativo):  DEBUG  → archivio diagnostico completo
   - Console (stdout):               INFO
-  - Pannello GUI:                   INFO di default; filtro blocca DEBUG/INFO da shared_lib.*
+  - Pannello GUI:                   INFO di default (filtro _LibraryFilter blocca tutti i DEBUG)
                                     Il toggle "Debug" nel pannello log rimuove il filtro
 """
 import logging
@@ -48,11 +49,14 @@ class _TextHandler(logging.Handler):
 
 class _LibraryFilter(logging.Filter):
     """
-    In modalità normale sopprime DEBUG/INFO provenienti dalle librerie interne
-    (shared_lib.*), lasciando passare solo WARNING+.
-    In modalità debug tutto passa.
+    Filtro applicato al solo handler GUI.
+    - Modalità normale : blocca TUTTI i DEBUG; INFO e superiori passano sempre.
+    - Modalità debug   : tutto passa (attivato dal checkbox nel pannello log).
+
+    Il root logger è impostato a DEBUG in modo che file e console ricevano
+    i messaggi secondo il proprio livello individuale, senza che il root
+    li scarti in anticipo.
     """
-    _LIB_PREFIXES = ('shared_lib.',)
 
     def __init__(self):
         super().__init__()
@@ -60,15 +64,11 @@ class _LibraryFilter(logging.Filter):
 
     def set_debug(self, enabled: bool):
         self._debug = enabled
-        # Abbassa/alza il livello del root per intercettare i DEBUG delle librerie
-        logging.getLogger().setLevel(logging.DEBUG if enabled else logging.INFO)
 
     def filter(self, record: logging.LogRecord) -> bool:
         if self._debug:
             return True
-        if any(record.name.startswith(p) for p in self._LIB_PREFIXES):
-            return record.levelno >= logging.WARNING
-        return True
+        return record.levelno >= logging.INFO
 
 
 _lib_filter: _LibraryFilter | None = None
@@ -91,7 +91,10 @@ def _setup_logging():
     fmt_short = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    # DEBUG: il root non scarta nulla; ogni handler applica il proprio livello.
+    # Senza questa riga il file handler (impostato a DEBUG) non riceve mai
+    # i messaggi DEBUG perché vengono bloccati qui prima di raggiungere qualsiasi handler.
+    root.setLevel(logging.DEBUG)
     for h in root.handlers[:]:
         root.removeHandler(h)
 
@@ -110,7 +113,7 @@ def _setup_logging():
     ch.setFormatter(fmt_full)
     root.addHandler(ch)
 
-    logging.info("Logging configurato — file: DEBUG, console: INFO.")
+    logging.info("Logging configurato — file: DEBUG, console: INFO, GUI: INFO (debug su richiesta).")
 
 
 def _add_gui_handler(log_queue):

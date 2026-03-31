@@ -232,24 +232,36 @@ class CsvPanel(ttk.Frame):
                        command=lambda c=cmd, k=key: c(self._manual_entries[k].get())
                        ).grid(row=i, column=2, padx=(2, _PX), pady=_PY, sticky='ew')
 
+        # ── Zero Freno ────────────────────────────────────────────────────────
+        btn_zero = tk.Button(
+            f, text="⬛  ZERO FRENO",
+            command=lambda: self._on_send_level(0),
+            font=('Helvetica', 10, 'bold'),
+            bg="#0D3B6E", fg="white",
+            activebackground="#082B52", activeforeground="white",
+            relief='raised', bd=2, cursor='hand2',
+        )
+        btn_zero.grid(row=4, column=0, columnspan=3,
+                      sticky="ew", padx=_PX, pady=(6, 4))
+
         # ── Separatore ────────────────────────────────────────────────────────
         ttk.Separator(f, orient='horizontal').grid(
-            row=4, column=0, columnspan=3, sticky='ew', padx=_PX, pady=(6, 4))
+            row=5, column=0, columnspan=3, sticky='ew', padx=_PX, pady=(4, 4))
 
         # ── Sezione Banco ─────────────────────────────────────────────────────
         ttk.Label(f, text="Banco", font=('Helvetica', 8, 'bold'),
                   foreground='#444444').grid(
-            row=5, column=0, columnspan=3, sticky='w', padx=_PX, pady=(0, 2))
+            row=6, column=0, columnspan=3, sticky='w', padx=_PX, pady=(0, 2))
 
         ttk.Label(f, text="Vel [km/h]", width=_W_LBL, anchor='w').grid(
-            row=6, column=0, padx=(_PX, 2), pady=_PY, sticky='w')
+            row=7, column=0, padx=(_PX, 2), pady=_PY, sticky='w')
         self._speed_spin = ttk.Spinbox(f, from_=0.0, to=100.0, increment=0.1,
                                        format="%.1f", width=_W_SPIN)
         self._speed_spin.set("0.0")
-        self._speed_spin.grid(row=6, column=1, padx=2, pady=_PY, sticky='ew')
+        self._speed_spin.grid(row=7, column=1, padx=2, pady=_PY, sticky='ew')
         ttk.Button(f, text="Set", width=_W_BTN,
                    command=self._clicked_set_speed).grid(
-            row=6, column=2, padx=(2, _PX), pady=_PY, sticky='ew')
+            row=7, column=2, padx=(2, _PX), pady=_PY, sticky='ew')
 
         # ── STOP BANCO ────────────────────────────────────────────────────────
         btn_stop = tk.Button(
@@ -260,8 +272,8 @@ class CsvPanel(ttk.Frame):
             activebackground="#B00000", activeforeground="white",
             relief='raised', bd=3, cursor='hand2', height=2,
         )
-        btn_stop.grid(row=7, column=0, columnspan=3,
-                      sticky="ew", padx=_PX, pady=(8, 8))
+        btn_stop.grid(row=8, column=0, columnspan=3,
+                      sticky="ew", padx=_PX, pady=(6, 6))
         try:
             btn_stop.config(highlightthickness=2,
                             highlightbackground="#660000",

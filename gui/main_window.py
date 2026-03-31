@@ -40,7 +40,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"Total Commander  —  {VERSION}")
-        self.geometry("965x750")
+        self.geometry("965x765")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)

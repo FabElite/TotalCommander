@@ -70,6 +70,13 @@ class LogPanel(ttk.LabelFrame):
                 elif ' - WARNING - '  in upper: tag = 'WARNING'
                 elif ' - DEBUG - '    in upper: tag = 'DEBUG'
                 else:                           tag = 'INFO'
+
+                # I messaggi DEBUG sono visibili nella GUI solo se il
+                # checkbox "Debug" è attivo. Il file di log su disco
+                # riceve invece sempre tutto (livello impostato sul handler).
+                if tag == 'DEBUG' and not self._debug_mode.get():
+                    continue
+
                 self._text.config(state='normal')
                 self._text.insert(tk.END, record + '\n', tag)
                 self._text.config(state='disabled')
