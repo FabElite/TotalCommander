@@ -290,8 +290,6 @@ class MainWindow(tk.Tk):
             self._status_bar.set_ble('warn')
         elif connected:
             self._status_bar.set_ble('ok')
-            if not self._ble_was_connected:
-                self.after(4000, self._auto_enable_ftms)
             self._ble_was_connected = True
         else:
             if self._ble_was_connected:
@@ -395,6 +393,9 @@ class MainWindow(tk.Tk):
                 self._connected_device_address = address
                 self.after(0, self._status_bar.set_device_info, name, address)
                 logging.getLogger().info(f"BLE connesso: {name} [{address}]")
+                # Abilita FTMS subito — connect_to_device garantisce già
+                # che i servizi GATT siano pronti a questo punto
+                self.after(0, self._auto_enable_ftms)
             else:
                 logging.getLogger().warning(f"Connessione BLE fallita: {name or address} non ha risposto.")
         except Exception as e:
