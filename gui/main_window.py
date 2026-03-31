@@ -20,6 +20,7 @@ from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
 from shared_lib.SerialDataLib import SerialDataReader
+from shared_lib.ScpiAlimentatore import Alimentatore, SCPIError, SCPINotConnectedError
 from logic.data_processing import DataProcessor
 from logic import settings_manager
 
@@ -55,6 +56,7 @@ class MainWindow(tk.Tk):
         self.modbus         = ModbusBancoCollaudo()
         self.lorenz_reader  = LorenzReader()
         self.serial_reader  = SerialDataReader(baudrate=115200)
+        self.psu: Alimentatore | None = None   # creato su connect, None = mai connesso
         self.executor       = ThreadPoolExecutor(max_workers=5)
 
         # ── Stato connessioni (per rilevare disconnessioni inattese) ──────────
@@ -62,6 +64,7 @@ class MainWindow(tk.Tk):
         self._lorenz_was_connected = False
         self._serial_was_connected = False
         self._modbus_was_connected = False
+        self._psu_was_connected    = False
         self._connected_device_name    = None
         self._connected_device_address = None
 
@@ -84,6 +87,7 @@ class MainWindow(tk.Tk):
         self.periodic_check_id = None
         self.lorenz_update_id  = None
         self.serial_update_id  = None
+        self.psu_update_id     = None
         self._heartbeat_reset_id = None
         self._last_packet_time   = None
         self._ui_pulse_id    = None
@@ -171,6 +175,9 @@ class MainWindow(tk.Tk):
             self,
             on_serial_connect    = self._serial_connect,
             on_serial_disconnect = self._serial_disconnect,
+            on_psu_connect       = self._psu_connect,
+            on_psu_disconnect    = self._psu_disconnect,
+            on_psu_settings      = self._open_psu_settings,
         )
         self._sidebar.grid(row=0, column=1, sticky="ns")
 
@@ -267,6 +274,7 @@ class MainWindow(tk.Tk):
         self._check_lorenz()
         self._check_serial()
         self._check_modbus()
+        self._check_psu()
         self.periodic_check_id = self.after(1000, self.periodic_connection_check)
 
     async def _async_check_ble(self):
@@ -770,6 +778,195 @@ class MainWindow(tk.Tk):
         msg = "Sensore seriale disconnesso." if ok else "Sensore: nessuna connessione attiva."
         self.after(0, logging.getLogger().info if ok else logging.getLogger().warning, msg)
 
+    # ── PSU (Alimentatore SCPI) ───────────────────────────────────────────────
+
+    def _check_psu(self):
+        connected = self.psu is not None and self.psu.is_connected()
+        self._status_bar.set_psu('ok' if connected else 'err')
+        if connected:
+            self._psu_was_connected = True
+        elif self._psu_was_connected:
+            logging.getLogger().warning("=" * 55)
+            logging.getLogger().warning("*** DISCONNESSIONE PSU - connessione persa ***")
+            logging.getLogger().warning("=" * 55)
+            self._stop_psu_update()
+            self._psu_was_connected = False
+            self.after(0, self._sidebar.update_psu, None, None, None)
+
+    def _psu_connect(self, port: str):
+        if not port:
+            logging.getLogger().warning("Selezionare una porta COM per il PSU.")
+            return
+        logging.getLogger().info(f"Connessione PSU su {port}...")
+        self.executor.submit(self._psu_connect_worker, port)
+
+    def _psu_connect_worker(self, port):
+        try:
+            psu = Alimentatore(port)
+            psu.connect()
+            idn = psu.identify()
+            self.psu = psu
+            self.after(0, logging.getLogger().info, f"PSU connesso: {idn}")
+            self.after(0, self._start_psu_update)
+        except SCPIError as e:
+            logging.getLogger().error(f"Errore connessione PSU: {e}")
+
+    def _psu_disconnect(self):
+        logging.getLogger().info("Disconnessione PSU in corso...")
+        self._psu_was_connected = False
+        self._stop_psu_update()
+        self.executor.submit(self._psu_disconnect_worker)
+
+    def _psu_disconnect_worker(self):
+        try:
+            if self.psu is not None:
+                self.psu.disconnect()
+                self.psu = None
+                self.after(0, logging.getLogger().info, "PSU disconnesso.")
+                self.after(0, self._sidebar.update_psu, None, None, None)
+        except Exception as e:
+            logging.getLogger().error(f"Errore disconnessione PSU: {e}")
+
+    def _start_psu_update(self):
+        self._stop_psu_update()
+        self._psu_update_tick()
+
+    def _stop_psu_update(self):
+        if self.psu_update_id is not None:
+            self.after_cancel(self.psu_update_id)
+            self.psu_update_id = None
+
+    def _psu_update_tick(self):
+        if self.psu is not None and self.psu.is_connected():
+            self.executor.submit(self._psu_measure_worker)
+        self.psu_update_id = self.after(1000, self._psu_update_tick)
+
+    def _psu_measure_worker(self):
+        try:
+            m = self.psu.measure_all()
+            data = {
+                'tensione_psu': m.tensione,
+                'corrente_psu': m.corrente,
+                'potenza_psu':  m.potenza,
+            }
+            self._latest_data.update(data)
+            self.after(0, self._sidebar.update_psu, m.tensione, m.corrente, m.potenza)
+        except Exception as e:
+            logging.getLogger().debug(f"PSU misura fallita: {e}")
+
+    def _open_psu_settings(self):
+        if self.psu is None or not self.psu.is_connected():
+            logging.getLogger().warning("PSU non connesso: impossibile aprire impostazioni.")
+            return
+
+        win = tk.Toplevel(self)
+        win.title("Impostazioni Alimentatore PSU")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
+        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+
+        pad = dict(padx=10, pady=4)
+        err_var = tk.StringVar()
+
+        def _show_err(msg):
+            err_var.set(msg)
+            win.after(3000, lambda: err_var.set(""))
+
+        # ── Uscita ────────────────────────────────────────────────────────────
+        ttk.Label(win, text="Uscita", font=('Helvetica', 9, 'bold')).grid(
+            row=0, column=0, columnspan=3, sticky='w', padx=10, pady=(12, 2))
+
+        ttk.Label(win, text="Tensione [V]:").grid(row=1, column=0, sticky='e', **pad)
+        e_volt = ttk.Entry(win, width=10, justify='right')
+        e_volt.insert(0, "0.000")
+        e_volt.grid(row=1, column=1, **pad)
+
+        ttk.Label(win, text="Corrente [A]:").grid(row=2, column=0, sticky='e', **pad)
+        e_curr = ttk.Entry(win, width=10, justify='right')
+        e_curr.insert(0, "0.000")
+        e_curr.grid(row=2, column=1, **pad)
+
+        def _apply_vi():
+            try:
+                v, i = float(e_volt.get()), float(e_curr.get())
+                self.executor.submit(lambda: self.psu.apply(v, i))
+                logging.getLogger().info(f"PSU: apply({v:.3f} V, {i:.3f} A)")
+            except Exception as ex:
+                _show_err(str(ex))
+
+        ttk.Button(win, text="⚡ Applica V+I", command=_apply_vi).grid(
+            row=1, column=2, rowspan=2, sticky='nsew', padx=(2, 10), pady=4)
+
+        rb = ttk.Frame(win)
+        rb.grid(row=3, column=0, columnspan=3, pady=(2, 4))
+        ttk.Button(rb, text="▶  Output ON",
+                   command=lambda: self.executor.submit(self.psu.output_on)
+                   ).grid(row=0, column=0, padx=6)
+        ttk.Button(rb, text="■  Output OFF",
+                   command=lambda: self.executor.submit(self.psu.output_off)
+                   ).grid(row=0, column=1, padx=6)
+
+        ttk.Separator(win, orient='horizontal').grid(
+            row=4, column=0, columnspan=3, sticky='ew', padx=10, pady=6)
+
+        # ── Protezioni ────────────────────────────────────────────────────────
+        ttk.Label(win, text="Protezioni", font=('Helvetica', 9, 'bold')).grid(
+            row=5, column=0, columnspan=3, sticky='w', padx=10, pady=(2, 2))
+
+        ttk.Label(win, text="OVP [V]:").grid(row=6, column=0, sticky='e', **pad)
+        e_ovp = ttk.Entry(win, width=10, justify='right')
+        e_ovp.insert(0, "0.000")
+        e_ovp.grid(row=6, column=1, **pad)
+        ob = ttk.Frame(win)
+        ob.grid(row=6, column=2, padx=(2, 10))
+        ttk.Button(ob, text="Abilita",
+                   command=lambda: self.executor.submit(
+                       lambda: self.psu.set_ovp(float(e_ovp.get())))
+                   ).grid(row=0, column=0, padx=(0, 2))
+        ttk.Button(ob, text="Disab.",
+                   command=lambda: self.executor.submit(self.psu.disable_ovp)
+                   ).grid(row=0, column=1)
+
+        ttk.Label(win, text="OCP [A]:").grid(row=7, column=0, sticky='e', **pad)
+        e_ocp = ttk.Entry(win, width=10, justify='right')
+        e_ocp.insert(0, "0.000")
+        e_ocp.grid(row=7, column=1, **pad)
+        ob2 = ttk.Frame(win)
+        ob2.grid(row=7, column=2, padx=(2, 10))
+        ttk.Button(ob2, text="Abilita",
+                   command=lambda: self.executor.submit(
+                       lambda: self.psu.set_ocp(float(e_ocp.get())))
+                   ).grid(row=0, column=0, padx=(0, 2))
+        ttk.Button(ob2, text="Disab.",
+                   command=lambda: self.executor.submit(self.psu.disable_ocp)
+                   ).grid(row=0, column=1)
+
+        ttk.Separator(win, orient='horizontal').grid(
+            row=8, column=0, columnspan=3, sticky='ew', padx=10, pady=6)
+
+        # ── Identificazione ───────────────────────────────────────────────────
+        idn_var = tk.StringVar(value="—")
+        ttk.Label(win, text="IDN:").grid(row=9, column=0, sticky='e', **pad)
+        ttk.Label(win, textvariable=idn_var, foreground='#555555',
+                  font=('Helvetica', 8), wraplength=180, justify='left'
+                  ).grid(row=9, column=1, sticky='w', **pad)
+        ttk.Button(win, text="Leggi",
+                   command=lambda: self.executor.submit(
+                       lambda: idn_var.set(self.psu.identify()))
+                   ).grid(row=9, column=2, padx=(2, 10))
+
+        # ── Errori e chiudi ───────────────────────────────────────────────────
+        ttk.Label(win, textvariable=err_var, foreground='#CC0000',
+                  font=('Helvetica', 8)).grid(
+            row=10, column=0, columnspan=3, padx=10, pady=(4, 0))
+        ttk.Button(win, text="Chiudi", command=win.destroy).grid(
+            row=11, column=0, columnspan=3, pady=(6, 14))
+
     # ── Emergency stop ────────────────────────────────────────────────────────
 
     def _emergency_stop(self):
@@ -1231,6 +1428,8 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._rec_timer_id);      self._rec_timer_id = None
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id); self._heartbeat_reset_id = None
+        if self.psu_update_id:
+            self.after_cancel(self.psu_update_id);      self.psu_update_id = None
         self._stop_serial_update()
         self._csv_panel.stop()
 
@@ -1340,6 +1539,13 @@ class MainWindow(tk.Tk):
                 self.serial_reader.close_connection()
             if self.modbus.is_connesso():
                 self.modbus.disconnetti()
+            if self.psu is not None and self.psu.is_connected():
+                try:
+                    self.psu.output_off()
+                    self.psu.disconnect()
+                    logging.getLogger().info("PSU spento e disconnesso (shutdown).")
+                except Exception as e:
+                    logging.getLogger().warning(f"Errore chiusura PSU in shutdown: {e}")
 
         except Exception as e:
             logging.getLogger().error(f"Errore durante lo spegnimento: {e}")

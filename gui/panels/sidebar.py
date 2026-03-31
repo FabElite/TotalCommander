@@ -7,10 +7,15 @@ Barra laterale collassabile — lato destro della finestra principale.
               │ │  │ [Connetti] [Disconnetti]│
               │ │  ├─ Dati COM ─────────────┤
               │ │  │ Valore 1    12.34       │
-              │ │  │ Valore 2     0.00       │
-              │C│  │ Valore 3      N/A       │
-              │O│  │ Valore 4      N/A       │
-              │M│  └────────────────────────┘
+              │C│  ├─ Alimentatore PSU ──────┤
+              │O│  │ Porta: [COM12▼] [🔄]   │
+              │M│  │ [Connetti] [Disconnetti]│
+              │+│  ├─ Misure PSU ────────────┤
+              │P│  │ Tensione    12.340 V     │
+              │S│  │ Corrente     1.234 A     │
+              │U│  │ Potenza     15.230 W     │
+              │ │  │ [⚙ Impostazioni PSU...] │
+              │ │  └────────────────────────┘
 """
 import math
 import tkinter as tk
@@ -25,16 +30,22 @@ _F_NORMAL  = ('Helvetica', 9)
 
 
 class CollapsibleSidebar(ttk.Frame):
-    """Barra laterale destra collassabile con sezione COM."""
+    """Barra laterale destra collapsabile con sezione COM e PSU."""
 
     def __init__(self, parent,
                  on_serial_connect,
                  on_serial_disconnect,
+                 on_psu_connect,
+                 on_psu_disconnect,
+                 on_psu_settings,
                  **kwargs):
         super().__init__(parent, **kwargs)
-        self._cb_connect    = on_serial_connect
-        self._cb_disconnect = on_serial_disconnect
-        self._expanded      = False
+        self._cb_connect      = on_serial_connect
+        self._cb_disconnect   = on_serial_disconnect
+        self._cb_psu_connect  = on_psu_connect
+        self._cb_psu_disconnect = on_psu_disconnect
+        self._cb_psu_settings = on_psu_settings
+        self._expanded        = False
 
         self.grid_columnconfigure(0, weight=0)  # strip
         self.grid_columnconfigure(1, weight=0)  # content
@@ -59,7 +70,7 @@ class CollapsibleSidebar(ttk.Frame):
         self._arrow.place(relx=0.5, rely=0.12, anchor='n')
         self._arrow.bind('<Button-1>', lambda e: self.toggle())
 
-        vtxt = tk.Label(strip, text='C\nO\nM', bg=_STRIP_BG,
+        vtxt = tk.Label(strip, text='C\nO\nM\n+\nP\nS\nU', bg=_STRIP_BG,
                         fg='#666666', font=_F_SMALL, cursor='hand2')
         vtxt.place(relx=0.5, rely=0.5, anchor='center')
         vtxt.bind('<Button-1>', lambda e: self.toggle())
@@ -116,6 +127,66 @@ class CollapsibleSidebar(ttk.Frame):
             e.grid(row=i, column=1, sticky='ew', padx=(0, 8), pady=3)
             self._com_vals.append(e)
 
+        # ── Alimentatore PSU ──────────────────────────────────────────────────
+        self._build_psu_section(outer)
+
+    def _build_psu_section(self, outer):
+        """Sezione connessione e misure alimentatore SCPI."""
+        # ── Connessione ───────────────────────────────────────────────────────
+        psu_f = ttk.LabelFrame(outer, text="Alimentatore PSU")
+        psu_f.pack(fill='x', padx=(0, 6), pady=(8, 4))
+        psu_f.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(psu_f, text="Porta:", font=_F_NORMAL).grid(
+            row=0, column=0, sticky='e', padx=(6, 4), pady=(6, 2))
+        self._psu_combo = ttk.Combobox(psu_f, width=10, font=_F_NORMAL)
+        self._psu_combo['values'] = self._get_ports()
+        if self._psu_combo['values']:
+            self._psu_combo.set(self._psu_combo['values'][0])
+        self._psu_combo.grid(row=0, column=1, sticky='ew', padx=(0, 2), pady=(6, 2))
+        tk.Button(psu_f, text='🔄', command=self._refresh_psu_ports,
+                  font=('Segoe UI Emoji', 11), relief='flat', bd=1,
+                  cursor='hand2', padx=2, pady=1
+                  ).grid(row=0, column=2, padx=(0, 6), pady=(6, 2))
+
+        rc = ttk.Frame(psu_f)
+        rc.grid(row=1, column=0, columnspan=3, sticky='ew', padx=6, pady=(2, 4))
+        rc.grid_columnconfigure(0, weight=1)
+        rc.grid_columnconfigure(1, weight=1)
+        ttk.Button(rc, text='Connetti',
+                   command=lambda: self._cb_psu_connect(self._psu_combo.get())
+                   ).grid(row=0, column=0, sticky='ew', padx=(0, 2))
+        ttk.Button(rc, text='Disconnetti',
+                   command=self._cb_psu_disconnect
+                   ).grid(row=0, column=1, sticky='ew', padx=(2, 0))
+
+        # ── Misure PSU ────────────────────────────────────────────────────────
+        meas_f = ttk.LabelFrame(outer, text="Misure PSU")
+        meas_f.pack(fill='x', padx=(0, 6), pady=4)
+        meas_f.grid_columnconfigure(1, weight=1)
+
+        self._psu_vals = {}
+        _rows = [
+            ('tensione', 'Tensione', 'V'),
+            ('corrente', 'Corrente', 'A'),
+            ('potenza',  'Potenza',  'W'),
+        ]
+        for i, (key, label, unit) in enumerate(_rows):
+            ttk.Label(meas_f, text=label, font=_F_NORMAL,
+                      anchor='e', width=8).grid(
+                row=i, column=0, sticky='e', padx=(8, 4), pady=3)
+            e = ttk.Entry(meas_f, state='readonly', justify='right',
+                          width=10, font=_F_NORMAL)
+            e.grid(row=i, column=1, sticky='ew', padx=(0, 2), pady=3)
+            ttk.Label(meas_f, text=unit, font=_F_NORMAL, width=2).grid(
+                row=i, column=2, sticky='w', padx=(0, 6), pady=3)
+            self._psu_vals[key] = e
+
+        ttk.Button(meas_f, text='⚙  Impostazioni PSU…',
+                   command=self._cb_psu_settings
+                   ).grid(row=3, column=0, columnspan=3,
+                          sticky='ew', padx=6, pady=(4, 8))
+
     # ── Toggle espansione ─────────────────────────────────────────────────────
 
     def toggle(self):
@@ -150,6 +221,13 @@ class CollapsibleSidebar(ttk.Frame):
         self._com_combo.set(
             current if current in ports else (ports[0] if ports else ''))
 
+    def _refresh_psu_ports(self):
+        current = self._psu_combo.get()
+        ports = self._get_ports()
+        self._psu_combo['values'] = ports
+        self._psu_combo.set(
+            current if current in ports else (ports[0] if ports else ''))
+
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def update_serial(self, data: dict):
@@ -157,6 +235,16 @@ class CollapsibleSidebar(ttk.Frame):
             v = data.get(key)
             text = f"{v:.2f}" if (v is not None and not math.isnan(v)) else 'N/A'
             e = self._com_vals[i]
+            e.config(state='normal')
+            e.delete(0, 'end')
+            e.insert(0, text)
+            e.config(state='readonly')
+
+    def update_psu(self, tensione, corrente, potenza):
+        """Aggiorna i campi di misura PSU. Valori None → 'N/A'."""
+        for key, val in [('tensione', tensione), ('corrente', corrente), ('potenza', potenza)]:
+            e = self._psu_vals[key]
+            text = f"{val:.3f}" if val is not None else 'N/A'
             e.config(state='normal')
             e.delete(0, 'end')
             e.insert(0, text)
