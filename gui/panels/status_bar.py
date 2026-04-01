@@ -73,11 +73,9 @@ class StatusBar(tk.Frame):
 
         self._sep(3)
 
-        # ── col 4-7: Lorenz, Banco, COM, PSU ─────────────────────────────────
+        # ── col 4-5: Lorenz, Banco ────────────────────────────────────────────
         for col, label, attr in [(4, 'Lorenz', '_led_lorenz'),
-                                 (5, 'Banco',  '_led_banco'),
-                                 (6, 'COM',    '_led_com'),
-                                 (7, 'PSU',    '_led_psu')]:
+                                 (5, 'Banco',  '_led_banco')]:
             g = tk.Frame(self, bg=_BG)
             g.grid(row=0, column=col, padx=8)
             led = tk.Label(g, text='●', bg=_BG, fg='#555555',
@@ -86,20 +84,20 @@ class StatusBar(tk.Frame):
             self._led_label(g, label, col=1)
             setattr(self, attr, led)
 
-        self._sep(8)
+        self._sep(6)
 
-        # ── col 9: Auto ───────────────────────────────────────────────────────
+        # ── col 7: Auto ───────────────────────────────────────────────────────
         g_auto = tk.Frame(self, bg=_BG)
-        g_auto.grid(row=0, column=9, padx=10)
+        g_auto.grid(row=0, column=7, padx=10)
         self._led_auto = tk.Label(g_auto, text='●', bg=_BG, fg='#555555',
                                   font=('Helvetica', 25))
         self._led_auto.grid(row=0, column=0, padx=(0, 3))
         self._lbl_auto = self._led_label(g_auto, 'Auto: OFF', col=1)
-        self._sep(10)
+        self._sep(8)
 
-        # ── col 11: REC ───────────────────────────────────────────────────────
+        # ── col 9: REC ───────────────────────────────────────────────────────
         g_rec = tk.Frame(self, bg=_BG)
-        g_rec.grid(row=0, column=11, padx=10)
+        g_rec.grid(row=0, column=9, padx=10)
         self._led_rec = tk.Label(g_rec, text='●', bg=_BG, fg='#555555',
                                  font=('Helvetica', 25))
         self._led_rec.grid(row=0, column=0, padx=(0, 3))
@@ -125,12 +123,6 @@ class StatusBar(tk.Frame):
 
     def set_banco(self, state: str):
         self._led_banco.config(fg=_LED_COLORS.get(state, '#555555'))
-
-    def set_com(self, state: str):
-        self._led_com.config(fg=_LED_COLORS.get(state, '#555555'))
-
-    def set_psu(self, state: str):
-        self._led_psu.config(fg=_LED_COLORS.get(state, '#555555'))
 
     def set_device_info(self, name=None, address=None):
         if name or address:

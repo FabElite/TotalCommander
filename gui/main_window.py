@@ -41,7 +41,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"Total Commander  —  {VERSION}")
-        self.geometry("965x765")
+        self.geometry("965x754")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -334,7 +334,7 @@ class MainWindow(tk.Tk):
 
     def _check_serial(self):
         connected = self.serial_reader.connected
-        self._status_bar.set_com('ok' if connected else 'err')
+        self._sidebar.set_com('ok' if connected else 'err')
         if connected:
             self._serial_was_connected = True
         elif self._serial_was_connected:
@@ -783,7 +783,7 @@ class MainWindow(tk.Tk):
 
     def _check_psu(self):
         connected = self.psu is not None and self.psu.is_connected()
-        self._status_bar.set_psu('ok' if connected else 'err')
+        self._sidebar.set_psu('ok' if connected else 'err')
         if connected:
             self._psu_was_connected = True
         elif self._psu_was_connected:

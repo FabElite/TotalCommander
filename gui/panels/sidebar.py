@@ -28,6 +28,8 @@ _STRIP_HOV = '#b8b8b8'
 _F_SMALL   = ('Helvetica', 7)
 _F_NORMAL  = ('Helvetica', 9)
 
+_LED_COLORS = {'ok': '#00cc44', 'err': '#cc2222', 'warn': '#cc8800', 'off': '#555555'}
+
 
 class CollapsibleSidebar(ttk.Frame):
     """Barra laterale destra collapsabile con sezione COM e PSU."""
@@ -70,7 +72,7 @@ class CollapsibleSidebar(ttk.Frame):
         self._arrow.place(relx=0.5, rely=0.12, anchor='n')
         self._arrow.bind('<Button-1>', lambda e: self.toggle())
 
-        vtxt = tk.Label(strip, text='C\nO\nM\n+\nP\nS\nU', bg=_STRIP_BG,
+        vtxt = tk.Label(strip, text='E\nX\nT\nR\nA', bg=_STRIP_BG,
                         fg='#666666', font=_F_SMALL, cursor='hand2')
         vtxt.place(relx=0.5, rely=0.5, anchor='center')
         vtxt.bind('<Button-1>', lambda e: self.toggle())
@@ -83,6 +85,23 @@ class CollapsibleSidebar(ttk.Frame):
         outer = ttk.Frame(self)
         self._content = outer
         # Non griddato finché non espanso
+
+        # ── LED di stato COM e PSU ────────────────────────────────────────────
+        led_f = tk.Frame(outer, bg='#1e1e2e', pady=4)
+        led_f.pack(fill='x', padx=(0, 6), pady=(8, 0))
+
+        def _led_pair(parent, col, label, attr):
+            g = tk.Frame(parent, bg='#1e1e2e')
+            g.grid(row=0, column=col, padx=10)
+            led = tk.Label(g, text='●', bg='#1e1e2e', fg='#555555',
+                           font=('Helvetica', 18))
+            led.grid(row=0, column=0, padx=(0, 3))
+            tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
+                     font=('Helvetica', 8)).grid(row=0, column=1)
+            setattr(self, attr, led)
+
+        _led_pair(led_f, 0, 'COM', '_led_com')
+        _led_pair(led_f, 1, 'PSU', '_led_psu')
 
         # ── COM connection ────────────────────────────────────────────────────
         com_f = ttk.LabelFrame(outer, text="Sensore COM")
@@ -249,6 +268,14 @@ class CollapsibleSidebar(ttk.Frame):
             e.delete(0, 'end')
             e.insert(0, text)
             e.config(state='readonly')
+
+    def set_com(self, state: str):
+        """Aggiorna il LED COM nella sidebar."""
+        self._led_com.config(fg=_LED_COLORS.get(state, '#555555'))
+
+    def set_psu(self, state: str):
+        """Aggiorna il LED PSU nella sidebar."""
+        self._led_psu.config(fg=_LED_COLORS.get(state, '#555555'))
 
     def is_expanded(self) -> bool:
         return self._expanded
