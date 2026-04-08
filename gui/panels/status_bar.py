@@ -99,7 +99,7 @@ class StatusBar(tk.Frame):
         g_rec = tk.Frame(self, bg=_BG)
         g_rec.grid(row=0, column=9, padx=10)
         self._led_rec = tk.Label(g_rec, text='●', bg=_BG, fg='#555555',
-                                 font=('Helvetica', 25))
+                                 font=('Helvetica', 35))
         self._led_rec.grid(row=0, column=0, padx=(0, 3))
         self._lbl_rec = self._led_label(g_rec, 'REC', col=1)
 

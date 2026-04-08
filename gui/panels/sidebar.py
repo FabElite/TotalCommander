@@ -87,14 +87,14 @@ class CollapsibleSidebar(ttk.Frame):
         # Non griddato finché non espanso
 
         # ── LED di stato COM e PSU ────────────────────────────────────────────
-        led_f = tk.Frame(outer, bg='#1e1e2e', pady=4)
+        led_f = tk.Frame(outer, bg='#1e1e2e', pady=5)
         led_f.pack(fill='x', padx=(0, 6), pady=(8, 0))
 
         def _led_pair(parent, col, label, attr):
             g = tk.Frame(parent, bg='#1e1e2e')
             g.grid(row=0, column=col, padx=10)
             led = tk.Label(g, text='●', bg='#1e1e2e', fg='#555555',
-                           font=('Helvetica', 18))
+                           font=('Helvetica', 25))
             led.grid(row=0, column=0, padx=(0, 3))
             tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
                      font=('Helvetica', 8)).grid(row=0, column=1)

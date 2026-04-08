@@ -1002,7 +1002,7 @@ class MainWindow(tk.Tk):
                   font=('Helvetica', 9, 'bold')
                   ).grid(row=0, column=0, columnspan=2, padx=16, pady=(14, 4), sticky='w')
 
-        name_entry = ttk.Entry(win, width=30)
+        name_entry = ttk.Entry(win, width=20)
         name_entry.grid(row=1, column=0, columnspan=2, padx=16, pady=(0, 4), sticky='ew')
         name_entry.focus()
 
