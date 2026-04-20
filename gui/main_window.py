@@ -1099,6 +1099,14 @@ class MainWindow(tk.Tk):
         settings_menu.add_command(label="Parametri delta e smoothing…",
                                   command=self._menu_open_settings)
 
+        # ── Dispositivo ──────────────────────────────────────────────────────
+        dispositivo_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Dispositivo", menu=dispositivo_menu)
+        dispositivo_menu.add_command(
+            label="Abilita cadenza simulata…",
+            command=self._cmd_abilita_cadenza_simulata,
+        )
+
         # ── Visualizza ───────────────────────────────────────────────────────
         view_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Visualizza", menu=view_menu)
@@ -1415,6 +1423,158 @@ class MainWindow(tk.Tk):
                 subprocess.Popen(["xdg-open", path])
         except Exception as e:
             logging.error(f"Impossibile aprire la cartella: {e}")
+
+    def _cmd_abilita_cadenza_simulata(self):
+        """
+        Apre un dialog con indirizzo EEPROM (hex, default 0x0549) e valore
+        (0-255, default 70) entrambi editabili. Conferma prima di scrivere.
+        """
+        from tkinter import messagebox
+
+        if not self.ble_manager.get_connection_status():
+            messagebox.showwarning(
+                "Dispositivo non connesso",
+                "Nessun trainer BLE connesso.\n"
+                "Connetti il dispositivo prima di inviare questo comando.",
+                parent=self,
+            )
+            return
+
+        # ── Dialog ───────────────────────────────────────────────────────────
+        win = tk.Toplevel(self)
+        win.title("Scrittura EEPROM — cadenza simulata")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
+        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+
+        pad = dict(padx=14, pady=4)
+
+        # Dispositivo connesso
+        if self._connected_device_name or self._connected_device_address:
+            dev_txt = (f"{self._connected_device_name or '?'}"
+                       f"  [{self._connected_device_address or '?'}]")
+            tk.Label(win, text=dev_txt, font=('Helvetica', 8), fg='#555555'
+                     ).grid(row=0, column=0, columnspan=3,
+                            padx=14, pady=(12, 4), sticky='w')
+
+        # ── Riga indirizzo ────────────────────────────────────────────────────
+        ttk.Label(win, text="Indirizzo EEPROM:").grid(
+            row=1, column=0, sticky='e', **pad)
+        addr_frame = ttk.Frame(win)
+        addr_frame.grid(row=1, column=1, columnspan=2, sticky='w', **pad)
+        tk.Label(addr_frame, text="0x", font=('Courier', 9),
+                 fg='#555555').grid(row=0, column=0)
+        addr_entry = ttk.Entry(addr_frame, width=6, justify='left',
+                               font=('Courier', 9))
+        addr_entry.insert(0, "0549")
+        addr_entry.grid(row=0, column=1)
+        tk.Label(addr_frame, text="(hex, 0000 – FFFF)",
+                 font=('Helvetica', 8), fg='#888888'
+                 ).grid(row=0, column=2, padx=(8, 0))
+
+        # ── Riga valore ───────────────────────────────────────────────────────
+        ttk.Label(win, text="Valore (0 – 255):").grid(
+            row=2, column=0, sticky='e', **pad)
+        spin = ttk.Spinbox(win, from_=0, to=255, increment=1,
+                           width=6, justify='right')
+        spin.set(70)
+        spin.grid(row=2, column=1, sticky='w', **pad)
+
+        hex_var = tk.StringVar(value="0x46")
+        tk.Label(win, textvariable=hex_var, font=('Courier', 9),
+                 fg='#888888').grid(row=2, column=2, sticky='w', padx=(0, 14))
+
+        def _update_hex(*_):
+            try:
+                hex_var.set(f"0x{int(float(spin.get())):02X}")
+            except Exception:
+                hex_var.set("—")
+
+        spin.bind('<KeyRelease>', _update_hex)
+        spin.bind('<<Increment>>', _update_hex)
+        spin.bind('<<Decrement>>', _update_hex)
+
+        # ── Avviso ────────────────────────────────────────────────────────────
+        ttk.Separator(win, orient='horizontal').grid(
+            row=3, column=0, columnspan=3, sticky='ew', padx=14, pady=(6, 4))
+        tk.Label(win,
+                 text="⚠  Supportato solo su alcuni modelli di trainer.\n"
+                      "Su modelli non compatibili il comportamento\n"
+                      "potrebbe essere imprevisto.",
+                 font=('Helvetica', 8), fg='#885500', justify='left'
+                 ).grid(row=4, column=0, columnspan=3,
+                        padx=14, pady=(0, 4), sticky='w')
+        ttk.Separator(win, orient='horizontal').grid(
+            row=5, column=0, columnspan=3, sticky='ew', padx=14, pady=(4, 2))
+
+        # Errore di validazione
+        err_var = tk.StringVar()
+        tk.Label(win, textvariable=err_var, font=('Helvetica', 8),
+                 fg='#CC0000').grid(row=6, column=0, columnspan=3,
+                                    padx=14, pady=(2, 2))
+
+        # ── Pulsanti ──────────────────────────────────────────────────────────
+        def _confirm():
+            # Valida indirizzo
+            try:
+                addr = int(addr_entry.get().strip(), 16)
+                if not (0x0000 <= addr <= 0xFFFF):
+                    raise ValueError
+            except ValueError:
+                err_var.set("Indirizzo non valido: inserire un valore hex tra 0000 e FFFF.")
+                addr_entry.focus()
+                return
+            # Valida valore
+            try:
+                value = int(float(spin.get()))
+                if not (0 <= value <= 255):
+                    raise ValueError
+            except ValueError:
+                err_var.set("Valore non valido: inserire un intero tra 0 e 255.")
+                spin.focus()
+                return
+
+            win.destroy()
+            self.executor.submit(self._cmd_abilita_cadenza_simulata_worker, addr, value)
+
+        bf = ttk.Frame(win)
+        bf.grid(row=7, column=0, columnspan=3, pady=(4, 14))
+        ttk.Button(bf, text="Scrivi",   command=_confirm   ).grid(row=0, column=0, padx=6)
+        ttk.Button(bf, text="Annulla",  command=win.destroy).grid(row=0, column=1, padx=6)
+        win.bind('<Return>', lambda e: _confirm())
+
+    def _cmd_abilita_cadenza_simulata_worker(self, address: int, value: int):
+        """Eseguito nel thread pool: chiama write_eeprom e riporta il risultato al main thread."""
+        try:
+            ok = self._run_ble(
+                self.ble_manager.write_eeprom(address=address, data=bytearray([value]))
+            ).result(timeout=10)
+        except Exception as e:
+            logging.getLogger().error(f"Errore scrittura EEPROM 0x{address:04X}: {e}")
+            ok = False
+
+        self.after(0, self._cmd_abilita_cadenza_simulata_result, ok, address, value)
+
+    def _cmd_abilita_cadenza_simulata_result(self, ok: bool, address: int, value: int):
+        """Chiamato sul main thread per mostrare l'esito all'utente."""
+        from tkinter import messagebox
+        if ok:
+            logging.getLogger().info(
+                f"EEPROM 0x{address:04X} = {value} (0x{value:02X}) — scrittura OK.")
+        else:
+            logging.getLogger().error(
+                f"Scrittura EEPROM 0x{address:04X} = {value} fallita.")
+            messagebox.showerror(
+                "Scrittura fallita",
+                "Impossibile scrivere nell'EEPROM del trainer.\n"
+                "Verifica la connessione BLE e riprova.",
+                parent=self,
+            )
 
     # ── Chiusura ──────────────────────────────────────────────────────────────
 
