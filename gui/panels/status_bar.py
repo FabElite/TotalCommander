@@ -18,6 +18,8 @@ class StatusBar(tk.Frame):
         self.grid_columnconfigure(99, weight=1)
         self._ui_phase = False
         self._rec_phase = False
+        self._rec_elapsed = 0          # secondi dall'avvio della registrazione
+        self._rec_tick_id = None       # id del after() del contatore
         self._build()
 
     # ── Costruzione ───────────────────────────────────────────────────────────
@@ -102,7 +104,12 @@ class StatusBar(tk.Frame):
                                  font=('Helvetica', 35))
         self._led_rec.grid(row=0, column=0, padx=(0, 3))
         self._lbl_rec = self._led_label(g_rec, 'REC', col=1)
+        self._lbl_rec_time = tk.Label(g_rec, text='', bg=_BG, fg='#888899',
+                                      font=('Courier', 8))
+        self._lbl_rec_time.grid(row=0, column=2, columnspan=2,
+                                padx=(10, 0))
 
+        self._sep(10)
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def pulse_ui(self):
@@ -158,12 +165,39 @@ class StatusBar(tk.Frame):
     def set_rec(self, recording: bool):
         """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""
         if not recording:
+            self._stop_rec_tick()
             self._led_rec.config(fg='#555555')
             self._lbl_rec.config(text='REC', fg='#aaaacc')
+            self._lbl_rec_time.config(text='')
         else:
             self._rec_phase = False
+            self._rec_elapsed = 0
             self._led_rec.config(fg='#cc2222')
             self._lbl_rec.config(text='REC', fg='#ff6666')
+            self._start_rec_tick()
+
+    # ── Contatore REC ─────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _fmt_elapsed(seconds: int) -> str:
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        s = seconds % 60
+        return f'{h:02d}:{m:02d}:{s:02d}'
+
+    def _start_rec_tick(self):
+        self._stop_rec_tick()
+        self._rec_tick()
+
+    def _stop_rec_tick(self):
+        if self._rec_tick_id is not None:
+            self.after_cancel(self._rec_tick_id)
+            self._rec_tick_id = None
+
+    def _rec_tick(self):
+        self._lbl_rec_time.config(text=self._fmt_elapsed(self._rec_elapsed))
+        self._rec_elapsed += 1
+        self._rec_tick_id = self.after(1000, self._rec_tick)
 
     def set_auto(self, state: str, label: str):
         self._led_auto.config(fg=_LED_COLORS.get(state, '#555555'))
