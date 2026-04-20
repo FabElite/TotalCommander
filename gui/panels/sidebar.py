@@ -87,8 +87,14 @@ class CollapsibleSidebar(ttk.Frame):
         # Non griddato finché non espanso
 
         # ── LED di stato COM e PSU ────────────────────────────────────────────
-        led_f = tk.Frame(outer, bg='#1e1e2e', pady=5)
-        led_f.pack(fill='x', padx=(0, 6), pady=(8, 0))
+        # --- LED status bar (altezza allineata alla StatusBar) ---
+
+        led_f = tk.Frame(
+            outer,
+            bg='#1e1e2e'
+        )
+        led_f.pack(fill='x', padx=(0, 6), pady=5)
+
 
         def _led_pair(parent, col, label, attr):
             g = tk.Frame(parent, bg='#1e1e2e')
@@ -98,6 +104,9 @@ class CollapsibleSidebar(ttk.Frame):
             led.grid(row=0, column=0, padx=(0, 3))
             tk.Label(g, text=label, bg='#1e1e2e', fg='#aaaacc',
                      font=('Helvetica', 8)).grid(row=0, column=1)
+            # Riga vuota row=1: pareggia l'altezza della StatusBar che ha label su row=1
+            tk.Label(g, text='', bg='#1e1e2e',
+                     font=('Helvetica', 8)).grid(row=1, column=0, columnspan=2, pady=(0, 1))
             setattr(self, attr, led)
 
         _led_pair(led_f, 0, 'COM', '_led_com')
