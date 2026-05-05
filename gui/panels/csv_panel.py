@@ -47,6 +47,7 @@ class CsvPanel(ttk.Frame):
                  stop_rec_on_auto_end,
                  on_before_auto_start=None,
                  on_stop_rec_changed=None,
+                 on_spindown=None,
                  **kwargs):
         super().__init__(parent, **kwargs)
         self._on_dispatch        = on_dispatch
@@ -59,6 +60,7 @@ class CsvPanel(ttk.Frame):
         self._on_emergency_stop  = on_emergency_stop
         self._on_before_auto_start = on_before_auto_start
         self._on_stop_rec_changed  = on_stop_rec_changed
+        self._on_spindown          = on_spindown          # callback(resume_fn) per calibrazione automatica
         self._stop_rec_var         = tk.BooleanVar(value=stop_rec_on_auto_end)
 
         self._log = logging.getLogger(__name__)
@@ -424,10 +426,25 @@ class CsvPanel(ttk.Frame):
                 if self._autoscroll_table.get():
                     self._table.see(command_items[index])
                 self._on_auto_status('ok', 'Auto: ON')
-                self._on_dispatch(command_type, value, speed_banco)
 
-                self._auto_command_id = self.after(
-                    wait_time * 1000, lambda: send_next(absolute_index + 1))
+                if command_type == "spindown" and self._on_spindown is not None:
+                    # La calibrazione è asincrona: non schedula il prossimo comando
+                    # subito. Sarà resume_fn a farlo al termine della calibrazione.
+                    self._log.info("[Auto] Avvio calibrazione spin-down automatica...")
+                    def _resume(success: bool):
+                        if not self.auto_commands_running:
+                            return
+                        if success:
+                            self._log.info("[Auto] Calibrazione completata — sequenza ripresa.")
+                        else:
+                            self._log.warning("[Auto] Calibrazione fallita — sequenza ripresa comunque.")
+                        self._auto_command_id = self.after(0, lambda: send_next(absolute_index + 1))
+                    self._on_spindown(_resume)
+                    # NB: _auto_command_id non viene impostato qui; viene impostato da _resume
+                else:
+                    self._on_dispatch(command_type, value, speed_banco)
+                    self._auto_command_id = self.after(
+                        wait_time * 1000, lambda: send_next(absolute_index + 1))
             else:
                 self.auto_commands_running = False
                 self._stop_countdown()

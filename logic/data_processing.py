@@ -231,15 +231,23 @@ class DataProcessor:
                             log.warning(f"CSV riga {line_num}: meno di 4 colonne, saltata.")
                             continue
 
-                        if row[1].strip():
+                        col1 = row[1].strip()
+                        col2 = row[2].strip()
+                        col3 = row[3].strip()
+
+                        # Parola chiave speciale "spindown" nella prima colonna valore
+                        if col1.lower() == 'spindown':
+                            command_type = "spindown"
+                            value = 0
+                        elif col1:
                             command_type = "livelli"
-                            value = int(row[1].strip())
-                        elif row[2].strip():
+                            value = int(col1)
+                        elif col2:
                             command_type = "potenza"
-                            value = int(row[2].strip())
-                        elif row[3].strip():
+                            value = int(col2)
+                        elif col3:
                             command_type = "simulazione"
-                            value = int(row[3].strip())
+                            value = int(col3)
                         else:
                             log.warning(f"CSV riga {line_num}: nessun comando valido, saltata.")
                             continue
