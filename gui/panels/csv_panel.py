@@ -312,20 +312,33 @@ class CsvPanel(ttk.Frame):
         self._lbl_total.config(text=_fmt(total))
 
     def _start_countdown(self):
+        """
+        Avvia il conto alla rovescia basato su wall-clock (time.monotonic).
+        Non accumula deriva perché legge il tempo reale ad ogni tick
+        invece di decrementare un contatore.
+        """
+        import time as _time
         self._stop_countdown()
+        _t0    = _time.monotonic()
+        _total = float(self.total_test_duration_seconds)
 
         def _tick():
-            if self.auto_commands_running and self.remaining_test_duration_seconds > 0:
-                self.remaining_test_duration_seconds -= 1
-                self._lbl_remaining.config(text=_fmt(self.remaining_test_duration_seconds))
-                self._countdown_id = self.after(1000, _tick)
-            elif self.auto_commands_running:
+            if not self.auto_commands_running:
+                self._countdown_id = None
+                return
+            elapsed   = _time.monotonic() - _t0
+            remaining = max(0.0, _total - elapsed)
+            self.remaining_test_duration_seconds = int(remaining)
+            self._lbl_remaining.config(text=_fmt(remaining))
+            # Aggiorna ogni 500 ms per display fluido; si ferma quando arriva a zero
+            if remaining > 0.5:
+                self._countdown_id = self.after(500, _tick)
+            else:
                 self._lbl_remaining.config(text="00:00:00")
                 self._countdown_id = None
-            else:
-                self._countdown_id = None
 
-        _tick()
+        # Prima chiamata dopo 1 s: il display iniziale è già impostato in start()
+        self._countdown_id = self.after(1000, _tick)
 
     def _stop_countdown(self):
         if self._countdown_id is not None:

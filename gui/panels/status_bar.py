@@ -28,9 +28,15 @@ class StatusBar(tk.Frame):
         tk.Frame(self, bg=_SEP, width=1, height=20).grid(
             row=0, column=col, padx=(10, 14))
 
-    def _led_label(self, parent, text, row=0, col=0, colspan=1):
-        lbl = tk.Label(parent, text=text, bg=_BG, fg='#aaaacc', font=('Helvetica', 8))
-        lbl.grid(row=row, column=col, columnspan=colspan)
+    def _led_label(self, parent, text, row=0, col=0, colspan=1, rowspan=1):
+        lbl = tk.Label(parent, text=text, bg=_BG, fg='#aaaacc',
+                       font=('Helvetica', 8))
+        lbl.grid(
+            row=row,
+            column=col,
+            columnspan=colspan,
+            rowspan=rowspan
+        )
         return lbl
 
     def _build(self):
@@ -102,12 +108,18 @@ class StatusBar(tk.Frame):
         g_rec.grid(row=0, column=9, padx=10)
         self._led_rec = tk.Label(g_rec, text='●', bg=_BG, fg='#555555',
                                  font=('Helvetica', 35))
-        self._led_rec.grid(row=0, column=0, padx=(0, 3))
-        self._lbl_rec = self._led_label(g_rec, 'REC', col=1)
-        self._lbl_rec_time = tk.Label(g_rec, text='', bg=_BG, fg='#888899',
+        # rowspan=2: il LED grande determina l'altezza del frame su entrambe le righe
+        self._led_rec.grid(row=0, column=0, rowspan=2, padx=(0, 3))
+        self._lbl_rec = self._led_label(g_rec, 'REC', col=1, rowspan=2)
+        # Contatore tempo — sempre visibile (--:--:-- a riposo)
+        self._lbl_rec_time = tk.Label(g_rec, text='--:--:--', bg=_BG, fg='#888899',
                                       font=('Courier', 8))
-        self._lbl_rec_time.grid(row=0, column=2, columnspan=2,
-                                padx=(10, 0))
+        self._lbl_rec_time.grid(row=0, column=2, columnspan=2, padx=(10, 0))
+        # Frequenza registrazione — seconda riga, dentro l'altezza già occupata dal LED
+        self._lbl_rec_hz = tk.Label(g_rec, text='-- Hz', bg=_BG, fg='#888899',
+                                    font=('Helvetica', 8))
+        self._lbl_rec_hz.grid(row=1, column=2, columnspan=2,
+                              padx=(10, 0), pady=(0, 1))
 
         self._sep(10)
     # ── API pubblica ──────────────────────────────────────────────────────────
@@ -168,12 +180,13 @@ class StatusBar(tk.Frame):
             self._stop_rec_tick()
             self._led_rec.config(fg='#555555')
             self._lbl_rec.config(text='REC', fg='#aaaacc')
-            self._lbl_rec_time.config(text='')
+            self._lbl_rec_time.config(text='--:--:--', fg='#888899')
         else:
             self._rec_phase = False
             self._rec_elapsed = 0
             self._led_rec.config(fg='#cc2222')
             self._lbl_rec.config(text='REC', fg='#ff6666')
+            self._lbl_rec_time.config(fg='#ffaaaa')
             self._start_rec_tick()
 
     # ── Contatore REC ─────────────────────────────────────────────────────────────────────
@@ -198,6 +211,19 @@ class StatusBar(tk.Frame):
         self._lbl_rec_time.config(text=self._fmt_elapsed(self._rec_elapsed))
         self._rec_elapsed += 1
         self._rec_tick_id = self.after(1000, self._rec_tick)
+
+    def set_rec_hz(self, hz=None, active: bool = False):
+        """
+        Aggiorna la frequenza di campionamento accanto al LED REC.
+        hz=None → non configurata (-- Hz).
+        hz=int  → mostra X Hz; colore chiaro se active, grigio se idle.
+        """
+        if hz is None:
+            self._lbl_rec_hz.config(text='-- Hz', fg='#888899')
+        elif active:
+            self._lbl_rec_hz.config(text=f'{int(hz)} Hz', fg='#ffaaaa')
+        else:
+            self._lbl_rec_hz.config(text=f'{int(hz)} Hz', fg='#888899')
 
     def set_auto(self, state: str, label: str):
         self._led_auto.config(fg=_LED_COLORS.get(state, '#555555'))

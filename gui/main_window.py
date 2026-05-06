@@ -184,6 +184,8 @@ class MainWindow(tk.Tk):
 
         # Aggiorna offset al primo avvio
         self._conn_bar.set_offset(self.lorenz_reader.offset)
+        # Inizializza label Hz REC con la frequenza configurata (sempre visibile)
+        self._status_bar.set_rec_hz(self._rec_hz)
 
         self._create_menu()
         self.periodic_connection_check()
@@ -1129,6 +1131,7 @@ class MainWindow(tk.Tk):
             fname = os.path.basename(self.data_processor.xlsx_filename)
             self._conn_bar.set_rec_state(True, fname)
             self._status_bar.set_rec(True)
+            self._status_bar.set_rec_hz(self._rec_hz, active=True)
             self._rec_tick()
             logging.getLogger().info(f"Registrazione avviata: {fname}")
             win.destroy()
@@ -1151,6 +1154,7 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._rec_timer_id)
             self._rec_timer_id = None
         self._status_bar.set_rec(False)
+        self._status_bar.set_rec_hz(self._rec_hz, active=False)
         fname = os.path.basename(self.data_processor.xlsx_filename) \
             if self.data_processor.xlsx_filename else "—"
         self._conn_bar.set_rec_state(False, f"OK {fname}")
@@ -1334,6 +1338,8 @@ class MainWindow(tk.Tk):
                 self.delta_power_thresholds_pct)
             self._live_panel.set_smoothing_window(n)
             self._save_settings()
+            # Aggiorna immediatamente la label Hz nella status bar
+            self._status_bar.set_rec_hz(hz, active=self.data_processor.is_recording)
             logging.getLogger().info(
                 f"Settings updated - spd ({s1},{s2}) km/h | pwr ({p1},{p2})% | N={n} | REC {hz}Hz")
 

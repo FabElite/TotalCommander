@@ -1,0 +1,16 @@
+{
+    "avg_dim": 20,
+    "invert_speed": false,
+    "offset": 0.025680000223219396,
+    "delta_speed_thresholds_kmh": [
+        1.0,
+        3.0
+    ],
+    "delta_power_thresholds_pct": [
+        2.0,
+        5.0
+    ],
+    "delta_smoothing_window": 5,
+    "rec_hz": 2,
+    "stop_rec_on_auto_end": true
+}
