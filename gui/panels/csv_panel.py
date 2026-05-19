@@ -99,7 +99,7 @@ class CsvPanel(ttk.Frame):
         tb = ttk.Frame(parent)
         tb.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 4))
 
-        ttk.Button(tb, text="Carica CSV",
+        ttk.Button(tb, text="Carica file",
                    command=self.load_csv, width=11
                    ).grid(row=0, column=0, padx=(0, 4))
 
@@ -355,7 +355,14 @@ class CsvPanel(ttk.Frame):
         if self.auto_commands_running:
             self._log.warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
             return
-        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        file_path = filedialog.askopenfilename(
+            filetypes=[
+                ("File sequenza", "*.csv *.xlsx *.xls"),
+                ("CSV", "*.csv"),
+                ("Excel", "*.xlsx *.xls"),
+                ("Tutti i file", "*.*"),
+            ]
+        )
         if not file_path:
             return
 
@@ -370,9 +377,9 @@ class CsvPanel(ttk.Frame):
         for item in self._table.get_children():
             self._table.delete(item)
 
-        commands = DataProcessor.read_brake_commands_from_csv(file_path)
+        commands = DataProcessor.read_brake_commands_from_file(file_path)
         if not commands:
-            self._log.warning("File CSV vuoto o non valido.")
+            self._log.warning("File vuoto o non valido (nessun comando riconosciuto).")
             return
 
         single_cycle_s = 0
