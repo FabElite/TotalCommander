@@ -14,6 +14,24 @@ FLUSH_INTERVAL_SECONDS = 60
 # Dimensione massima del file xlsx prima della rotazione. Default: 50 MB
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
+# ── Schema comandi sequenza automatica ───────────────────────────────────────
+# Formato file (CSV o xlsx):
+#   col 0: comando      → nome del comando (stringa)
+#   col 1: tempo_s      → attesa dopo il comando in secondi (int); per spindown
+#                         il rullo gestisce i propri tempi, il valore è ignorato
+#   col 2: valore_rullo → livello 0-200 / potenza [W] / pendenza [%] (int)
+#   col 3: banco_kmh    → velocità banco [km/h] (float, opzionale)
+#
+# Per aggiungere un nuovo comando: aggiungere una voce qui e il relativo handler
+# in main_window._dispatch_command. Nessun'altra parte del codice va toccata.
+COMMAND_SCHEMA = {
+    #  comando         richiede_valore  richiede_tempo
+    "livelli":     {"requires_valore": True,  "requires_tempo": True},
+    "potenza":     {"requires_valore": True,  "requires_tempo": True},
+    "simulazione": {"requires_valore": True,  "requires_tempo": True},
+    "spindown":    {"requires_valore": False, "requires_tempo": False},
+}
+
 
 class DataProcessor:
     """
@@ -220,81 +238,75 @@ class DataProcessor:
     @staticmethod
     def _parse_command_row(row: list, line_num: int, log) -> tuple | None:
         """
-        Interpreta una riga (lista di stringhe o valori) e restituisce
-        (command_type, value, wait_time, speed_banco) oppure None se la riga
-        va saltata.  Funziona sia per righe CSV che per celle xlsx.
+        Interpreta una riga nel nuovo formato standard:
+          col 0  comando       → nome comando (stringa)
+          col 1  tempo_s       → secondi di attesa / finestra (int)
+          col 2  valore_rullo  → livello / potenza / pendenza  (int, se richiesto)
+          col 3  banco_kmh     → velocità banco km/h           (float, opzionale)
+
+        Restituisce (command_type, tempo_s, valore_rullo, banco_kmh) o None.
         """
-        # Normalizza a stringa e stripa spazi
+        # Normalizza a stringa pulita
         row = [str(c).strip() if c is not None else "" for c in row]
 
-        if len(row) < 4:
-            log.warning(f"Riga {line_num}: meno di 4 colonne, saltata.")
+        if not row or not row[0]:
+            return None  # riga vuota o comando assente
+
+        command_type = row[0].lower()
+
+        if command_type not in COMMAND_SCHEMA:
+            log.warning(f"Riga {line_num}: comando sconosciuto '{row[0]}', saltata.")
             return None
 
-        col1, col2, col3 = row[1], row[2], row[3]
+        schema = COMMAND_SCHEMA[command_type]
 
-        if col1.lower() == 'spindown':
-            command_type, value = "spindown", 0
-        elif col1:
+        # ── tempo_s ────────────────────────────────────────────────────────────
+        tempo_s = 0
+        if len(row) > 1 and row[1]:
             try:
-                command_type, value = "livelli", int(col1)
+                tempo_s = int(float(row[1]))
             except ValueError:
-                log.warning(f"Riga {line_num}: valore livello non numerico '{col1}', saltata.")
-                return None
-        elif col2:
+                log.warning(f"Riga {line_num}: tempo_s non valido '{row[1]}', usato 0.")
+        elif schema["requires_tempo"]:
+            log.warning(f"Riga {line_num}: {command_type} richiede tempo_s, usato 0.")
+
+        # ── valore_rullo ───────────────────────────────────────────────────────
+        valore_rullo = None
+        if len(row) > 2 and row[2]:
             try:
-                command_type, value = "potenza", int(col2)
+                valore_rullo = int(float(row[2]))
             except ValueError:
-                log.warning(f"Riga {line_num}: valore potenza non numerico '{col2}', saltata.")
-                return None
-        elif col3:
-            try:
-                command_type, value = "simulazione", int(col3)
-            except ValueError:
-                log.warning(f"Riga {line_num}: valore simulazione non numerico '{col3}', saltata.")
-                return None
-        else:
-            log.warning(f"Riga {line_num}: nessun comando valido, saltata.")
+                log.warning(f"Riga {line_num}: valore_rullo non valido '{row[2]}', ignorato.")
+        if schema["requires_valore"] and valore_rullo is None:
+            log.warning(f"Riga {line_num}: {command_type} richiede valore_rullo, saltata.")
             return None
 
-        try:
-            wait_time = int(float(row[0]))
-        except (ValueError, IndexError):
-            log.warning(f"Riga {line_num}: tempo attesa non valido '{row[0]}', saltata.")
-            return None
-
-        speed_banco = None
-        if len(row) >= 5 and row[4]:
+        # ── banco_kmh ──────────────────────────────────────────────────────────
+        banco_kmh = None
+        if len(row) > 3 and row[3]:
             try:
-                speed_banco = float(row[4])
+                banco_kmh = float(row[3])
             except ValueError:
-                log.warning(f"Riga {line_num}: velocità banco non valida '{row[4]}', ignorata.")
+                log.warning(f"Riga {line_num}: banco_kmh non valido '{row[3]}', ignorato.")
 
-        return (command_type, value, wait_time, speed_banco)
+        return (command_type, tempo_s, valore_rullo, banco_kmh)
 
     @staticmethod
     def _detect_csv_delimiter(file_path: str) -> str:
         """
         Usa csv.Sniffer per rilevare il delimitatore nelle prime righe.
-        Candidati comuni: ; , TAB |
-        In caso di incertezza fa una votazione manuale sui candidati.
-        Fallback: ';'.
+        Candidati: ; , TAB |  — fallback: ';'.
         """
         candidates = [';', ',', '\t', '|']
         try:
             with open(file_path, mode='r', encoding='utf-8-sig') as f:
                 sample = f.read(4096)
-            # Prova con Sniffer limitando ai candidati noti
             dialect = csv.Sniffer().sniff(sample, delimiters=''.join(candidates))
             return dialect.delimiter
         except csv.Error:
-            # Sniffer non riesce: conta le occorrenze nella prima riga non vuota
             try:
                 with open(file_path, mode='r', encoding='utf-8-sig') as f:
-                    first_line = ""
-                    for line in f:
-                        first_line = line
-                        break
+                    first_line = next(f, "")
                 counts = {d: first_line.count(d) for d in candidates}
                 best = max(counts, key=counts.get)
                 if counts[best] > 0:
@@ -306,18 +318,15 @@ class DataProcessor:
     @staticmethod
     def read_brake_commands_from_file(file_path: str) -> list:
         """
-        Carica la sequenza comandi da file CSV (qualsiasi separatore)
-        oppure da file Excel (.xlsx / .xls).
+        Carica la sequenza comandi da CSV (qualsiasi separatore) o Excel (.xlsx/.xls).
 
-        CSV: il separatore viene rilevato automaticamente (; , TAB |).
-        Excel: legge il foglio attivo dalla riga 2 in poi (riga 1 = intestazione).
+        Formato atteso (riga 1 = intestazione, ignorata):
+          col 0  comando       → livelli | potenza | simulazione | spindown | …
+          col 1  tempo_s       → secondi attesa (int)
+          col 2  valore_rullo  → livello / potenza / pendenza (int, se richiesto)
+          col 3  banco_kmh     → velocità banco km/h (float, opzionale)
 
-        Struttura colonne attesa (identica per entrambi i formati):
-          col 0: tempo_attesa [s]
-          col 1: livello  (0-200) oppure "spindown"
-          col 2: potenza  [W]
-          col 3: simulazione [%]
-          col 4: velocità_banco [km/h]  (opzionale)
+        Restituisce lista di tuple (command_type, tempo_s, valore_rullo, banco_kmh).
         """
         log = logging.getLogger(__name__)
         brake_commands = []
@@ -325,12 +334,9 @@ class DataProcessor:
 
         try:
             if ext in ('.xlsx', '.xls'):
-                # ── Lettura Excel ─────────────────────────────────────────────
                 wb = load_workbook(file_path, read_only=True, data_only=True)
                 ws = wb.active
-                rows_iter = ws.iter_rows(min_row=2, values_only=True)
-                for line_num, raw_row in enumerate(rows_iter, start=2):
-                    # Salta righe completamente vuote
+                for line_num, raw_row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                     if all(c is None or str(c).strip() == "" for c in raw_row):
                         continue
                     result = DataProcessor._parse_command_row(list(raw_row), line_num, log)
@@ -339,15 +345,14 @@ class DataProcessor:
                 wb.close()
 
             else:
-                # ── Lettura CSV con auto-detect del separatore ────────────────
                 delimiter = DataProcessor._detect_csv_delimiter(file_path)
-                log.info(f"Separatore CSV rilevato: '{repr(delimiter)}'")
+                log.info(f"Separatore CSV rilevato: {repr(delimiter)}")
                 with open(file_path, mode='r', encoding='utf-8-sig') as f:
                     reader = csv.reader(f, delimiter=delimiter)
-                    next(reader, None)   # salta intestazione (None evita StopIteration su file vuoto)
+                    next(reader, None)   # salta intestazione
                     for line_num, row in enumerate(reader, start=2):
                         if not any(c.strip() for c in row):
-                            continue    # riga vuota
+                            continue
                         result = DataProcessor._parse_command_row(row, line_num, log)
                         if result:
                             brake_commands.append(result)
@@ -359,8 +364,3 @@ class DataProcessor:
 
         log.info(f"Letti {len(brake_commands)} comandi da '{os.path.basename(file_path)}'")
         return brake_commands
-
-    @staticmethod
-    def read_brake_commands_from_csv(file_path: str) -> list:
-        """Alias mantenuto per retrocompatibilità — delega a read_brake_commands_from_file."""
-        return DataProcessor.read_brake_commands_from_file(file_path)

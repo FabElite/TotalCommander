@@ -138,14 +138,21 @@ class CsvPanel(ttk.Frame):
 
         self._table = ttk.Treeview(
             wrap,
-            columns=("Comando", "Val", "t[s]", "Vb[km/h]"),
+            columns=("#", "Comando", "t[s]", "Valore", "Banco[km/h]"),
             show='headings',
             yscrollcommand=sb.set,
             style='Compact.Treeview',
         )
-        for col, w in [("Comando", 95), ("Val", 70), ("t[s]", 55), ("Vb[km/h]", 85)]:
+        col_defs = [
+            ("#",          28, 'center'),
+            ("Comando",    88, 'center'),
+            ("t[s]",       48, 'center'),
+            ("Valore",     62, 'center'),
+            ("Banco[km/h]",78, 'center'),
+        ]
+        for col, w, anchor in col_defs:
             self._table.heading(col, text=col)
-            self._table.column(col, width=w, anchor='center')
+            self._table.column(col, width=w, anchor=anchor, stretch=False)
         self._table.grid(row=0, column=0, sticky="nsew")
         sb.config(command=self._table.yview)
         self._table.tag_configure('oddrow',     background='lightgrey')
@@ -385,11 +392,11 @@ class CsvPanel(ttk.Frame):
         single_cycle_s = 0
         for i, command in enumerate(commands):
             try:
-                single_cycle_s += int(float(command[2]))
+                single_cycle_s += int(float(command[1]))   # col 1 = tempo_s
             except (ValueError, TypeError, IndexError):
-                self._log.warning(f"Valore tempo non valido nel CSV: {command}")
+                self._log.warning(f"Valore tempo non valido nel file: {command}")
             tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-            self._table.insert("", "end", values=command, tags=(tag,))
+            self._table.insert("", "end", values=(i + 1, *command), tags=(tag,))
 
         self._csv_single_cycle_seconds = single_cycle_s
         self._on_cycles_changed()
@@ -435,8 +442,12 @@ class CsvPanel(ttk.Frame):
             if absolute_index < total_commands and self.auto_commands_running:
                 index = absolute_index % len(commands)
                 cycle = absolute_index // len(commands) + 1
-                command_type, value, wait_time, speed_banco = commands[index]
-                wait_time = int(wait_time)
+                # Treeview restituisce: (#, command_type, tempo_s, valore_rullo, banco_kmh)
+                _num, command_type, tempo_s, valore_rullo, banco_kmh = commands[index]
+                try:
+                    wait_time = int(float(tempo_s))
+                except (ValueError, TypeError):
+                    wait_time = 0
 
                 if absolute_index > 0:
                     prev = (absolute_index - 1) % len(commands)
@@ -448,8 +459,6 @@ class CsvPanel(ttk.Frame):
                 self._on_auto_status('ok', 'Auto: ON')
 
                 if command_type == "spindown" and self._on_spindown is not None:
-                    # La calibrazione è asincrona: non schedula il prossimo comando
-                    # subito. Sarà resume_fn a farlo al termine della calibrazione.
                     self._log.info("[Auto] Avvio calibrazione spin-down automatica...")
                     def _resume(success: bool):
                         if not self.auto_commands_running:
@@ -460,9 +469,8 @@ class CsvPanel(ttk.Frame):
                             self._log.warning("[Auto] Calibrazione fallita — sequenza ripresa comunque.")
                         self._auto_command_id = self.after(0, lambda: send_next(absolute_index + 1))
                     self._on_spindown(_resume)
-                    # NB: _auto_command_id non viene impostato qui; viene impostato da _resume
                 else:
-                    self._on_dispatch(command_type, value, speed_banco)
+                    self._on_dispatch(command_type, valore_rullo, banco_kmh)
                     self._auto_command_id = self.after(
                         wait_time * 1000, lambda: send_next(absolute_index + 1))
             else:
