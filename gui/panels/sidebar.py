@@ -14,7 +14,14 @@ Barra laterale collassabile — lato destro della finestra principale.
               │P│  │ Tensione    12.340 V     │
               │S│  │ Corrente     1.234 A     │
               │U│  │ Potenza     15.230 W     │
-              │ │  │ [⚙ Impostazioni PSU...] │
+              │+│  │ [⚙ Impostazioni PSU...] │
+              │G│  ├─ Gamma Sensor ──────────┤
+              │A│  │ Porta: [COM5▼] [🔄]    │
+              │M│  │ [Connetti] [Disconnetti]│
+              │M│  ├─ Dati Gamma ────────────┤
+              │A│  │ DGS      1234           │
+              │ │  │ TPR       567           │
+              │ │  │ Trigger     0           │
               │ │  └────────────────────────┘
 """
 import math
@@ -32,7 +39,7 @@ _LED_COLORS = {'ok': '#00cc44', 'err': '#cc2222', 'warn': '#cc8800', 'off': '#55
 
 
 class CollapsibleSidebar(ttk.Frame):
-    """Barra laterale destra collapsabile con sezione COM e PSU."""
+    """Barra laterale destra collassabile con sezione COM, PSU e Gamma Sensor."""
 
     def __init__(self, parent,
                  on_serial_connect,
@@ -40,14 +47,18 @@ class CollapsibleSidebar(ttk.Frame):
                  on_psu_connect,
                  on_psu_disconnect,
                  on_psu_settings,
+                 on_gamma_connect,
+                 on_gamma_disconnect,
                  **kwargs):
         super().__init__(parent, **kwargs)
-        self._cb_connect      = on_serial_connect
-        self._cb_disconnect   = on_serial_disconnect
-        self._cb_psu_connect  = on_psu_connect
-        self._cb_psu_disconnect = on_psu_disconnect
-        self._cb_psu_settings = on_psu_settings
-        self._expanded        = False
+        self._cb_connect          = on_serial_connect
+        self._cb_disconnect       = on_serial_disconnect
+        self._cb_psu_connect      = on_psu_connect
+        self._cb_psu_disconnect   = on_psu_disconnect
+        self._cb_psu_settings     = on_psu_settings
+        self._cb_gamma_connect    = on_gamma_connect
+        self._cb_gamma_disconnect = on_gamma_disconnect
+        self._expanded            = False
 
         self.grid_columnconfigure(0, weight=0)  # strip
         self.grid_columnconfigure(1, weight=0)  # content
@@ -109,8 +120,9 @@ class CollapsibleSidebar(ttk.Frame):
                      font=('Helvetica', 8)).grid(row=1, column=0, columnspan=2, pady=(0, 1))
             setattr(self, attr, led)
 
-        _led_pair(led_f, 0, 'COM', '_led_com')
-        _led_pair(led_f, 1, 'PSU', '_led_psu')
+        _led_pair(led_f, 0, 'COM',   '_led_com')
+        _led_pair(led_f, 1, 'PSU',   '_led_psu')
+        _led_pair(led_f, 2, 'Gamma', '_led_gamma')
 
         # ── COM connection ────────────────────────────────────────────────────
         com_f = ttk.LabelFrame(outer, text="Sensore COM")
@@ -215,6 +227,62 @@ class CollapsibleSidebar(ttk.Frame):
                    ).grid(row=3, column=0, columnspan=3,
                           sticky='ew', padx=6, pady=(4, 8))
 
+        # ── Gamma Sensor ──────────────────────────────────────────────────────
+        self._build_gamma_section(outer)
+
+    def _build_gamma_section(self, outer):
+        """Sezione connessione e dati Gamma Sensor."""
+        # ── Connessione ───────────────────────────────────────────────────────
+        gamma_f = ttk.LabelFrame(outer, text="Gamma Sensor")
+        gamma_f.pack(fill='x', padx=(0, 6), pady=(8, 4))
+        gamma_f.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(gamma_f, text="Porta:", font=_F_NORMAL).grid(
+            row=0, column=0, sticky='e', padx=(6, 4), pady=(6, 2))
+        self._gamma_combo = ttk.Combobox(gamma_f, width=10, font=_F_NORMAL)
+        self._gamma_combo['values'] = self._get_ports()
+        if self._gamma_combo['values']:
+            self._gamma_combo.set(self._gamma_combo['values'][0])
+        self._gamma_combo.grid(row=0, column=1, sticky='ew', padx=(0, 2), pady=(6, 2))
+        tk.Button(gamma_f, text='🔄', command=self._refresh_gamma_ports,
+                  font=('Segoe UI Emoji', 11), relief='flat', bd=1,
+                  cursor='hand2', padx=2, pady=1
+                  ).grid(row=0, column=2, padx=(0, 6), pady=(6, 2))
+
+        rc = ttk.Frame(gamma_f)
+        rc.grid(row=1, column=0, columnspan=3, sticky='ew', padx=6, pady=(2, 6))
+        rc.grid_columnconfigure(0, weight=1)
+        rc.grid_columnconfigure(1, weight=1)
+        ttk.Button(rc, text='Connetti',
+                   command=lambda: self._cb_gamma_connect(self._gamma_combo.get())
+                   ).grid(row=0, column=0, sticky='ew', padx=(0, 2))
+        ttk.Button(rc, text='Disconnetti',
+                   command=self._cb_gamma_disconnect
+                   ).grid(row=0, column=1, sticky='ew', padx=(2, 0))
+
+        # ── Dati Gamma ────────────────────────────────────────────────────────
+        data_f = ttk.LabelFrame(outer, text="Dati Gamma")
+        data_f.pack(fill='x', padx=(0, 6), pady=4)
+        data_f.grid_columnconfigure(1, weight=1)
+
+        self._gamma_vals = {}
+        _rows = [
+            ('dgs',     'DGS',     ''),
+            ('tpr',     'TPR',     ''),
+            ('trigger', 'Trigger', ''),
+        ]
+        for i, (key, label, unit) in enumerate(_rows):
+            ttk.Label(data_f, text=label, font=_F_NORMAL,
+                      anchor='e', width=8).grid(
+                row=i, column=0, sticky='e', padx=(8, 4), pady=3)
+            e = ttk.Entry(data_f, state='readonly', justify='right',
+                          width=10, font=_F_NORMAL)
+            e.grid(row=i, column=1, sticky='ew', padx=(0, 2), pady=3)
+            if unit:
+                ttk.Label(data_f, text=unit, font=_F_NORMAL, width=2).grid(
+                    row=i, column=2, sticky='w', padx=(0, 6), pady=3)
+            self._gamma_vals[key] = e
+
     # ── Toggle espansione ─────────────────────────────────────────────────────
 
     def toggle(self):
@@ -256,6 +324,13 @@ class CollapsibleSidebar(ttk.Frame):
         self._psu_combo.set(
             current if current in ports else (ports[0] if ports else ''))
 
+    def _refresh_gamma_ports(self):
+        current = self._gamma_combo.get()
+        ports = self._get_ports()
+        self._gamma_combo['values'] = ports
+        self._gamma_combo.set(
+            current if current in ports else (ports[0] if ports else ''))
+
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def update_serial(self, data: dict):
@@ -278,6 +353,26 @@ class CollapsibleSidebar(ttk.Frame):
             e.insert(0, text)
             e.config(state='readonly')
 
+    def update_gamma(self, sample):
+        """
+        Aggiorna i campi di visualizzazione Gamma Sensor.
+        sample può essere un GammaSample oppure None (→ mostra 'N/A').
+        """
+        if sample is None:
+            vals = {'dgs': 'N/A', 'tpr': 'N/A', 'trigger': 'N/A'}
+        else:
+            vals = {
+                'dgs':     str(sample.dgs),
+                'tpr':     str(sample.tpr),
+                'trigger': str(sample.trigger),
+            }
+        for key, text in vals.items():
+            e = self._gamma_vals[key]
+            e.config(state='normal')
+            e.delete(0, 'end')
+            e.insert(0, text)
+            e.config(state='readonly')
+
     def set_com(self, state: str):
         """Aggiorna il LED COM nella sidebar."""
         self._led_com.config(fg=_LED_COLORS.get(state, '#555555'))
@@ -285,6 +380,10 @@ class CollapsibleSidebar(ttk.Frame):
     def set_psu(self, state: str):
         """Aggiorna il LED PSU nella sidebar."""
         self._led_psu.config(fg=_LED_COLORS.get(state, '#555555'))
+
+    def set_gamma(self, state: str):
+        """Aggiorna il LED Gamma nella sidebar."""
+        self._led_gamma.config(fg=_LED_COLORS.get(state, '#555555'))
 
     def is_expanded(self) -> bool:
         return self._expanded

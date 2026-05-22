@@ -1,7 +1,7 @@
 {
     "avg_dim": 20,
     "invert_speed": false,
-    "offset": 0.025680000223219396,
+    "offset": 0.0,
     "delta_speed_thresholds_kmh": [
         1.0,
         3.0

@@ -44,7 +44,8 @@ class DataProcessor:
         "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
         "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz",
         "Valore1", "Valore2", "Valore3", "Valore4",
-        "tensione_psu", "corrente_psu", "potenza_psu"
+        "tensione_psu", "corrente_psu", "potenza_psu",
+        "dgs_gamma", "tpr_gamma", "trigger_gamma",
     ]
 
     def __init__(self):
@@ -165,6 +166,9 @@ class DataProcessor:
             data.get("tensione_psu"),
             data.get("corrente_psu"),
             data.get("potenza_psu"),
+            data.get("dgs_gamma"),
+            data.get("tpr_gamma"),
+            data.get("trigger_gamma"),
         ]
 
         try:

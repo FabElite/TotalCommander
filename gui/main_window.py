@@ -20,6 +20,7 @@ from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
 from shared_lib.SerialDataLib import SerialDataReader
+from shared_lib.GammaLib import GammaSensorReader, ConnectionState as GammaConnectionState
 from shared_lib.ScpiAlimentatore import Alimentatore, SCPIError, SCPINotConnectedError
 from logic.data_processing import DataProcessor
 from logic import settings_manager
@@ -56,6 +57,7 @@ class MainWindow(tk.Tk):
         self.modbus         = ModbusBancoCollaudo()
         self.lorenz_reader  = LorenzReader()
         self.serial_reader  = SerialDataReader(baudrate=115200)
+        self.gamma_reader   = GammaSensorReader(auto_reconnect=False)
         self.psu: Alimentatore | None = None   # creato su connect, None = mai connesso
         self.executor       = ThreadPoolExecutor(max_workers=5)
 
@@ -65,6 +67,7 @@ class MainWindow(tk.Tk):
         self._serial_was_connected = False
         self._modbus_was_connected = False
         self._psu_was_connected    = False
+        self._gamma_was_connected  = False
         self._connected_device_name    = None
         self._connected_device_address = None
 
@@ -85,8 +88,6 @@ class MainWindow(tk.Tk):
 
         # ── Timer ids ─────────────────────────────────────────────────────────
         self.periodic_check_id = None
-        self.lorenz_update_id  = None
-        self.serial_update_id  = None
         self.psu_update_id     = None
         self._heartbeat_reset_id = None
         self._last_packet_time   = None
@@ -178,6 +179,8 @@ class MainWindow(tk.Tk):
             on_psu_connect       = self._psu_connect,
             on_psu_disconnect    = self._psu_disconnect,
             on_psu_settings      = self._open_psu_settings,
+            on_gamma_connect     = self._gamma_connect,
+            on_gamma_disconnect  = self._gamma_disconnect,
         )
         self._sidebar.grid(row=0, column=1, sticky="ns")
 
@@ -275,6 +278,7 @@ class MainWindow(tk.Tk):
         self._check_serial()
         self._check_modbus()
         self._check_psu()
+        self._check_gamma()
         self.periodic_check_id = self.after(1000, self.periodic_connection_check)
 
     async def _async_check_ble(self):
@@ -329,7 +333,7 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("=" * 55)
             logging.getLogger().warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
             logging.getLogger().warning("=" * 55)
-            self._stop_lorenz_update()
+            self.lorenz_reader.on_data = None
             self._lorenz_was_connected = False
 
     def _check_serial(self):
@@ -341,7 +345,7 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("=" * 55)
             logging.getLogger().warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
             logging.getLogger().warning("=" * 55)
-            self._stop_serial_update()
+            self.serial_reader.on_data = None
             self._serial_was_connected = False
 
     def _check_modbus(self, from_user_action=False):
@@ -630,30 +634,22 @@ class MainWindow(tk.Tk):
     def _on_lorenz_connect_result(self, ok):
         if ok:
             logging.getLogger().info("Lorenz connesso")
-            self._start_lorenz_update()
+            # Wire callback: emessa dal polling thread a output_rate_hz,
+            # instradata al main thread via after(0, ...).
+            self.lorenz_reader.on_data = lambda d: self.after(0, self._on_lorenz_data, d)
         else:
             logging.getLogger().warning("Lorenz non connesso.")
 
-    def _start_lorenz_update(self):
-        self._stop_lorenz_update()
-        self._lorenz_update_tick()
-
-    def _lorenz_update_tick(self):
-        data = self.lorenz_reader.get_data()
+    def _on_lorenz_data(self, data: dict):
+        """Riceve i dati Lorenz sul main thread (via after). Aggiorna live panel e _latest_data."""
         self._latest_data.update(data)
         self._live_panel.update_lorenz(data)
         self._conn_bar.set_offset(self.lorenz_reader.offset)
-        self.lorenz_update_id = self.after(500, self._lorenz_update_tick)
-
-    def _stop_lorenz_update(self):
-        if self.lorenz_update_id is not None:
-            self.after_cancel(self.lorenz_update_id)
-            self.lorenz_update_id = None
 
     def _lorenz_disconnect(self):
         logging.getLogger().info("Disconnessione Lorenz in corso...")
         self._lorenz_was_connected = False
-        self._stop_lorenz_update()
+        self.lorenz_reader.on_data = None   # ferma i callback prima della chiusura
         self.executor.submit(self._lorenz_disconnect_worker)
 
     def _lorenz_disconnect_worker(self):
@@ -746,32 +742,24 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._serial_connect_worker, port)
 
     def _serial_connect_worker(self, port):
+        # Wire callback PRIMA di open_connection: il reader thread parte subito
+        self.serial_reader.on_data = lambda d: self.after(0, self._on_serial_data, d)
         ok = self.serial_reader.open_connection(port)
         if ok:
             self.after(0, logging.getLogger().info, "Sensore seriale connesso")
-            self.after(0, self._start_serial_update)
         else:
+            self.serial_reader.on_data = None   # connessione fallita, pulisci
             self.after(0, logging.getLogger().warning, "Sensore seriale non connesso.")
 
-    def _start_serial_update(self):
-        self._stop_serial_update()
-        self._serial_update_tick()
-
-    def _serial_update_tick(self):
-        data = self.serial_reader.get_data()
+    def _on_serial_data(self, data: dict):
+        """Riceve i dati COM sul main thread (via after). Aggiorna sidebar e _latest_data."""
         self._latest_data.update(data)
         self._sidebar.update_serial(data)
-        self.serial_update_id = self.after(500, self._serial_update_tick)
-
-    def _stop_serial_update(self):
-        if self.serial_update_id is not None:
-            self.after_cancel(self.serial_update_id)
-            self.serial_update_id = None
 
     def _serial_disconnect(self):
         logging.getLogger().info("Disconnessione sensore seriale in corso...")
         self._serial_was_connected = False
-        self._stop_serial_update()
+        self.serial_reader.on_data = None   # ferma i callback prima della chiusura
         self.executor.submit(self._serial_disconnect_worker)
 
     def _serial_disconnect_worker(self):
@@ -968,6 +956,61 @@ class MainWindow(tk.Tk):
         ttk.Button(win, text="Chiudi", command=win.destroy).grid(
             row=11, column=0, columnspan=3, pady=(6, 14))
 
+    # ── Gamma Sensor ──────────────────────────────────────────────────────────
+
+    def _check_gamma(self):
+        connected = self.gamma_reader.is_connected
+        self._sidebar.set_gamma('ok' if connected else 'err')
+        if connected:
+            self._gamma_was_connected = True
+        elif self._gamma_was_connected:
+            logging.getLogger().warning("=" * 55)
+            logging.getLogger().warning("*** DISCONNESSIONE GAMMA - connessione persa ***")
+            logging.getLogger().warning("=" * 55)
+            self.gamma_reader.on_sample = None
+            self._gamma_was_connected = False
+            self.after(0, self._sidebar.update_gamma, None)
+
+    def _gamma_connect(self, port: str):
+        if not port:
+            logging.getLogger().warning("Seleziona una porta COM prima di connettere il Gamma Sensor.")
+            return
+        logging.getLogger().info(f"Connessione Gamma Sensor su {port}...")
+        self.executor.submit(self._gamma_connect_worker, port)
+
+    def _gamma_connect_worker(self, port):
+        # Wire callback PRIMA di connect: il reader thread parte subito alla connessione
+        self.gamma_reader.on_sample = lambda s: self.after(0, self._on_gamma_sample, s)
+        ok = self.gamma_reader.connect(port)
+        if ok:
+            self.after(0, logging.getLogger().info,
+                       f"Gamma Sensor connesso su {port}")
+        else:
+            self.gamma_reader.on_sample = None   # connessione fallita, pulisci
+            self.after(0, logging.getLogger().warning,
+                       f"Gamma Sensor: connessione a {port} fallita.")
+
+    def _on_gamma_sample(self, sample):
+        """Riceve un campione Gamma sul main thread (via after). Aggiorna sidebar e _latest_data."""
+        data = {
+            'dgs_gamma':     sample.dgs,
+            'tpr_gamma':     sample.tpr,
+            'trigger_gamma': sample.trigger,
+        }
+        self._latest_data.update(data)
+        self._sidebar.update_gamma(sample)
+
+    def _gamma_disconnect(self):
+        logging.getLogger().info("Disconnessione Gamma Sensor in corso...")
+        self._gamma_was_connected = False
+        self.gamma_reader.on_sample = None   # ferma i callback prima della chiusura
+        self.executor.submit(self._gamma_disconnect_worker)
+
+    def _gamma_disconnect_worker(self):
+        self.gamma_reader.disconnect()
+        self.after(0, logging.getLogger().info, "Gamma Sensor disconnesso.")
+        self.after(0, self._sidebar.update_gamma, None)
+
     # ── Emergency stop ────────────────────────────────────────────────────────
 
     def _emergency_stop(self):
@@ -1067,11 +1110,10 @@ class MainWindow(tk.Tk):
         logging.getLogger().info(f"Registrazione terminata: {fname}")
 
     def _rec_tick(self):
-        """Timer fisso per la scrittura dati. Indipendente da BLE."""
+        """Timer fisso per la scrittura dati. I callback dei sensori tengono
+        _latest_data sempre aggiornato; qui basta scattare uno snapshot atomico."""
         if self.data_processor.is_recording:
-            lorenz = self.lorenz_reader.get_data()
-            serial = self.serial_reader.get_data() if self.serial_reader.connected else {}
-            snapshot = {**self._latest_data, **lorenz, **serial}
+            snapshot = dict(self._latest_data)   # copia shallow sul main thread
             self.executor.submit(self.data_processor.handle_bike_data, snapshot)
         interval_ms = max(100, int(1000 / self._rec_hz))
         self._rec_timer_id = self.after(interval_ms, self._rec_tick)
@@ -1357,6 +1399,12 @@ class MainWindow(tk.Tk):
         body("Connette un sensore seriale aggiuntivo (fino a 4 valori numerici separati "
              "da ';'). Il pannello è collassabile con il pulsante '+COM'.")
 
+        h2("Gamma Sensor")
+        body("Connette il sensore Gamma via porta seriale. Legge continuamente DGS, TPR e Trigger "
+             "dal sensore con parsing hardware del protocollo frame (header FF FF, CRC, footer 55 AA). "
+             "I valori sono visualizzati nel pannello laterale e vengono registrati automaticamente "
+             "nelle colonne dgs_gamma, tpr_gamma, trigger_gamma del file Excel se la registrazione è attiva.")
+
         h1("● Comandi e Sequenza Automatica")
 
         h2("Comandi manuali")
@@ -1581,8 +1629,6 @@ class MainWindow(tk.Tk):
     def on_closing(self):
         if self.periodic_check_id:
             self.after_cancel(self.periodic_check_id);  self.periodic_check_id = None
-        if self.lorenz_update_id:
-            self.after_cancel(self.lorenz_update_id);   self.lorenz_update_id = None
         if self._ui_pulse_id:
             self.after_cancel(self._ui_pulse_id);       self._ui_pulse_id = None
         if self._rec_timer_id:
@@ -1591,7 +1637,10 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._heartbeat_reset_id); self._heartbeat_reset_id = None
         if self.psu_update_id:
             self.after_cancel(self.psu_update_id);      self.psu_update_id = None
-        self._stop_serial_update()
+        # Blocca i callback dei sensori prima dello shutdown asincrono
+        self.lorenz_reader.on_data   = None
+        self.serial_reader.on_data   = None
+        self.gamma_reader.on_sample  = None
         self._csv_panel.stop()
 
         self.protocol("WM_DELETE_WINDOW", lambda: None)
@@ -1698,6 +1747,8 @@ class MainWindow(tk.Tk):
                 self.lorenz_reader.close_connection()
             if self.serial_reader.connected:
                 self.serial_reader.close_connection()
+            if self.gamma_reader.is_connected:
+                self.gamma_reader.disconnect()
             if self.modbus.is_connesso():
                 self.modbus.disconnetti()
             if self.psu is not None and self.psu.is_connected():
