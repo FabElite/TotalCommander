@@ -48,6 +48,7 @@ class CsvPanel(ttk.Frame):
                  on_before_auto_start=None,
                  on_stop_rec_changed=None,
                  on_spindown=None,
+                 on_save=None,
                  **kwargs):
         super().__init__(parent, **kwargs)
         self._on_dispatch        = on_dispatch
@@ -60,7 +61,8 @@ class CsvPanel(ttk.Frame):
         self._on_emergency_stop  = on_emergency_stop
         self._on_before_auto_start = on_before_auto_start
         self._on_stop_rec_changed  = on_stop_rec_changed
-        self._on_spindown          = on_spindown          # callback(resume_fn) per calibrazione automatica
+        self._on_spindown          = on_spindown
+        self._on_save              = on_save
         self._stop_rec_var         = tk.BooleanVar(value=stop_rec_on_auto_end)
 
         self._log = logging.getLogger(__name__)
@@ -138,7 +140,7 @@ class CsvPanel(ttk.Frame):
 
         self._table = ttk.Treeview(
             wrap,
-            columns=("#", "Comando", "t[s]", "Valore", "Banco[km/h]"),
+            columns=("#", "Comando", "t[s]", "Valore", "Banco[km/h]", "Etichetta"),
             show='headings',
             yscrollcommand=sb.set,
             style='Compact.Treeview',
@@ -149,6 +151,7 @@ class CsvPanel(ttk.Frame):
             ("t[s]",       48, 'center'),
             ("Valore",     62, 'center'),
             ("Banco[km/h]",78, 'center'),
+            ("Etichetta",  90, 'w'),
         ]
         for col, w, anchor in col_defs:
             self._table.heading(col, text=col)
@@ -442,8 +445,8 @@ class CsvPanel(ttk.Frame):
             if absolute_index < total_commands and self.auto_commands_running:
                 index = absolute_index % len(commands)
                 cycle = absolute_index // len(commands) + 1
-                # Treeview restituisce: (#, command_type, tempo_s, valore_rullo, banco_kmh)
-                _num, command_type, tempo_s, valore_rullo, banco_kmh = commands[index]
+                # Treeview restituisce: (#, command_type, tempo_s, valore_rullo, banco_kmh, etichetta)
+                _num, command_type, tempo_s, valore_rullo, banco_kmh, etichetta = commands[index]
                 try:
                     wait_time = int(float(tempo_s))
                 except (ValueError, TypeError):
@@ -458,17 +461,34 @@ class CsvPanel(ttk.Frame):
                     self._table.see(command_items[index])
                 self._on_auto_status('ok', 'Auto: ON')
 
-                if command_type == "spindown" and self._on_spindown is not None:
+                if command_type == "save" and self._on_save is not None:
+                    label_str = f"'{etichetta}'" if etichetta else "(nessuna)"
+                    self._log.info(
+                        f"[Auto] Raccolta media {label_str} — finestra {wait_time}s...")
+                    self._on_auto_status('ok', 'Auto: SAVE…')
+                    def _resume_save(success: bool, _ai=absolute_index):
+                        if not self.auto_commands_running:
+                            return
+                        if success:
+                            self._log.info("[Auto] Media salvata nel file sintesi.")
+                        else:
+                            self._log.warning("[Auto] Raccolta interrotta — riga non salvata.")
+                        self._auto_command_id = self.after(
+                            0, lambda: send_next(_ai + 1))
+                    self._on_save(wait_time, str(etichetta), _resume_save)
+
+                elif command_type == "spindown" and self._on_spindown is not None:
                     self._log.info("[Auto] Avvio calibrazione spin-down automatica...")
-                    def _resume(success: bool):
+                    def _resume(success: bool, _ai=absolute_index):
                         if not self.auto_commands_running:
                             return
                         if success:
                             self._log.info("[Auto] Calibrazione completata — sequenza ripresa.")
                         else:
                             self._log.warning("[Auto] Calibrazione fallita — sequenza ripresa comunque.")
-                        self._auto_command_id = self.after(0, lambda: send_next(absolute_index + 1))
+                        self._auto_command_id = self.after(0, lambda: send_next(_ai + 1))
                     self._on_spindown(_resume)
+
                 else:
                     self._on_dispatch(command_type, valore_rullo, banco_kmh)
                     self._auto_command_id = self.after(

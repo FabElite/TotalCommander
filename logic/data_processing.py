@@ -30,6 +30,7 @@ COMMAND_SCHEMA = {
     "potenza":     {"requires_valore": True,  "requires_tempo": True},
     "simulazione": {"requires_valore": True,  "requires_tempo": True},
     "spindown":    {"requires_valore": False, "requires_tempo": False},
+    "save":        {"requires_valore": False, "requires_tempo": True},
 }
 
 
@@ -293,7 +294,14 @@ class DataProcessor:
             except ValueError:
                 log.warning(f"Riga {line_num}: banco_kmh non valido '{row[3]}', ignorato.")
 
-        return (command_type, tempo_s, valore_rullo, banco_kmh)
+        # ── etichetta (col 4, opzionale) ────────────────────────────────────
+        # Usata dal comando 'save' come label descrittiva della riga di sintesi.
+        # Per tutti gli altri comandi è inclusa nel tuple ma ignorata.
+        etichetta = ""
+        if len(row) > 4 and row[4]:
+            etichetta = str(row[4]).strip()
+
+        return (command_type, tempo_s, valore_rullo, banco_kmh, etichetta)
 
     @staticmethod
     def _detect_csv_delimiter(file_path: str) -> str:
@@ -368,3 +376,175 @@ class DataProcessor:
 
         log.info(f"Letti {len(brake_commands)} comandi da '{os.path.basename(file_path)}'")
         return brake_commands
+
+
+# ── SintesiWriter ─────────────────────────────────────────────────────────────
+
+class SintesiWriter:
+    """
+    Scrive il file di sintesi delle medie prodotte dal comando 'save'.
+
+    Un file per sessione: creato alla prima riga, nominato in base alla
+    sessione REC attiva (se presente) oppure con timestamp autonomo.
+    Chiamare reset() a ogni nuova sessione REC così il successivo save
+    apre un file collegato al nuovo nome sessione.
+
+    Colonne fissse di metadato:
+        n_riga | timestamp | durata_media_s | etichetta | rec_file
+
+    Seguite dalle stesse colonne dati di DataProcessor.HEADERS
+    (stesso ordine → i due file sono confrontabili direttamente).
+    """
+
+    # Colonne metadato seguite da tutte le colonne dati (senza timestamp/s
+    # di DataProcessor che qui sono sostituiti dai metadati propri).
+    HEADERS = [
+        "n_riga", "timestamp", "durata_media_s", "etichetta", "rec_file",
+        "speed_trainer", "cadence_trainer", "power_trainer",
+        "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
+        "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz",
+        "Valore1", "Valore2", "Valore3", "Valore4",
+        "tensione_psu", "corrente_psu", "potenza_psu",
+        "dgs_gamma", "tpr_gamma", "trigger_gamma",
+    ]
+
+    # Mappa chiave _latest_data → nome colonna in HEADERS
+    _KEY_MAP = {
+        "Spd":              "speed_trainer",
+        "Cad":              "cadence_trainer",
+        "Pwr":              "power_trainer",
+        "TotDist":          "total_distance_trainer",
+        "Res":              "resistance_trainer",
+        "ElaTime":          "elapsed_time_trainer",
+        "offset_lorenz":    "offset_lorenz",
+        "speed_avg_lorenz": "speed_avg_lorenz",
+        "torque_lorenz":    "torque_lorenz",
+        "power_lorenz":     "power_lorenz",
+        "Valore1":          "Valore1",
+        "Valore2":          "Valore2",
+        "Valore3":          "Valore3",
+        "Valore4":          "Valore4",
+        "tensione_psu":     "tensione_psu",
+        "corrente_psu":     "corrente_psu",
+        "potenza_psu":      "potenza_psu",
+        "dgs_gamma":        "dgs_gamma",
+        "tpr_gamma":        "tpr_gamma",
+        "trigger_gamma":    "trigger_gamma",
+    }
+
+    # Colonne dati nell'ordine atteso (sottoinsieme di HEADERS senza metadati)
+    _DATA_COLS = HEADERS[5:]
+
+    def __init__(self, output_dir: str = "output"):
+        self._log        = logging.getLogger(__name__)
+        self._output_dir = output_dir
+        self._filename: str | None = None
+        self._row_count  = 0
+        self._lock       = threading.Lock()
+
+    # ── API pubblica ──────────────────────────────────────────────────────────
+
+    def reset(self):
+        """
+        Resetta per una nuova sessione: il prossimo save creerà un nuovo file.
+        Chiamare da MainWindow ogni volta che parte una sessione REC.
+        """
+        self._filename  = None
+        self._row_count = 0
+        self._log.debug("SintesiWriter resettato — prossimo save creerà nuovo file.")
+
+    def add_row(self, samples: list, durata_s: int,
+                etichetta: str = "", rec_file: str = "",
+                session_name: str | None = None):
+        """
+        Calcola la media dei campioni raccolti e scrive una riga nel file sintesi.
+
+        samples     : lista di dict _latest_data acquisiti durante la finestra
+        durata_s    : durata nominale della finestra (secondi)
+        etichetta   : label descrittiva (col 4 del CSV save)
+        rec_file    : nome del file bike_data in corso (per tracciabilità)
+        session_name: usato solo alla prima chiamata per nominare il file
+        """
+        if not samples:
+            self._log.warning("save: nessun campione raccolto — riga non scritta.")
+            return
+
+        with self._lock:
+            try:
+                path = self._ensure_file(session_name)
+            except Exception:
+                return   # errore già loggato in _ensure_file
+
+            # ── Calcola medie ─────────────────────────────────────────────────
+            averaged: dict[str, float | None] = {}
+            for raw_key, col_name in self._KEY_MAP.items():
+                vals = []
+                for s in samples:
+                    v = s.get(raw_key)
+                    if v is not None:
+                        try:
+                            vals.append(float(v))
+                        except (TypeError, ValueError):
+                            pass
+                averaged[col_name] = (
+                    round(sum(vals) / len(vals), 4) if vals else None
+                )
+
+            # ── Costruisci riga ───────────────────────────────────────────────
+            self._row_count += 1
+            ts  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            row = [
+                self._row_count,
+                ts,
+                durata_s,
+                etichetta,
+                rec_file,
+            ] + [averaged.get(col) for col in self._DATA_COLS]
+
+            # ── Scrivi su disco ───────────────────────────────────────────────
+            try:
+                wb = load_workbook(path)
+                ws = wb.active
+                ws.append(row)
+                wb.save(path)
+                self._log.info(
+                    f"Sintesi riga {self._row_count} salvata — "
+                    f"etichetta='{etichetta}', {len(samples)} campioni, {durata_s}s"
+                )
+            except Exception as e:
+                self._log.error(f"Errore scrittura riga sintesi: {e}")
+                self._row_count -= 1   # rollback contatore
+
+    # ── Internals ─────────────────────────────────────────────────────────────
+
+    def _ensure_file(self, session_name: str | None) -> str:
+        """
+        Crea il file xlsx alla prima scrittura della sessione e ne memorizza
+        il percorso.  Chiamate successive restituiscono subito il path già noto.
+        """
+        if self._filename is not None:
+            return self._filename
+
+        os.makedirs(self._output_dir, exist_ok=True)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        if session_name:
+            fname = f"sintesi_{session_name}.xlsx"
+        else:
+            fname = f"sintesi_{ts}.xlsx"
+
+        path = os.path.join(self._output_dir, fname)
+
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Sintesi"
+            ws.append(self.HEADERS)
+            wb.save(path)
+            self._filename = path
+            self._log.info(f"File sintesi creato: {fname}")
+        except Exception as e:
+            self._log.error(f"Errore creazione file sintesi '{fname}': {e}")
+            raise
+
+        return path

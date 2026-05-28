@@ -9,6 +9,7 @@ from tkinter import ttk
 import asyncio
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -22,7 +23,7 @@ from shared_lib.modbus_utils import ModbusBancoCollaudo
 from shared_lib.SerialDataLib import SerialDataReader
 from shared_lib.GammaLib import GammaSensorReader, ConnectionState as GammaConnectionState
 from shared_lib.ScpiAlimentatore import Alimentatore, SCPIError, SCPINotConnectedError
-from logic.data_processing import DataProcessor
+from logic.data_processing import DataProcessor, SintesiWriter
 from logic import settings_manager
 
 from gui.panels.status_bar      import StatusBar
@@ -60,6 +61,7 @@ class MainWindow(tk.Tk):
         self.gamma_reader   = GammaSensorReader(auto_reconnect=False)
         self.psu: Alimentatore | None = None   # creato su connect, None = mai connesso
         self.executor       = ThreadPoolExecutor(max_workers=5)
+        self._sintesi_writer = SintesiWriter(output_dir=self.data_processor.output_dir)
 
         # ── Stato connessioni (per rilevare disconnessioni inattese) ──────────
         self._ble_was_connected    = False
@@ -154,6 +156,7 @@ class MainWindow(tk.Tk):
             on_before_auto_start = self._on_before_auto_start,
             stop_rec_on_auto_end = self._stop_rec_on_auto_end,
             on_stop_rec_changed  = self._on_stop_rec_changed,
+            on_save              = self._on_save,
         )
         self._csv_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
@@ -501,6 +504,64 @@ class MainWindow(tk.Tk):
             logging.getLogger().info(
                 "Fine sequenza automatica — interruzione registrazione automatica.")
             self._rec_stop()
+
+    def _on_save(self, tempo_s: int, etichetta: str, resume_fn):
+        """
+        Callback del comando 'save': raccoglie campioni da _latest_data per
+        tempo_s secondi, ne calcola la media e la scrive nel file sintesi.
+
+        La raccolta avviene sul main thread (stesso thread di _latest_data),
+        la scrittura su disco è delegata all'executor per non bloccare la UI.
+        Il conto alla rovescia della sequenza resta aggiornato normalmente
+        perché _start_countdown è wall-clock based e continua indipendente.
+        """
+        import time as _time
+
+        samples: list = []
+        interval_ms   = max(200, int(1000 / max(1, self._rec_hz)))
+        t_end         = _time.monotonic() + max(float(tempo_s), 0.5)
+
+        # ── Ricava session_name per il file sintesi ────────────────────────
+        # Il file sintesi è legato alla sessione REC corrente: stesso prefisso
+        # timestamp del bike_data, senza il suffisso _partXX e senza estensione.
+        # Se non c'è sessione REC attiva il SintesiWriter userà un timestamp
+        # autonomo al momento della prima scrittura.
+        session_name: str | None = None
+        if self.data_processor.xlsx_filename:
+            base = os.path.basename(self.data_processor.xlsx_filename)
+            base = re.sub(r'_part\d+\.xlsx$', '', base)
+            base = re.sub(r'\.xlsx$',         '', base)
+            session_name = base
+
+        rec_file = (os.path.basename(self.data_processor.xlsx_filename)
+                    if self.data_processor.xlsx_filename else "")
+
+        # ── Raccolta campioni (main thread, usa after) ─────────────────────
+        def _collect():
+            if not self._csv_panel.auto_commands_running:
+                # Sequenza interrotta mentre si raccoglieva: non salvare
+                resume_fn(False)
+                return
+
+            samples.append(dict(self._latest_data))
+
+            remaining_ms = int((t_end - _time.monotonic()) * 1000)
+            if remaining_ms > 0:
+                # Programma il prossimo tick; non superare il tempo rimanente
+                self.after(min(interval_ms, max(50, remaining_ms)), _collect)
+            else:
+                # Finestra completata: scrittura asincrona poi ripresa sequenza
+                n = len(samples)
+                logging.getLogger().debug(
+                    f"save: {n} campioni raccolti in {tempo_s}s — scrittura su disco...")
+                self.executor.submit(
+                    self._sintesi_writer.add_row,
+                    samples, tempo_s, etichetta, rec_file, session_name,
+                )
+                resume_fn(True)
+
+        # Primo campione dopo interval_ms (non immediatamente)
+        self.after(interval_ms, _collect)
 
     def _on_stop_rec_changed(self, value: bool):
         """Chiamato quando l'utente toglia il checkbox Stop REC nel pannello CSV."""
@@ -1079,6 +1140,9 @@ class MainWindow(tk.Tk):
             except Exception as e:
                 err_var.set(str(e))
                 return
+            # Nuova sessione REC → il prossimo 'save' creerà un file sintesi
+            # con lo stesso prefisso nome/timestamp del file bike_data.
+            self._sintesi_writer.reset()
             fname = os.path.basename(self.data_processor.xlsx_filename)
             self._conn_bar.set_rec_state(True, fname)
             self._status_bar.set_rec(True)
