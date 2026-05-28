@@ -156,6 +156,7 @@ class MainWindow(tk.Tk):
             on_before_auto_start = self._on_before_auto_start,
             stop_rec_on_auto_end = self._stop_rec_on_auto_end,
             on_stop_rec_changed  = self._on_stop_rec_changed,
+            on_spindown          = self._run_spindown_auto,
             on_save              = self._on_save,
         )
         self._csv_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
@@ -1072,6 +1073,95 @@ class MainWindow(tk.Tk):
         self.after(0, logging.getLogger().info, "Gamma Sensor disconnesso.")
         self.after(0, self._sidebar.update_gamma, None)
 
+        # ── Calibrazione automatica da sequenza CSV ───────────────────────────────
+
+    def _run_spindown_auto(self, resume_cb):
+        """
+        Esegue una calibrazione spin-down in modalità automatica (da sequenza CSV).
+
+        Gestione banco:
+          CTRL_REQ → banco a 10 km/h di avvio
+          SPIN_UP  → banco a target_high + 1 km/h (se ricevuto dal rullo)
+          COAST_DOWN → banco a 0 subito
+          SUCCESS/FAILED → banco a 0 per sicurezza, poi chiama resume_cb
+
+        resume_cb(success: bool) viene chiamato sul main thread al termine.
+        """
+        from shared_lib.bluetooth_manager import CalibrationPhase
+
+        if not self.ble_manager.get_connection_status():
+            logging.getLogger().warning("[Auto-Calib] BLE non connesso: calibrazione saltata.")
+            resume_cb(False)
+            return
+
+        banco_ok = self.modbus.is_connesso()
+        _RAMP_START = 10.0  # km/h avvio banco
+        _MARGIN_KMH = 1.0  # km/h di margine sopra la velocità target
+        _done = [False]  # flag anti-doppia-chiamata resume_cb
+
+        def _safe_resume(success: bool):
+            if _done[0]:
+                return
+            _done[0] = True
+            self.after(0, lambda: resume_cb(success))
+
+        def _on_phase(phase: CalibrationPhase, info: dict):
+            if phase == CalibrationPhase.CTRL_REQ:
+                if banco_ok:
+                    self._set_banco_speed(_RAMP_START)
+                    logging.getLogger().info(
+                        f"[Auto-Calib] Banco avviato a {_RAMP_START:.0f} km/h")
+
+            elif phase == CalibrationPhase.SPIN_UP:
+                high = info.get('target_speed_high_kmh')
+                if high is not None and banco_ok:
+                    target = round(high + _MARGIN_KMH, 1)
+                    self._set_banco_speed(target)
+                    logging.getLogger().info(
+                        f"[Auto-Calib] Banco portato a {target:.1f} km/h "
+                        f"(target_high={high:.1f} + {_MARGIN_KMH:.0f} km/h margine)")
+
+            elif phase == CalibrationPhase.COAST_DOWN:
+                if banco_ok:
+                    self._set_banco_speed(0)
+                    logging.getLogger().info("[Auto-Calib] Banco fermato (coast-down)")
+
+            elif phase == CalibrationPhase.SUCCESS:
+                logging.getLogger().info("[Auto-Calib] Calibrazione completata con successo.")
+                _safe_resume(True)
+
+            elif phase == CalibrationPhase.FAILED:
+                reason = info.get('reason', '?')
+                logging.getLogger().warning(f"[Auto-Calib] Calibrazione fallita: {reason}")
+                if banco_ok:
+                    self._set_banco_speed(0)
+                    logging.getLogger().info("[Auto-Calib] Banco fermato per sicurezza.")
+                _safe_resume(False)
+
+        self.executor.submit(self._run_spindown_auto_worker, _on_phase, _safe_resume)
+
+    def _run_spindown_auto_worker(self, on_phase_cb, safe_resume):
+        """Eseguito nel thread pool: lancia la coroutine sul loop BLE e attende."""
+        from shared_lib.bluetooth_manager import CalibrationPhase
+        fut = self._run_ble(
+            self.ble_manager.start_spindown_calibration(
+                status_callback=on_phase_cb,
+                timeout_ctrl=5.0,
+                timeout_spinup_request=60.0,  # parametro mantenuto per firma
+                timeout_spinup=180.0,  # 3 min per raggiungere la velocità
+                timeout_coastdown=90.0,
+            )
+        )
+        try:
+            result = fut.result(timeout=400)
+            # safe_resume già chiamato da _on_phase per SUCCESS/FAILED;
+            # questa chiamata è una rete di sicurezza in caso di percorsi anomali.
+            if result not in (CalibrationPhase.SUCCESS, CalibrationPhase.FAILED):
+                safe_resume(False)
+        except Exception as e:
+            logging.getLogger().error(f"[Auto-Calib] Eccezione nel worker: {e}")
+            safe_resume(False)
+
     # ── Emergency stop ────────────────────────────────────────────────────────
 
     def _emergency_stop(self):
@@ -1146,6 +1236,7 @@ class MainWindow(tk.Tk):
             fname = os.path.basename(self.data_processor.xlsx_filename)
             self._conn_bar.set_rec_state(True, fname)
             self._status_bar.set_rec(True)
+            self._status_bar.set_rec_hz(self._rec_hz, active=True)
             self._rec_tick()
             logging.getLogger().info(f"Registrazione avviata: {fname}")
             win.destroy()
@@ -1168,6 +1259,7 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._rec_timer_id)
             self._rec_timer_id = None
         self._status_bar.set_rec(False)
+        self._status_bar.set_rec_hz(self._rec_hz, active=False)
         fname = os.path.basename(self.data_processor.xlsx_filename) \
             if self.data_processor.xlsx_filename else "—"
         self._conn_bar.set_rec_state(False, f"OK {fname}")
@@ -1211,6 +1303,15 @@ class MainWindow(tk.Tk):
         dispositivo_menu.add_command(
             label="Abilita cadenza simulata…",
             command=self._cmd_abilita_cadenza_simulata,
+        )
+        dispositivo_menu.add_separator()
+        dispositivo_menu.add_command(
+            label="Informazioni dispositivo…",
+            command=self._cmd_show_device_info,
+        )
+        dispositivo_menu.add_command(
+            label="Calibrazione spin-down…",
+            command=self._cmd_spindown_calibration,
         )
 
         # ── Visualizza ───────────────────────────────────────────────────────
@@ -1341,6 +1442,8 @@ class MainWindow(tk.Tk):
                 self.delta_power_thresholds_pct)
             self._live_panel.set_smoothing_window(n)
             self._save_settings()
+            # Aggiorna immediatamente la label Hz nella status bar
+            self._status_bar.set_rec_hz(hz, active=self.data_processor.is_recording)
             logging.getLogger().info(
                 f"Settings updated - spd ({s1},{s2}) km/h | pwr ({p1},{p2})% | N={n} | REC {hz}Hz")
 
@@ -1687,7 +1790,540 @@ class MainWindow(tk.Tk):
                 "Verifica la connessione BLE e riprova.",
                 parent=self,
             )
+    def _cmd_show_device_info(self):
+        """Mostra le informazioni DIS (Device Information Service) del dispositivo BLE connesso."""
+        if not self.ble_manager.get_connection_status():
+            from tkinter import messagebox
+            messagebox.showwarning(
+                "Dispositivo non connesso",
+                "Nessun trainer BLE connesso.\n"
+                "Connetti il dispositivo prima di leggere le informazioni.",
+                parent=self,
+            )
+            return
 
+        win = tk.Toplevel(self)
+        win.title("Informazioni Dispositivo")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        win.geometry(f"420x360+{px + (pw - 420) // 2}+{py + (ph - 360) // 2}")
+
+        # ── Header device ─────────────────────────────────────────────────────────
+        hf = tk.Frame(win, bg='#1e1e2e')
+        hf.pack(fill='x')
+        tk.Label(hf, text=self._connected_device_name or "Dispositivo",
+                 font=('Helvetica', 10, 'bold'), bg='#1e1e2e', fg='#88ffaa',
+                 ).pack(side='left', padx=12, pady=(7, 2))
+        tk.Label(hf, text=self._connected_device_address or "",
+                 font=('Helvetica', 8), bg='#1e1e2e', fg='#888899',
+                 ).pack(side='left', pady=(7, 2))
+
+        # ── Griglia campi DIS ────────────────────────────────────────────────────
+        _FIELD_LABELS = [
+            ('manufacturer_name', 'Produttore'),
+            ('model_number', 'Modello'),
+            ('serial_number', 'N. Seriale'),
+            ('firmware_revision', 'Firmware'),
+            ('hardware_revision', 'Hardware Rev.'),
+            ('software_revision', 'Software Rev.'),
+            ('system_id', 'System ID'),
+            ('pnp_id', 'PnP ID'),
+        ]
+
+        grid = ttk.Frame(win)
+        grid.pack(fill='both', expand=True, padx=14, pady=10)
+        grid.grid_columnconfigure(1, weight=1)
+
+        status_var = tk.StringVar(value="Lettura in corso…")
+        ttk.Label(grid, textvariable=status_var,
+                  font=('Helvetica', 8, 'italic'), foreground='#888888',
+                  ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 6))
+
+        val_vars = {}
+        for i, (key, label) in enumerate(_FIELD_LABELS, start=1):
+            ttk.Label(grid, text=label + ":", font=('Helvetica', 9),
+                      anchor='e', width=13,
+                      ).grid(row=i, column=0, sticky='e', padx=(0, 8), pady=2)
+            var = tk.StringVar(value="…")
+            ttk.Label(grid, textvariable=var, font=('Helvetica', 9),
+                      foreground='#222222', anchor='w',
+                      ).grid(row=i, column=1, sticky='w', pady=2)
+            val_vars[key] = var
+
+        # ── Pulsanti ─────────────────────────────────────────────────────────────
+        bf = ttk.Frame(win)
+        bf.pack(fill='x', padx=14, pady=(4, 10))
+        btn_refresh = ttk.Button(bf, text="🔄 Aggiorna", command=lambda: _fetch())
+        btn_refresh.pack(side='left')
+        ttk.Button(bf, text="Chiudi", command=win.destroy).pack(side='right')
+
+        # ── Populate ─────────────────────────────────────────────────────────────
+        def _populate(info: dict):
+            data = info.get('data', {})
+            missing = set(info.get('missing', []))
+            for key, var in val_vars.items():
+                if key in missing:
+                    var.set("N/A")
+                elif key in data:
+                    v = data[key]
+                    if isinstance(v, dict):
+                        if key == 'system_id':
+                            var.set(
+                                f"Manuf: 0x{v.get('manufacturer_id', 0):010X}"
+                                f"  OUI: 0x{v.get('oui', 0):06X}"
+                            )
+                        elif key == 'pnp_id':
+                            var.set(
+                                f"VID: 0x{v.get('vendor_id', 0):04X}"
+                                f"  PID: 0x{v.get('product_id', 0):04X}"
+                                f"  Rev: 0x{v.get('product_version', 0):04X}"
+                            )
+                        else:
+                            var.set(str(v))
+                    else:
+                        var.set(str(v) if v else "—")
+                else:
+                    var.set("—")
+            status_var.set("Aggiornato")
+            btn_refresh.config(state='normal')
+
+        def _fetch():
+            btn_refresh.config(state='disabled')
+            status_var.set("Lettura in corso…")
+            for var in val_vars.values():
+                var.set("…")
+
+            def _worker():
+                fut = self._run_ble(self.ble_manager.read_device_information(timeout=6.0))
+                try:
+                    info = fut.result(timeout=10)
+                except Exception as e:
+                    logging.getLogger().error(f"Errore lettura device info: {e}")
+                    info = {'data': {}, 'missing': [k for k in val_vars], 'errors': {}}
+                self.after(0, _populate, info)
+
+            self.executor.submit(_worker)
+
+        _fetch()
+
+    def _cmd_spindown_calibration(self):
+        """Dialog guidato per la calibrazione spin-down FTMS con controllo banco integrato."""
+        from shared_lib.bluetooth_manager import CalibrationPhase
+
+        if not self.ble_manager.get_connection_status():
+            from tkinter import messagebox
+            messagebox.showwarning(
+                "Dispositivo non connesso",
+                "Nessun trainer BLE connesso.\n"
+                "Connetti il dispositivo prima di avviare la calibrazione.",
+                parent=self,
+            )
+            return
+
+        banco_ok = self.modbus.is_connesso()
+
+        win = tk.Toplevel(self)
+        win.title("Calibrazione Spin-Down")
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        win.geometry(f"460x540+{px + (pw - 460) // 2}+{py + (ph - 540) // 2}")
+
+        # ── Header ───────────────────────────────────────────────────────────────
+        hf = tk.Frame(win, bg='#1e1e2e')
+        hf.pack(fill='x')
+        tk.Label(hf, text="Calibrazione Spin-Down",
+                 font=('Helvetica', 11, 'bold'), bg='#1e1e2e', fg='#aaaaff',
+                 ).pack(side='left', padx=12, pady=8)
+        dev = (self._connected_device_name or "")
+        if self._connected_device_address:
+            dev += f"  [{self._connected_device_address}]"
+        tk.Label(hf, text=dev, font=('Helvetica', 8),
+                 bg='#1e1e2e', fg='#666688').pack(side='left', pady=8)
+
+        # ── Avviso banco non connesso ─────────────────────────────────────────────
+        if not banco_ok:
+            warn_f = tk.Frame(win, bg='#FFF3CD')
+            warn_f.pack(fill='x')
+            tk.Label(warn_f,
+                     text="⚠  Banco non connesso — velocità controllata manualmente.",
+                     font=('Helvetica', 8), bg='#FFF3CD', fg='#7B4D00',
+                     pady=4, padx=12).pack(anchor='w')
+
+        # ── Indicatore fasi ───────────────────────────────────────────────────────
+        _PHASES_DEF = [
+            ("Avvio", "ctrl"),
+            ("Spin-Up", "spinup"),
+            ("Coast-Down", "coast"),
+            ("Risultato", "result"),
+        ]
+        _C_IDLE = '#AAAAAA'
+        _C_ACTIVE = '#E8A000'
+        _C_OK = '#00BB44'
+        _C_FAIL = '#CC2222'
+
+        step_frame = tk.Frame(win, bg='white')
+        step_frame.pack(fill='x', padx=16, pady=(10, 4))
+        phase_leds = {}
+        for i, (label, key) in enumerate(_PHASES_DEF):
+            col = i * 2
+            step_frame.grid_columnconfigure(col, weight=1)
+            step_frame.grid_columnconfigure(col + 1, weight=0)
+            led = tk.Label(step_frame, text='●', font=('Helvetica', 18),
+                           bg='white', fg=_C_IDLE)
+            led.grid(row=0, column=col, sticky='ew')
+            tk.Label(step_frame, text=label, font=('Helvetica', 7),
+                     bg='white', fg='#555555').grid(row=1, column=col, sticky='ew')
+            if i < len(_PHASES_DEF) - 1:
+                tk.Label(step_frame, text='──', font=('Helvetica', 9),
+                         bg='white', fg='#cccccc').grid(row=0, column=col + 1)
+            phase_leds[key] = led
+
+        # ── Area istruzione ───────────────────────────────────────────────────────
+        instr_var = tk.StringVar(value="Premi Avvia per iniziare.")
+        instr_lbl = tk.Label(win, textvariable=instr_var,
+                             font=('Helvetica', 11, 'bold'),
+                             fg='#1a1a2e', bg='#F0F4FF',
+                             justify='center', wraplength=420,
+                             relief='groove', bd=1, pady=10, padx=10)
+        instr_lbl.pack(fill='x', padx=16, pady=(4, 4))
+
+        # ── Velocità: attuale (grande) + range target (low–high) ────────────────
+        spd_outer = tk.Frame(win, bg='white', relief='sunken', bd=1)
+        spd_outer.pack(fill='x', padx=16, pady=(2, 2))
+
+        # Riga superiore: velocità attuale letta dal rullo BLE
+        spd_top = tk.Frame(spd_outer, bg='white')
+        spd_top.pack(fill='x', padx=8, pady=(6, 0))
+
+        tk.Label(spd_top, text="Velocità attuale",
+                 font=('Helvetica', 8), fg='#555555', bg='white',
+                 anchor='w').pack(side='left')
+
+        speed_var = tk.StringVar(value="—")
+        tk.Label(spd_top, textvariable=speed_var,
+                 font=('Courier', 28, 'bold'), fg='#003300', bg='white',
+                 anchor='e').pack(side='right', padx=(0, 4))
+
+        tk.Label(spd_top, text="km/h",
+                 font=('Helvetica', 10), fg='#555555', bg='white',
+                 ).pack(side='right')
+
+        # Separatore
+        tk.Frame(spd_outer, bg='#e0e0e0', height=1).pack(fill='x', padx=8, pady=2)
+
+        # Riga inferiore: range target (min – max)
+        spd_bot = tk.Frame(spd_outer, bg='white')
+        spd_bot.pack(fill='x', padx=8, pady=(0, 6))
+
+        tk.Label(spd_bot, text="Target",
+                 font=('Helvetica', 8), fg='#555555', bg='white',
+                 anchor='w').pack(side='left')
+
+        # "min:" label
+        tk.Label(spd_bot, text="min:",
+                 font=('Helvetica', 8), fg='#885500', bg='white',
+                 ).pack(side='left', padx=(8, 2))
+        target_low_var = tk.StringVar(value="—")
+        target_low_lbl = tk.Label(spd_bot, textvariable=target_low_var,
+                                  font=('Courier', 13, 'bold'), fg='#885500', bg='white')
+        target_low_lbl.pack(side='left')
+        tk.Label(spd_bot, text="km/h",
+                 font=('Helvetica', 8), fg='#885500', bg='white').pack(side='left', padx=(2, 10))
+
+        # "max:" label
+        tk.Label(spd_bot, text="max:",
+                 font=('Helvetica', 8), fg='#006600', bg='white',
+                 ).pack(side='left', padx=(0, 2))
+        target_high_var = tk.StringVar(value="—")
+        target_high_lbl = tk.Label(spd_bot, textvariable=target_high_var,
+                                   font=('Courier', 13, 'bold'), fg='#006600', bg='white')
+        target_high_lbl.pack(side='left')
+        tk.Label(spd_bot, text="km/h",
+                 font=('Helvetica', 8), fg='#006600', bg='white').pack(side='left', padx=(2, 0))
+
+        # ── Progressbar coast-down + elapsed timer ────────────────────────────────
+        pb_frame = tk.Frame(win, bg=win.cget('bg'))     # contenitore non visibile finché non serve
+        pb = ttk.Progressbar(pb_frame, mode='indeterminate', length=400)
+        pb.pack(fill='x', padx=0)
+        _coast_elapsed_var = tk.StringVar(value="")
+        _coast_elapsed_lbl = tk.Label(pb_frame, textvariable=_coast_elapsed_var,
+                                      font=('Helvetica', 7), fg='#555577',
+                                      bg=win.cget('bg'))
+        _coast_elapsed_lbl.pack(anchor='e', padx=4)
+        _coast_timer_id = [None]
+        _coast_t0 = [0.0]
+
+        def _start_coast_timer():
+            import time as _time
+            _coast_t0[0] = _time.monotonic()
+            _coast_elapsed_var.set("coast-down: 0 s")
+
+            def _tick():
+                elapsed = int(_time.monotonic() - _coast_t0[0])
+                _coast_elapsed_var.set(f"coast-down: {elapsed} s")
+                _coast_timer_id[0] = win.after(1000, _tick)
+
+            _tick()
+
+        def _stop_coast_timer():
+            if _coast_timer_id[0]:
+                win.after_cancel(_coast_timer_id[0])
+                _coast_timer_id[0] = None
+            _coast_elapsed_var.set("")
+
+        # ── Controllo Banco ───────────────────────────────────────────────────────
+        banco_frame = ttk.LabelFrame(win, text="Controllo Banco")
+        banco_frame.pack(fill='x', padx=16, pady=(6, 4))
+
+        bf_inner = ttk.Frame(banco_frame)
+        bf_inner.pack(fill='x', padx=8, pady=6)
+        bf_inner.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(bf_inner, text="Velocità banco [km/h]:").grid(
+            row=0, column=0, sticky='e', padx=(0, 6))
+
+        banco_speed_var = tk.DoubleVar(value=0.0)
+        banco_spin = ttk.Spinbox(bf_inner, from_=0.0, to=80.0, increment=0.5,
+                                 format="%.1f", width=8,
+                                 textvariable=banco_speed_var)
+        banco_spin.grid(row=0, column=1, sticky='w')
+
+        def _set_banco_manual():
+            try:
+                v = float(banco_speed_var.get())
+            except (ValueError, tk.TclError):
+                return
+            self._set_banco_speed(v)
+            logging.getLogger().info(
+                f"[Calibrazione] Banco impostato manualmente a {v:.1f} km/h")
+
+        def _stop_banco_now():
+            banco_speed_var.set(0.0)
+            self._set_banco_speed(0)
+            logging.getLogger().info("[Calibrazione] Banco fermato manualmente.")
+
+        ttk.Button(bf_inner, text="Set", width=5,
+                   command=_set_banco_manual).grid(row=0, column=2, padx=(8, 4))
+        tk.Button(bf_inner, text="■  Stop Banco",
+                  font=('Helvetica', 9, 'bold'),
+                  bg='#CC2222', fg='white',
+                  activebackground='#AA0000', activeforeground='white',
+                  relief='raised', bd=2, cursor='hand2', width=11,
+                  command=_stop_banco_now,
+                  ).grid(row=0, column=3, padx=(4, 0))
+
+        banco_status_var = tk.StringVar(
+            value="Banco connesso — pronto" if banco_ok else "Banco non connesso")
+        tk.Label(banco_frame, textvariable=banco_status_var,
+                 font=('Helvetica', 7, 'italic'), fg='#555555',
+                 ).pack(anchor='w', padx=10, pady=(0, 4))
+
+        # ── Pulsanti principali ───────────────────────────────────────────────────
+        main_bf = ttk.Frame(win)
+        main_bf.pack(fill='x', padx=16, pady=(4, 10))
+        btn_start = tk.Button(
+            main_bf, text="▶  Avvia",
+            font=('Helvetica', 10, 'bold'),
+            bg='#0D3B6E', fg='white',
+            activebackground='#082B52', activeforeground='white',
+            relief='raised', bd=2, cursor='hand2', width=10,
+        )
+        btn_start.pack(side='left')
+        btn_close = ttk.Button(main_bf, text="Chiudi",
+                               command=lambda: _on_close(), width=8)
+        btn_close.pack(side='right')
+
+        # ── Stato interno ─────────────────────────────────────────────────────────
+        _calib_running = [False]
+        _speed_poll_id = [None]
+
+        def _set_phase_led(key, state):
+            colors = {'active': _C_ACTIVE, 'ok': _C_OK, 'fail': _C_FAIL, 'idle': _C_IDLE}
+            if key in phase_leds:
+                phase_leds[key].config(fg=colors.get(state, _C_IDLE))
+
+        # Polling velocità: parte subito all'apertura, non solo durante spin-up
+        def _start_speed_poll():
+            def _tick():
+                spd = self._latest_data.get('Spd')
+                speed_var.set(f"{spd:.1f}" if spd is not None else "—")
+                _speed_poll_id[0] = win.after(200, _tick)
+
+            _tick()
+
+        def _stop_speed_poll():
+            if _speed_poll_id[0]:
+                win.after_cancel(_speed_poll_id[0])
+                _speed_poll_id[0] = None
+
+        # ── Callback calibrazione ─────────────────────────────────────────────────
+        def _on_phase(phase: CalibrationPhase, info: dict):
+            self.after(0, _apply_phase, phase, info)
+
+        # Velocità di avvio automatico banco nella fase CTRL_REQ.
+        # Usata solo se banco connesso; l'utente può sovrascriverla col Set.
+        _RAMP_START_SPEED_KMH = 10.0
+
+        def _apply_phase(phase: CalibrationPhase, info: dict):
+            pb.stop()
+            pb_frame.pack_forget()
+            _stop_coast_timer()
+
+            if phase == CalibrationPhase.CTRL_REQ:
+                _set_phase_led('ctrl', 'active')
+                if banco_ok:
+                    banco_speed_var.set(_RAMP_START_SPEED_KMH)
+                    self._set_banco_speed(_RAMP_START_SPEED_KMH)
+                    banco_status_var.set(
+                        f"✔  Banco avviato a {_RAMP_START_SPEED_KMH:.0f} km/h — aumenta gradualmente")
+                    instr_var.set(
+                        "Banco avviato — aumenta la velocità finché il rullo non risponde.\n"
+                        "Il rullo segnalerà quando smettere.")
+                else:
+                    instr_var.set(
+                        "Pedala fino alla velocità target.\n"
+                        "Il rullo segnalerà quando smettere.")
+                instr_lbl.config(fg='#885500', bg='#FFFBE6')
+
+            elif phase == CalibrationPhase.SPIN_UP:
+                _set_phase_led('ctrl', 'ok')
+                _set_phase_led('spinup', 'active')
+                low  = info.get('target_speed_low_kmh')
+                high = info.get('target_speed_high_kmh')
+
+                target_low_var.set(f"{low:.1f}"   if low  is not None else "—")
+                target_high_var.set(f"{high:.1f}" if high is not None else "—")
+
+                if high is not None:
+                    if banco_ok:
+                        target = round(high, 1)
+                        banco_speed_var.set(target)
+                        self._set_banco_speed(target)
+                        banco_status_var.set(f"✔  Banco impostato a {target:.1f} km/h (automatico)")
+                        instr_var.set(
+                            f"Raggiungi {high:.1f} km/h\n"
+                            f"(banco impostato automaticamente)")
+                    else:
+                        instr_var.set(
+                            f"Raggiungi {high:.1f} km/h\n"
+                            "Imposta il banco manualmente." if low is not None
+                            else f"Raggiungi {high:.1f} km/h")
+                else:
+                    instr_var.set("Pedala fino alla velocità target.\n(target non ricevuto dal rullo)")
+                instr_lbl.config(fg='#1a1a2e', bg='#E8F5E9')
+
+            elif phase == CalibrationPhase.COAST_DOWN:
+                # Il trainer può arrivare qui saltando la notifica SPIN_UP
+                if phase_leds['ctrl'].cget('fg') == _C_ACTIVE:
+                    _set_phase_led('ctrl', 'ok')
+                if phase_leds['spinup'].cget('fg') in (_C_ACTIVE, _C_IDLE):
+                    _set_phase_led('spinup', 'ok')
+                _set_phase_led('coast', 'active')
+                target_low_var.set("—")
+                target_high_var.set("—")
+                if banco_ok:
+                    self._set_banco_speed(0)
+                    banco_speed_var.set(0.0)
+                    banco_status_var.set("✔  Banco fermato (coast-down automatico)")
+                instr_var.set("⏸  Smetti di pedalare.\nCoast-down in corso, non toccare il banco…")
+                instr_lbl.config(fg='#005580', bg='#E3F2FD')
+                pb_frame.pack(fill='x', padx=16, pady=(0, 4))
+                pb.start(10)
+                _start_coast_timer()
+
+            elif phase == CalibrationPhase.SUCCESS:
+                _set_phase_led('coast', 'ok')
+                _set_phase_led('result', 'ok')
+                instr_var.set("✅  Calibrazione completata con successo!")
+                instr_lbl.config(fg='#005500', bg='#E8F5E9')
+                btn_start.config(state='normal', text='▶  Ripeti')
+                btn_close.config(state='normal')
+                _calib_running[0] = False
+                logging.getLogger().info("[Calibrazione] Spin-down completato con successo.")
+
+            elif phase == CalibrationPhase.FAILED:
+                for key in ('ctrl', 'spinup', 'coast', 'result'):
+                    if phase_leds[key].cget('fg') == _C_ACTIVE:
+                        _set_phase_led(key, 'fail')
+                _set_phase_led('result', 'fail')
+                if banco_ok:
+                    self._set_banco_speed(0)
+                    banco_speed_var.set(0.0)
+                    banco_status_var.set("■  Banco fermato (sicurezza)")
+                    logging.getLogger().warning(
+                        "[Calibrazione] Banco fermato per sicurezza dopo fallimento.")
+                reason_map = {
+                    'request_control_failed':    'Richiesta controllo fallita',
+                    'spindown_cmd_failed':        'Comando spin-down rifiutato dal rullo',
+                    'spinup_timeout':             'Timeout: velocità target non raggiunta in tempo',
+                    'coastdown_timeout':          'Timeout: coast-down troppo lungo',
+                }
+                reason_raw = info.get('reason', 'errore sconosciuto')
+                reason_txt = reason_map.get(reason_raw, reason_raw)
+                instr_var.set(f"❌  Calibrazione fallita\n{reason_txt}")
+                instr_lbl.config(fg='#880000', bg='#FFEBEE')
+                btn_start.config(state='normal', text='▶  Riprova')
+                btn_close.config(state='normal')
+                _calib_running[0] = False
+
+        def _on_phase(phase: CalibrationPhase, info: dict):
+            """Callback dal loop BLE → rimanda sul main thread."""
+            self.after(0, _apply_phase, phase, info)
+
+        def _start_calib():
+            if _calib_running[0]:
+                return
+            _calib_running[0] = True
+            btn_start.config(state='disabled')
+            btn_close.config(state='disabled')
+            for key in phase_leds:
+                _set_phase_led(key, 'idle')
+            target_low_var.set("—")
+            target_high_var.set("—")
+            instr_var.set("Avvio in corso…")
+            instr_lbl.config(fg='#1a1a2e', bg='#F0F4FF')
+            self.executor.submit(_calib_worker)
+
+        def _calib_worker():
+            fut = self._run_ble(
+                self.ble_manager.start_spindown_calibration(
+                    status_callback=_on_phase,
+                    timeout_ctrl=5.0,
+                    timeout_spinup_request=60.0,
+                    timeout_spinup=180.0,
+                    timeout_coastdown=90.0,
+                )
+            )
+            try:
+                fut.result(timeout=400)
+            except Exception as e:
+                logging.getLogger().error(f"Errore calibrazione: {e}")
+                self.after(0, _apply_phase,
+                           CalibrationPhase.FAILED, {'reason': str(e)})
+
+        def _on_close():
+            _stop_speed_poll()
+            _stop_coast_timer()
+            pb.stop()
+            if _calib_running[0] and banco_ok:
+                self._set_banco_speed(0)
+                logging.getLogger().warning(
+                    "[Calibrazione] Finestra chiusa durante procedura — banco fermato.")
+            win.destroy()
+
+        btn_start.config(command=_start_calib)
+        win.protocol("WM_DELETE_WINDOW", _on_close)
+
+        # Polling velocità parte subito, indipendente dalla calibrazione
+        _start_speed_poll()
     # ── Chiusura ──────────────────────────────────────────────────────────────
 
     def on_closing(self):
