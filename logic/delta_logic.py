@@ -2,7 +2,6 @@
 Funzioni pure per il calcolo, la formattazione e la colorazione dei delta BLE ↔ Lorenz.
 Nessuna dipendenza da tkinter o da altri moduli del progetto.
 """
-from collections import deque
 
 
 # ── Calcolo ──────────────────────────────────────────────────────────────────

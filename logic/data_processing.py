@@ -249,7 +249,7 @@ class DataProcessor:
           col 2  valore_rullo  → livello / potenza / pendenza  (int, se richiesto)
           col 3  banco_kmh     → velocità banco km/h           (float, opzionale)
 
-        Restituisce (command_type, tempo_s, valore_rullo, banco_kmh) o None.
+        Restituisce (command_type, tempo_s, valore_rullo, banco_kmh, etichetta) o None.
         """
         # Normalizza a stringa pulita
         row = [str(c).strip() if c is not None else "" for c in row]
@@ -338,7 +338,7 @@ class DataProcessor:
           col 2  valore_rullo  → livello / potenza / pendenza (int, se richiesto)
           col 3  banco_kmh     → velocità banco km/h (float, opzionale)
 
-        Restituisce lista di tuple (command_type, tempo_s, valore_rullo, banco_kmh).
+        Restituisce lista di tuple (command_type, tempo_s, valore_rullo, banco_kmh, etichetta).
         """
         log = logging.getLogger(__name__)
         brake_commands = []

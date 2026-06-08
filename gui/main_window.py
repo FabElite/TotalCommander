@@ -5,7 +5,7 @@ tra i vari componenti (connessioni, polling, shutdown).
 Tutta la UI di dettaglio vive nei rispettivi panel; le funzioni pure in logic/.
 """
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import asyncio
 import logging
 import os
@@ -14,14 +14,16 @@ import subprocess
 import sys
 import threading
 import time
+import types
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
-from shared_lib.bluetooth_manager import BLEManager
+from shared_lib.bluetooth_manager import BLEManager, CalibrationPhase
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.funzioni_accessorie import trova_porta_usb_serial
 from shared_lib.modbus_utils import ModbusBancoCollaudo
 from shared_lib.SerialDataLib import SerialDataReader
-from shared_lib.GammaLib import GammaSensorReader, ConnectionState as GammaConnectionState
+from shared_lib.GammaLib import GammaSensorReader
 from shared_lib.ScpiAlimentatore import Alimentatore, SCPIError, SCPINotConnectedError
 from logic.data_processing import DataProcessor, SintesiWriter
 from logic import settings_manager
@@ -56,9 +58,9 @@ class MainWindow(tk.Tk):
         self.ble_manager    = BLEManager()
         self.data_processor = DataProcessor()
         self.modbus         = ModbusBancoCollaudo()
-        self.lorenz_reader  = LorenzReader()
+        self.lorenz_reader  = LorenzReader(campioni_media=20, full_scale_nm=200.0, sample_rate_hz=1000, output_rate_hz=10.0)
         self.serial_reader  = SerialDataReader(baudrate=115200)
-        self.gamma_reader   = GammaSensorReader(auto_reconnect=False)
+        self.gamma_reader   = GammaSensorReader()
         self.psu: Alimentatore | None = None   # creato su connect, None = mai connesso
         self.executor       = ThreadPoolExecutor(max_workers=5)
         self._sintesi_writer = SintesiWriter(output_dir=self.data_processor.output_dir)
@@ -95,6 +97,7 @@ class MainWindow(tk.Tk):
         self._last_packet_time   = None
         self._ui_pulse_id    = None
         self._rec_timer_id   = None
+        self._sensor_poll_id = None   # polling Lorenz/COM/Gamma a 100 ms
         self._latest_data    = {}
         self._shutdown_win    = None
         self._shutdown_anim_id = None
@@ -133,6 +136,7 @@ class MainWindow(tk.Tk):
             on_lorenz_invert     = self._lorenz_invert_speed,
             on_banco_connect     = self._banco_connect,
             on_banco_disconnect  = self._banco_disconnect,
+            banco_ip             = self._banco_ip,
         )
         self._conn_bar.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 2))
 
@@ -194,7 +198,33 @@ class MainWindow(tk.Tk):
         self._create_menu()
         self.periodic_connection_check()
         self._ui_pulse()
+        self._sensor_poll()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    # ── Utility UI ───────────────────────────────────────────────────────────
+
+    def _make_dialog(self, title: str, *,
+                     resizable: bool = False,
+                     modal: bool = True,
+                     size: tuple | None = None) -> tk.Toplevel:
+        """Crea e centra un Toplevel sulla finestra principale.
+        size=(w, h) per dimensione fissa; None per auto-size basato sul contenuto."""
+        win = tk.Toplevel(self)
+        win.title(title)
+        win.resizable(resizable, resizable)
+        win.transient(self)
+        if modal:
+            win.grab_set()
+        win.update_idletasks()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        if size:
+            w, h = size
+            win.geometry(f"{w}x{h}+{px + (pw - w) // 2}+{py + (ph - h) // 2}")
+        else:
+            ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
+            win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+        return win
 
     # ── Settings ─────────────────────────────────────────────────────────────
 
@@ -220,6 +250,7 @@ class MainWindow(tk.Tk):
             self._rec_hz = 1
         self._stop_rec_on_auto_end = bool(
             data.get('stop_rec_on_auto_end', d['stop_rec_on_auto_end']))
+        self._banco_ip = str(data.get('banco_ip', d['banco_ip']))
         if not data:
             self._save_settings()
 
@@ -233,6 +264,8 @@ class MainWindow(tk.Tk):
             'delta_smoothing_window':     int(self.delta_smoothing_window),
             'rec_hz':                     int(self._rec_hz),
             'stop_rec_on_auto_end':       bool(self._stop_rec_on_auto_end),
+            'banco_ip': (self._conn_bar.get_banco_ip()
+                         if hasattr(self, '_conn_bar') else self._banco_ip),
         })
 
     # ── Loop asyncio BLE ─────────────────────────────────────────────────────
@@ -329,7 +362,7 @@ class MainWindow(tk.Tk):
         self._reset_ftms_state()
 
     def _check_lorenz(self):
-        connected = self.lorenz_reader.connected
+        connected = self.lorenz_reader.is_connected()
         self._status_bar.set_lorenz('ok' if connected else 'err')
         if connected:
             self._lorenz_was_connected = True
@@ -337,7 +370,6 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("=" * 55)
             logging.getLogger().warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
             logging.getLogger().warning("=" * 55)
-            self.lorenz_reader.on_data = None
             self._lorenz_was_connected = False
 
     def _check_serial(self):
@@ -349,7 +381,6 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("=" * 55)
             logging.getLogger().warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
             logging.getLogger().warning("=" * 55)
-            self.serial_reader.on_data = None
             self._serial_was_connected = False
 
     def _check_modbus(self, from_user_action=False):
@@ -516,11 +547,9 @@ class MainWindow(tk.Tk):
         Il conto alla rovescia della sequenza resta aggiornato normalmente
         perché _start_countdown è wall-clock based e continua indipendente.
         """
-        import time as _time
-
         samples: list = []
         interval_ms   = max(200, int(1000 / max(1, self._rec_hz)))
-        t_end         = _time.monotonic() + max(float(tempo_s), 0.5)
+        t_end         = time.monotonic() + max(float(tempo_s), 0.5)
 
         # ── Ricava session_name per il file sintesi ────────────────────────
         # Il file sintesi è legato alla sessione REC corrente: stesso prefisso
@@ -546,7 +575,7 @@ class MainWindow(tk.Tk):
 
             samples.append(dict(self._latest_data))
 
-            remaining_ms = int((t_end - _time.monotonic()) * 1000)
+            remaining_ms = int((t_end - time.monotonic()) * 1000)
             if remaining_ms > 0:
                 # Programma il prossimo tick; non superare il tempo rimanente
                 self.after(min(interval_ms, max(50, remaining_ms)), _collect)
@@ -582,7 +611,6 @@ class MainWindow(tk.Tk):
         if self.data_processor.is_recording:
             return True
 
-        from tkinter import messagebox
         ans = messagebox.askyesnocancel(
             "Registrazione non attiva",
             "La registrazione dati non è attiva.\n\n"
@@ -679,7 +707,6 @@ class MainWindow(tk.Tk):
 
     def _lorenz_connect_worker(self):
         try:
-            import re
             port = trova_porta_usb_serial("Lorenz USB sensor interface Port")
             if port:
                 match = re.search(r'(\d+)$', port)
@@ -696,14 +723,12 @@ class MainWindow(tk.Tk):
     def _on_lorenz_connect_result(self, ok):
         if ok:
             logging.getLogger().info("Lorenz connesso")
-            # Wire callback: emessa dal polling thread a output_rate_hz,
-            # instradata al main thread via after(0, ...).
-            self.lorenz_reader.on_data = lambda d: self.after(0, self._on_lorenz_data, d)
+            # Il polling in _sensor_poll legge i dati via lorenz_reader.get_data()
         else:
             logging.getLogger().warning("Lorenz non connesso.")
 
     def _on_lorenz_data(self, data: dict):
-        """Riceve i dati Lorenz sul main thread (via after). Aggiorna live panel e _latest_data."""
+        """Aggiorna live panel e _latest_data con i dati Lorenz. Chiamata da _sensor_poll."""
         self._latest_data.update(data)
         self._live_panel.update_lorenz(data)
         self._conn_bar.set_offset(self.lorenz_reader.offset)
@@ -711,7 +736,6 @@ class MainWindow(tk.Tk):
     def _lorenz_disconnect(self):
         logging.getLogger().info("Disconnessione Lorenz in corso...")
         self._lorenz_was_connected = False
-        self.lorenz_reader.on_data = None   # ferma i callback prima della chiusura
         self.executor.submit(self._lorenz_disconnect_worker)
 
     def _lorenz_disconnect_worker(self):
@@ -749,6 +773,8 @@ class MainWindow(tk.Tk):
 
     def _banco_connect(self, ip: str):
         logging.getLogger().info(f"Connessione Banco a {ip}...")
+        self._banco_ip = ip
+        self._save_settings()
         self.executor.submit(self._banco_connect_worker, ip)
 
     def _banco_connect_worker(self, ip):
@@ -804,24 +830,20 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._serial_connect_worker, port)
 
     def _serial_connect_worker(self, port):
-        # Wire callback PRIMA di open_connection: il reader thread parte subito
-        self.serial_reader.on_data = lambda d: self.after(0, self._on_serial_data, d)
         ok = self.serial_reader.open_connection(port)
         if ok:
             self.after(0, logging.getLogger().info, "Sensore seriale connesso")
         else:
-            self.serial_reader.on_data = None   # connessione fallita, pulisci
             self.after(0, logging.getLogger().warning, "Sensore seriale non connesso.")
 
     def _on_serial_data(self, data: dict):
-        """Riceve i dati COM sul main thread (via after). Aggiorna sidebar e _latest_data."""
+        """Aggiorna sidebar e _latest_data con i dati COM. Chiamata da _sensor_poll."""
         self._latest_data.update(data)
         self._sidebar.update_serial(data)
 
     def _serial_disconnect(self):
         logging.getLogger().info("Disconnessione sensore seriale in corso...")
         self._serial_was_connected = False
-        self.serial_reader.on_data = None   # ferma i callback prima della chiusura
         self.executor.submit(self._serial_disconnect_worker)
 
     def _serial_disconnect_worker(self):
@@ -910,16 +932,7 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("PSU non connesso: impossibile aprire impostazioni.")
             return
 
-        win = tk.Toplevel(self)
-        win.title("Impostazioni Alimentatore PSU")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
-        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+        win = self._make_dialog("Impostazioni Alimentatore PSU")
 
         pad = dict(padx=10, pady=4)
         err_var = tk.StringVar()
@@ -1021,7 +1034,7 @@ class MainWindow(tk.Tk):
     # ── Gamma Sensor ──────────────────────────────────────────────────────────
 
     def _check_gamma(self):
-        connected = self.gamma_reader.is_connected
+        connected = self._gamma_is_connected()
         self._sidebar.set_gamma('ok' if connected else 'err')
         if connected:
             self._gamma_was_connected = True
@@ -1029,7 +1042,6 @@ class MainWindow(tk.Tk):
             logging.getLogger().warning("=" * 55)
             logging.getLogger().warning("*** DISCONNESSIONE GAMMA - connessione persa ***")
             logging.getLogger().warning("=" * 55)
-            self.gamma_reader.on_sample = None
             self._gamma_was_connected = False
             self.after(0, self._sidebar.update_gamma, None)
 
@@ -1041,19 +1053,26 @@ class MainWindow(tk.Tk):
         self.executor.submit(self._gamma_connect_worker, port)
 
     def _gamma_connect_worker(self, port):
-        # Wire callback PRIMA di connect: il reader thread parte subito alla connessione
-        self.gamma_reader.on_sample = lambda s: self.after(0, self._on_gamma_sample, s)
-        ok = self.gamma_reader.connect(port)
-        if ok:
+        # La nuova GammaLib.open_connection() si aspetta solo il numero di porta
+        # (internamente aggiunge "COM"). Estraiamo le cifre finali dalla stringa
+        # restituita dalla combobox (es. "COM5" -> "5", "/dev/ttyUSB4" -> "4").
+        match = re.search(r'\d+$', port)
+        port_id = match.group() if match else port
+
+        self.gamma_reader.open_connection(port_id)
+
+        # open_connection() imposta self.ser su successo, lo azzera su errore
+        connected = self._gamma_is_connected()
+        if connected:
             self.after(0, logging.getLogger().info,
                        f"Gamma Sensor connesso su {port}")
         else:
-            self.gamma_reader.on_sample = None   # connessione fallita, pulisci
             self.after(0, logging.getLogger().warning,
                        f"Gamma Sensor: connessione a {port} fallita.")
 
     def _on_gamma_sample(self, sample):
-        """Riceve un campione Gamma sul main thread (via after). Aggiorna sidebar e _latest_data."""
+        """Aggiorna sidebar e _latest_data con i dati Gamma. Chiamata da _sensor_poll.
+        sample è un types.SimpleNamespace con attributi .dgs, .tpr, .trigger."""
         data = {
             'dgs_gamma':     sample.dgs,
             'tpr_gamma':     sample.tpr,
@@ -1065,13 +1084,58 @@ class MainWindow(tk.Tk):
     def _gamma_disconnect(self):
         logging.getLogger().info("Disconnessione Gamma Sensor in corso...")
         self._gamma_was_connected = False
-        self.gamma_reader.on_sample = None   # ferma i callback prima della chiusura
         self.executor.submit(self._gamma_disconnect_worker)
 
     def _gamma_disconnect_worker(self):
-        self.gamma_reader.disconnect()
+        self.gamma_reader.close()
         self.after(0, logging.getLogger().info, "Gamma Sensor disconnesso.")
         self.after(0, self._sidebar.update_gamma, None)
+
+    def _gamma_is_connected(self) -> bool:
+        """Controlla se il Gamma Sensor è connesso e il thread di lettura è vivo.
+        Usato al posto della proprietà is_connected rimossa nella nuova GammaLib."""
+        return (
+            self.gamma_reader.ser is not None
+            and self.gamma_reader.read_thread is not None
+            and self.gamma_reader.read_thread.is_alive()
+        )
+
+    # ── Polling sensori (Lorenz / COM / Gamma) ────────────────────────────────
+
+    def _sensor_poll(self):
+        """
+        Eseguito ogni 100 ms sul main thread.
+        Sostituisce i callback on_data / on_sample rimossi nelle nuove librerie:
+        legge i dati via get_data() / attributi diretti e aggiorna _latest_data
+        e i pannelli live. La cadenza di 100 ms (10 Hz) è allineata all'output
+        rate di LorenzReader (output_rate_hz=10).
+        """
+        # ── Lorenz ────────────────────────────────────────────────────────────
+        if self.lorenz_reader.is_connected():
+            data = self.lorenz_reader.get_data()
+            self._on_lorenz_data(data)
+
+        # ── Sensore seriale COM ───────────────────────────────────────────────
+        if self.serial_reader.connected:
+            self._on_serial_data(self.serial_reader.get_data())
+
+        # ── Gamma Sensor ──────────────────────────────────────────────────────
+        if self._gamma_is_connected():
+            new_data = False
+            dgs = tpr = trigger = None
+            with self.gamma_reader.lock:
+                if self.gamma_reader.new_data_flag:
+                    new_data = True
+                    dgs     = self.gamma_reader.DGS_value
+                    tpr     = self.gamma_reader.TPR_value
+                    trigger = self.gamma_reader.trigger_value
+                    self.gamma_reader.new_data_flag = False
+            if new_data:
+                self._on_gamma_sample(
+                    types.SimpleNamespace(dgs=dgs, tpr=tpr, trigger=trigger)
+                )
+
+        self._sensor_poll_id = self.after(100, self._sensor_poll)
 
         # ── Calibrazione automatica da sequenza CSV ───────────────────────────────
 
@@ -1087,7 +1151,6 @@ class MainWindow(tk.Tk):
 
         resume_cb(success: bool) viene chiamato sul main thread al termine.
         """
-        from shared_lib.bluetooth_manager import CalibrationPhase
 
         if not self.ble_manager.get_connection_status():
             logging.getLogger().warning("[Auto-Calib] BLE non connesso: calibrazione saltata.")
@@ -1142,7 +1205,6 @@ class MainWindow(tk.Tk):
 
     def _run_spindown_auto_worker(self, on_phase_cb, safe_resume):
         """Eseguito nel thread pool: lancia la coroutine sul loop BLE e attende."""
-        from shared_lib.bluetooth_manager import CalibrationPhase
         fut = self._run_ble(
             self.ble_manager.start_spindown_calibration(
                 status_callback=on_phase_cb,
@@ -1179,18 +1241,9 @@ class MainWindow(tk.Tk):
     # ── Registrazione dati ───────────────────────────────────────────────────
 
     def _rec_start_dialog(self):
-        win = tk.Toplevel(self)
-        win.title("Nuova sessione di registrazione")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
-        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+        win = self._make_dialog("Nuova sessione di registrazione")
 
-        ts_preview = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+        ts_preview = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         ttk.Label(win, text="Nome sessione (opzionale):",
                   font=('Helvetica', 9, 'bold')
@@ -1211,7 +1264,7 @@ class MainWindow(tk.Tk):
                  ).grid(row=3, column=0, columnspan=2, padx=16, pady=(0, 2))
 
         def _update_preview(*_):
-            ts = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             raw = name_entry.get().strip().replace(' ', '_')
             # Con nome: YYYYMMDD_HHMMSS_nome.xlsx — Senza: YYYYMMDD_HHMMSS_bike_data.xlsx
             fname = f"{ts}_{raw}.xlsx" if raw else f"{ts}_bike_data.xlsx"
@@ -1342,16 +1395,7 @@ class MainWindow(tk.Tk):
     # ── Azioni menu Impostazioni ──────────────────────────────────────────────
 
     def _menu_open_settings(self):
-        win = tk.Toplevel(self)
-        win.title("Parametri delta e smoothing")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
-        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+        win = self._make_dialog("Parametri delta e smoothing")
 
         pad = dict(padx=12, pady=4)
 
@@ -1457,11 +1501,7 @@ class MainWindow(tk.Tk):
     # ── Azioni menu Info ──────────────────────────────────────────────────────
 
     def _menu_show_info(self):
-        win = tk.Toplevel(self)
-        win.title("Guida all'uso")
-        win.resizable(True, True)
-        win.transient(self)
-        win.geometry("580x540")
+        win = self._make_dialog("Guida all'uso", resizable=True, modal=False, size=(580, 540))
 
         outer = ttk.Frame(win)
         outer.pack(fill='both', expand=True, padx=2, pady=2)
@@ -1644,7 +1684,6 @@ class MainWindow(tk.Tk):
         Apre un dialog con indirizzo EEPROM (hex, default 0x0549) e valore
         (0-255, default 70) entrambi editabili. Conferma prima di scrivere.
         """
-        from tkinter import messagebox
 
         if not self.ble_manager.get_connection_status():
             messagebox.showwarning(
@@ -1656,16 +1695,7 @@ class MainWindow(tk.Tk):
             return
 
         # ── Dialog ───────────────────────────────────────────────────────────
-        win = tk.Toplevel(self)
-        win.title("Scrittura EEPROM — cadenza simulata")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        ww, wh = win.winfo_reqwidth(), win.winfo_reqheight()
-        win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+        win = self._make_dialog("Scrittura EEPROM — cadenza simulata")
 
         pad = dict(padx=14, pady=4)
 
@@ -1777,7 +1807,6 @@ class MainWindow(tk.Tk):
 
     def _cmd_abilita_cadenza_simulata_result(self, ok: bool, address: int, value: int):
         """Chiamato sul main thread per mostrare l'esito all'utente."""
-        from tkinter import messagebox
         if ok:
             logging.getLogger().info(
                 f"EEPROM 0x{address:04X} = {value} (0x{value:02X}) — scrittura OK.")
@@ -1793,7 +1822,6 @@ class MainWindow(tk.Tk):
     def _cmd_show_device_info(self):
         """Mostra le informazioni DIS (Device Information Service) del dispositivo BLE connesso."""
         if not self.ble_manager.get_connection_status():
-            from tkinter import messagebox
             messagebox.showwarning(
                 "Dispositivo non connesso",
                 "Nessun trainer BLE connesso.\n"
@@ -1802,15 +1830,7 @@ class MainWindow(tk.Tk):
             )
             return
 
-        win = tk.Toplevel(self)
-        win.title("Informazioni Dispositivo")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        win.geometry(f"420x360+{px + (pw - 420) // 2}+{py + (ph - 360) // 2}")
+        win = self._make_dialog("Informazioni Dispositivo", size=(420, 360))
 
         # ── Header device ─────────────────────────────────────────────────────────
         hf = tk.Frame(win, bg='#1e1e2e')
@@ -1912,10 +1932,8 @@ class MainWindow(tk.Tk):
 
     def _cmd_spindown_calibration(self):
         """Dialog guidato per la calibrazione spin-down FTMS con controllo banco integrato."""
-        from shared_lib.bluetooth_manager import CalibrationPhase
 
         if not self.ble_manager.get_connection_status():
-            from tkinter import messagebox
             messagebox.showwarning(
                 "Dispositivo non connesso",
                 "Nessun trainer BLE connesso.\n"
@@ -1926,15 +1944,7 @@ class MainWindow(tk.Tk):
 
         banco_ok = self.modbus.is_connesso()
 
-        win = tk.Toplevel(self)
-        win.title("Calibrazione Spin-Down")
-        win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
-        win.update_idletasks()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        win.geometry(f"460x540+{px + (pw - 460) // 2}+{py + (ph - 540) // 2}")
+        win = self._make_dialog("Calibrazione Spin-Down", size=(460, 540))
 
         # ── Header ───────────────────────────────────────────────────────────────
         hf = tk.Frame(win, bg='#1e1e2e')
@@ -2062,12 +2072,11 @@ class MainWindow(tk.Tk):
         _coast_t0 = [0.0]
 
         def _start_coast_timer():
-            import time as _time
-            _coast_t0[0] = _time.monotonic()
+            _coast_t0[0] = time.monotonic()
             _coast_elapsed_var.set("coast-down: 0 s")
 
             def _tick():
-                elapsed = int(_time.monotonic() - _coast_t0[0])
+                elapsed = int(time.monotonic() - _coast_t0[0])
                 _coast_elapsed_var.set(f"coast-down: {elapsed} s")
                 _coast_timer_id[0] = win.after(1000, _tick)
 
@@ -2337,10 +2346,9 @@ class MainWindow(tk.Tk):
             self.after_cancel(self._heartbeat_reset_id); self._heartbeat_reset_id = None
         if self.psu_update_id:
             self.after_cancel(self.psu_update_id);      self.psu_update_id = None
-        # Blocca i callback dei sensori prima dello shutdown asincrono
-        self.lorenz_reader.on_data   = None
-        self.serial_reader.on_data   = None
-        self.gamma_reader.on_sample  = None
+        if self._sensor_poll_id:
+            self.after_cancel(self._sensor_poll_id);    self._sensor_poll_id = None
+        # Ferma la sequenza automatica CSV
         self._csv_panel.stop()
 
         self.protocol("WM_DELETE_WINDOW", lambda: None)
@@ -2447,8 +2455,8 @@ class MainWindow(tk.Tk):
                 self.lorenz_reader.close_connection()
             if self.serial_reader.connected:
                 self.serial_reader.close_connection()
-            if self.gamma_reader.is_connected:
-                self.gamma_reader.disconnect()
+            if self._gamma_is_connected():
+                self.gamma_reader.close()
             if self.modbus.is_connesso():
                 self.modbus.disconnetti()
             if self.psu is not None and self.psu.is_connected():

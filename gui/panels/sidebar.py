@@ -310,26 +310,21 @@ class CollapsibleSidebar(ttk.Frame):
     def _get_ports(self):
         return [p.device for p in serial.tools.list_ports.comports()]
 
-    def _refresh_ports(self):
-        current = self._com_combo.get()
+    def _refresh_combo(self, combo: ttk.Combobox):
+        """Aggiorna la lista porte di un Combobox mantenendo la selezione corrente."""
+        current = combo.get()
         ports = self._get_ports()
-        self._com_combo['values'] = ports
-        self._com_combo.set(
-            current if current in ports else (ports[0] if ports else ''))
+        combo['values'] = ports
+        combo.set(current if current in ports else (ports[0] if ports else ''))
+
+    def _refresh_ports(self):
+        self._refresh_combo(self._com_combo)
 
     def _refresh_psu_ports(self):
-        current = self._psu_combo.get()
-        ports = self._get_ports()
-        self._psu_combo['values'] = ports
-        self._psu_combo.set(
-            current if current in ports else (ports[0] if ports else ''))
+        self._refresh_combo(self._psu_combo)
 
     def _refresh_gamma_ports(self):
-        current = self._gamma_combo.get()
-        ports = self._get_ports()
-        self._gamma_combo['values'] = ports
-        self._gamma_combo.set(
-            current if current in ports else (ports[0] if ports else ''))
+        self._refresh_combo(self._gamma_combo)
 
     # ── API pubblica ──────────────────────────────────────────────────────────
 

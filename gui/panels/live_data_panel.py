@@ -37,7 +37,7 @@ _F_VAL_H = ('Helvetica', 13, 'bold')
 _F_VAL_S = ('Helvetica', 9)
 _F_DELTA = ('Helvetica', 11, 'bold')
 
-_W_LABEL = 7
+_W_LABEL = 11
 
 
 class LiveDataPanel(ttk.Frame):
@@ -70,9 +70,9 @@ class LiveDataPanel(ttk.Frame):
         outer = ttk.LabelFrame(self, text="Misure")
         outer.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         # col 0: label misura | col 1: BLE | col 2: Lorenz | col 3: delta
-        outer.grid_columnconfigure(0, weight=1)
-        outer.grid_columnconfigure(1, weight=2)
-        outer.grid_columnconfigure(2, weight=2)
+        outer.grid_columnconfigure(0, weight=0)  # fissa al più largo widget
+        outer.grid_columnconfigure(1, weight=1)  # ← peso dimezzato ma uguale tra loro
+        outer.grid_columnconfigure(2, weight=1)
         outer.grid_columnconfigure(3, weight=0, minsize=80)
 
         self._outer = outer

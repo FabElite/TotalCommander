@@ -14,8 +14,7 @@ Layout:
 import tkinter as tk
 from tkinter import ttk
 
-# IP banco hardcoded — in futuro letto da settings
-_BANCO_IP = "192.168.0.10"
+_BANCO_DEFAULT_IP = "192.168.0.10"
 
 
 class ConnectionsBar(ttk.Frame):
@@ -29,7 +28,8 @@ class ConnectionsBar(ttk.Frame):
                  on_ble_search, on_ble_connect, on_ble_disconnect,
                  on_lorenz_connect, on_lorenz_disconnect,
                  on_lorenz_read_offset, on_lorenz_avg_change, on_lorenz_invert,
-                 on_banco_connect, on_banco_disconnect, **kwargs):
+                 on_banco_connect, on_banco_disconnect,
+                 banco_ip: str = _BANCO_DEFAULT_IP, **kwargs):
         super().__init__(parent, **kwargs)
 
         self._lorenz_reader        = lorenz_reader
@@ -46,6 +46,7 @@ class ConnectionsBar(ttk.Frame):
         self._cb_lorenz_invert     = on_lorenz_invert
         self._cb_banco_connect     = on_banco_connect
         self._cb_banco_disconnect  = on_banco_disconnect
+        self._banco_ip_init        = banco_ip
 
         # Stato animazione progress
         self._progress_anim_id = None
@@ -308,7 +309,7 @@ class ConnectionsBar(ttk.Frame):
                                padx=self.PAD_IN, pady=(2, self.PAD_IN))
 
     # ------------------------------------------------------------------ #
-    # Banco  (IP hardcoded, bottoni sovrapposti)
+    # Banco  (IP da settings, modificabile in linea)
     # ------------------------------------------------------------------ #
     def _build_banco(self):
         f = ttk.LabelFrame(self, text="Banco")
@@ -316,15 +317,25 @@ class ConnectionsBar(ttk.Frame):
                padx=self.PAD_OUT, pady=self.PAD_OUT)
         f.grid_columnconfigure(0, weight=1)
 
-        # _BANCO_IP è costante di modulo; in futuro leggerla da settings
+        # Riga IP
+        ip_f = ttk.Frame(f)
+        ip_f.grid(row=0, column=0, sticky="ew",
+                  padx=self.PAD_IN, pady=(self.PAD_IN, 2))
+        ip_f.grid_columnconfigure(1, weight=1)
+        ttk.Label(ip_f, text="IP:").grid(row=0, column=0, sticky="e", padx=(0, 4))
+        self._banco_ip_entry = ttk.Entry(ip_f, width=14, justify='left')
+        self._banco_ip_entry.insert(0, self._banco_ip_init)
+        self._banco_ip_entry.grid(row=0, column=1, sticky="ew")
+
         ttk.Button(f, text="Connetti",
-                   command=lambda: self._cb_banco_connect(_BANCO_IP), width=10
-                   ).grid(row=0, column=0, sticky="ew",
-                          padx=self.PAD_IN, pady=(self.PAD_IN, 2))
+                   command=lambda: self._cb_banco_connect(self._banco_ip_entry.get()),
+                   width=10
+                   ).grid(row=1, column=0, sticky="ew",
+                          padx=self.PAD_IN, pady=(2, 2))
 
         ttk.Button(f, text="Disconnetti",
                    command=self._cb_banco_disconnect, width=10
-                   ).grid(row=1, column=0, sticky="ew",
+                   ).grid(row=2, column=0, sticky="ew",
                           padx=self.PAD_IN, pady=(2, self.PAD_IN))
 
     # ------------------------------------------------------------------ #
@@ -396,6 +407,10 @@ class ConnectionsBar(ttk.Frame):
         if not sel:
             return None, None
         return self.device_list.item(sel[0])['values'][0], sel[0]
+
+    def get_banco_ip(self) -> str:
+        """Restituisce l'IP banco attualmente inserito nel campo."""
+        return self._banco_ip_entry.get().strip()
 
     def set_offset(self, value: float):
         self._offset_entry.config(state='normal')

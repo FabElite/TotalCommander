@@ -1,8 +1,6 @@
 Comando;t;Valore;Vbanco;
-Livelli;2;100;;
-Potenza;2;150;;
-Simulazione;2;2;;
+Livelli;2;0;10;
+Potenza;5;150;;
 save;5;;;punto 1
-spindown;2;100;;
-Livelli;2;100;;
-save;10;;;punto 2
+Potenza;5;200;;
+save;5;;;punto 2

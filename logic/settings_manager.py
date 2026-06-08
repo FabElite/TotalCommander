@@ -7,8 +7,7 @@ import os
 import logging
 
 DEFAULTS = {
-    'avg_dim': 20,           # campioni per la media mobile; la finestra temporale reale
-                             # dipende dalla frequenza effettiva del DLL Lorenz (vedi log all'avvio)
+    'avg_dim': 20,
     'invert_speed': False,
     'offset': 0.0,
     'delta_speed_thresholds_kmh': [1.0, 3.0],
@@ -16,6 +15,7 @@ DEFAULTS = {
     'delta_smoothing_window': 5,
     'rec_hz': 2,
     'stop_rec_on_auto_end': True,
+    'banco_ip': '192.168.0.10',
 }
 
 _log = logging.getLogger(__name__)
