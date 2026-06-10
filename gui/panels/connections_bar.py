@@ -61,9 +61,9 @@ class ConnectionsBar(ttk.Frame):
 
         # Griglia principale
         self.grid_columnconfigure(0, weight=0, minsize=150)  # Sessione – fisso
-        self.grid_columnconfigure(1, weight=1)  # BLE      – espandibile
-        self.grid_columnconfigure(2, weight=0)  # Lorenz   – fisso
-        self.grid_columnconfigure(3, weight=0)  # Banco    – fisso
+        self.grid_columnconfigure(1, weight=1)               # BLE      – espandibile
+        self.grid_columnconfigure(2, weight=0)               # Lorenz   – fisso/compatto
+        self.grid_columnconfigure(3, weight=0, minsize=130)  # Banco    – fisso/compatto
 
         self._build_sessione()
         self._build_ble()
@@ -258,41 +258,35 @@ class ConnectionsBar(ttk.Frame):
         f.grid_columnconfigure(0, weight=1)
         f.grid_columnconfigure(1, weight=1)
 
-        # Connetti / Disconnetti sulla stessa riga
-        rl = ttk.Frame(f)
-        rl.grid(row=0, column=0, columnspan=2, sticky="ew",
-                padx=self.PAD_IN, pady=(self.PAD_IN, 2))
-        rl.grid_columnconfigure(0, weight=1)
-        rl.grid_columnconfigure(1, weight=1)
-        ttk.Button(rl, text="Connetti",
+        ttk.Button(f, text="Connetti",
                    command=self._cb_lorenz_connect
-                   ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        ttk.Button(rl, text="Disconnetti",
+                   ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(self.PAD_IN, 2), padx=2)
+        ttk.Button(f, text="Disconnetti",
                    command=self._cb_lorenz_disconnect
-                   ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+                   ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2), padx=2)
 
         # Offset: label + entry readonly + pulsante "Leggi" compatti
         off_f = ttk.Frame(f)
-        off_f.grid(row=1, column=0, columnspan=2, sticky="ew",
-                   padx=self.PAD_IN, pady=2)
+        off_f.grid(row=2, column=0, columnspan=2, sticky="ew",
+                   padx=2, pady=2)
         off_f.grid_columnconfigure(1, weight=1)
         ttk.Label(off_f, text="Offset:").grid(row=0, column=0,
-                                               sticky="e", padx=(0, 4))
+                                               sticky="e", padx=(0, 2))
         self._offset_entry = ttk.Entry(off_f, state='readonly',
-                                       justify='right', width=8)
-        self._offset_entry.grid(row=0, column=1, sticky="ew", padx=(0, 4))
+                                       justify='right', width=5)
+        self._offset_entry.grid(row=0, column=1, sticky="ew", padx=(0, 2))
         ttk.Button(off_f, text="Leggi", width=5,
                    command=self._cb_lorenz_offset
                    ).grid(row=0, column=2)
 
         # Media
         avg_f = ttk.Frame(f)
-        avg_f.grid(row=2, column=0, columnspan=2, sticky="ew",
-                   padx=self.PAD_IN, pady=2)
+        avg_f.grid(row=3, column=0, columnspan=2, sticky="ew",
+                   padx=2, pady=2)
         avg_f.grid_columnconfigure(1, weight=1)
         ttk.Label(avg_f, text="Media:").grid(row=0, column=0,
-                                              sticky="e", padx=(0, 4))
-        self.avg_entry = ttk.Entry(avg_f, width=8, justify='right')
+                                              sticky="e", padx=(0, 2))
+        self.avg_entry = ttk.Entry(avg_f, justify='right', width=5)
         self.avg_entry.grid(row=0, column=1, sticky="ew")
         self.avg_entry.insert(0, str(self._lorenz_reader.avg_dim))
         self.avg_entry.bind("<Return>",
@@ -305,8 +299,8 @@ class ConnectionsBar(ttk.Frame):
         ttk.Checkbutton(f, text="Inverti Velocità",
                         variable=self._invert_var,
                         command=lambda: self._cb_lorenz_invert(self._invert_var.get())
-                        ).grid(row=3, column=0, columnspan=2, sticky="w",
-                               padx=self.PAD_IN, pady=(2, self.PAD_IN))
+                        ).grid(row=4, column=0, columnspan=2, sticky="w",
+                               padx=2, pady=(2, self.PAD_IN))
 
     # ------------------------------------------------------------------ #
     # Banco  (IP da settings, modificabile in linea)
@@ -323,18 +317,18 @@ class ConnectionsBar(ttk.Frame):
                   padx=self.PAD_IN, pady=(self.PAD_IN, 2))
         ip_f.grid_columnconfigure(1, weight=1)
         ttk.Label(ip_f, text="IP:").grid(row=0, column=0, sticky="e", padx=(0, 4))
-        self._banco_ip_entry = ttk.Entry(ip_f, width=14, justify='left')
+        self._banco_ip_entry = ttk.Entry(ip_f, width=11, justify='left')
         self._banco_ip_entry.insert(0, self._banco_ip_init)
         self._banco_ip_entry.grid(row=0, column=1, sticky="ew")
 
         ttk.Button(f, text="Connetti",
                    command=lambda: self._cb_banco_connect(self._banco_ip_entry.get()),
-                   width=10
+                   width=8
                    ).grid(row=1, column=0, sticky="ew",
                           padx=self.PAD_IN, pady=(2, 2))
 
         ttk.Button(f, text="Disconnetti",
-                   command=self._cb_banco_disconnect, width=10
+                   command=self._cb_banco_disconnect, width=8
                    ).grid(row=2, column=0, sticky="ew",
                           padx=self.PAD_IN, pady=(2, self.PAD_IN))
 

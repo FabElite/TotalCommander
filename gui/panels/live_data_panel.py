@@ -70,8 +70,8 @@ class LiveDataPanel(ttk.Frame):
         outer = ttk.LabelFrame(self, text="Misure")
         outer.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         # col 0: label misura | col 1: BLE | col 2: Lorenz | col 3: delta
-        outer.grid_columnconfigure(0, weight=0)  # fissa al più largo widget
-        outer.grid_columnconfigure(1, weight=1, minsize=80)  # ← peso dimezzato ma uguale tra loro
+        outer.grid_columnconfigure(0, weight=0)
+        outer.grid_columnconfigure(1, weight=1, minsize=80)
         outer.grid_columnconfigure(2, weight=1, minsize=80)
         outer.grid_columnconfigure(3, weight=1, minsize=80)
 

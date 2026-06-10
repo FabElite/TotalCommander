@@ -45,7 +45,7 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"Total Commander  —  {VERSION}")
-        self.geometry("1010x754")
+        self.geometry("950x767")
 
         # ── Stili ─────────────────────────────────────────────────────────────
         self.style = ttk.Style(self)
@@ -143,8 +143,8 @@ class MainWindow(tk.Tk):
         # Content area (2 colonne)
         content = ttk.Frame(_mf)
         content.grid(row=2, column=0, sticky="nsew", padx=6, pady=(0, 4))
-        content.grid_columnconfigure(0, weight=0)
-        content.grid_columnconfigure(1, weight=1)
+        content.grid_columnconfigure(0, weight=1)  # CsvPanel — si espande con la finestra
+        content.grid_columnconfigure(1, weight=0)  # LiveDataPanel — larghezza fissa al minimo
         content.grid_rowconfigure(0, weight=1)
 
         self._csv_panel = CsvPanel(

@@ -140,22 +140,22 @@ class CsvPanel(ttk.Frame):
 
         self._table = ttk.Treeview(
             wrap,
-            columns=("#", "Comando", "t[s]", "Valore", "Banco[km/h]", "Etichetta"),
+            columns=("#", "Comando", "t[s]", "Valore", "Banco[km/h]", "info"),
             show='headings',
             yscrollcommand=sb.set,
             style='Compact.Treeview',
         )
         col_defs = [
-            ("#",          28, 'center'),
-            ("Comando",    88, 'center'),
-            ("t[s]",       48, 'center'),
-            ("Valore",     62, 'center'),
-            ("Banco[km/h]",78, 'center'),
-            ("Etichetta",  90, 'w'),
+            ("#",           25, 'center', False),
+            ("Comando",     80, 'center', False),
+            ("t[s]",        45, 'center', False),
+            ("Valore",      55, 'center', False),
+            ("Banco[km/h]", 82, 'center', False),
+            ("info",   10, 'w',      True),   # si espande quando CsvPanel cresce
         ]
-        for col, w, anchor in col_defs:
+        for col, w, anchor, stretch in col_defs:
             self._table.heading(col, text=col)
-            self._table.column(col, width=w, anchor=anchor, stretch=False)
+            self._table.column(col, width=w, anchor=anchor, stretch=stretch)
         self._table.grid(row=0, column=0, sticky="nsew")
         sb.config(command=self._table.yview)
         self._table.tag_configure('oddrow',     background='lightgrey')
@@ -205,17 +205,18 @@ class CsvPanel(ttk.Frame):
         col_b.grid(row=0, column=1, sticky="new")
         col_b.grid_columnconfigure(0, weight=1)
 
+        # Un unico LabelFrame con griglia condivisa → tutto allineato
         f = ttk.LabelFrame(col_b, text="Comandi")
         f.grid(row=0, column=0, sticky="ew")
 
-        _W_SPIN = 8
+        _W_SPIN = 8    # larghezza spinbox
         _PX = 5
         _PY = 3
 
-        # Prima: 3 colonne (label | spinbox | pulsante)
-        # Ora:   2 colonne (spinbox | pulsante autodescrittivo)
-        f.grid_columnconfigure(0, weight=0)  # spinbox — fisso
-        f.grid_columnconfigure(1, weight=1)  # pulsante — si espande
+        # Prima: 3 colonne (label | spinbox | "Invia")
+        # Ora:   2 colonne (spinbox | pulsante autodescrittivo che si espande)
+        f.grid_columnconfigure(0, weight=0)   # spinbox — larghezza fissa
+        f.grid_columnconfigure(1, weight=1)   # pulsante — si espande con il frame
 
         # ── Sezione BLE ───────────────────────────────────────────────────────
         ttk.Label(f, text="BLE", font=('Helvetica', 8, 'bold'),
@@ -223,9 +224,9 @@ class CsvPanel(ttk.Frame):
             row=0, column=0, columnspan=2, sticky='w', padx=_PX, pady=(6, 2))
 
         specs = [
-            ("Livello [/200]", self._on_send_level, 0, 200, 1, None, 'livello'),
-            ("Potenza [W]", self._on_send_power, 0, 5000, 1, None, 'potenza'),
-            ("Simulazione [%]", self._on_send_simulation, -999999, 999999, 0.1, "%.1f", 'simulazione'),
+            ("Livello [/200]",  self._on_send_level,       0,       200,    1,    None,   'livello'),
+            ("Potenza [W]",     self._on_send_power,        0,      5000,    1,    None,   'potenza'),
+            ("Simulazione [%]",      self._on_send_simulation, -999999, 999999, 0.1, "%.1f",   'simulazione'),
         ]
         self._manual_entries = {}
         for i, (btn_label, cmd, lo, hi, inc, fmt, key) in enumerate(specs, start=1):
@@ -247,9 +248,9 @@ class CsvPanel(ttk.Frame):
             font=('Helvetica', 10, 'bold'),
             bg="#0D3B6E", fg="white",
             activebackground="#082B52", activeforeground="white",
-            relief='raised', bd=2, cursor='hand2',
+            relief='raised', bd=2, cursor='hand2', height=2,
         )
-        btn_zero.grid(row=4, column=0, columnspan=2,  # ← era columnspan=3
+        btn_zero.grid(row=4, column=0, columnspan=2,
                       sticky="ew", padx=_PX, pady=(6, 4))
 
         # ── Separatore ────────────────────────────────────────────────────────
@@ -265,7 +266,7 @@ class CsvPanel(ttk.Frame):
                                        format="%.1f", width=_W_SPIN)
         self._speed_spin.set("0.0")
         self._speed_spin.grid(row=7, column=0, padx=(_PX, 2), pady=_PY)
-        ttk.Button(f, text="Vel. Banco [km/h]",  # ← era Label "Vel [km/h]" + Button "Set"
+        ttk.Button(f, text="Vel. Banco [km/h]",
                    command=self._clicked_set_speed).grid(
             row=7, column=1, padx=(2, _PX), pady=_PY, sticky='ew')
 
@@ -278,7 +279,7 @@ class CsvPanel(ttk.Frame):
             activebackground="#B00000", activeforeground="white",
             relief='raised', bd=3, cursor='hand2', height=2,
         )
-        btn_stop.grid(row=8, column=0, columnspan=2,  # ← era columnspan=3
+        btn_stop.grid(row=8, column=0, columnspan=2,
                       sticky="ew", padx=_PX, pady=(6, 6))
         try:
             btn_stop.config(highlightthickness=2,
