@@ -8,4 +8,4 @@ spostare pulsante offset lorenz su visualizzazione dati
 
 leggere seriale dati e parlante da rullo connesso e visualizzarlo su barra stato
 
-
+verificare alta frequenza ble

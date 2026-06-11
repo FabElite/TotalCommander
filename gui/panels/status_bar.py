@@ -170,10 +170,6 @@ class StatusBar(tk.Frame):
             self._lbl_ftms.config(fg='#88ffaa')
             self._lbl_ftms_hz.config(text=f'{hz:.1f} Hz')
 
-    # set_heartbeat mantenuto come alias per retrocompatibilità
-    def set_heartbeat(self, hz=None):
-        self.set_ftms(hz)
-
     def set_rec(self, recording: bool):
         """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""
         if not recording:

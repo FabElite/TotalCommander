@@ -34,6 +34,7 @@ from gui.panels.csv_panel       import CsvPanel
 from gui.panels.live_data_panel import LiveDataPanel
 from gui.panels.log_panel       import LogPanel
 from gui.panels.sidebar         import CollapsibleSidebar
+from collections import deque
 
 try:
     from version import VERSION
@@ -102,6 +103,7 @@ class MainWindow(tk.Tk):
         self._shutdown_win    = None
         self._shutdown_anim_id = None
         self._shutdown_pb      = None
+        self._ftms_timestamps: deque = deque(maxlen=10)
 
         # ── Layout root: col 0 = contenuto, col 1 = sidebar ──────────────────
         self.grid_rowconfigure(0, weight=1)
@@ -355,6 +357,7 @@ class MainWindow(tk.Tk):
         self._connected_device_name = None
         self._connected_device_address = None
         self._status_bar.set_device_info()
+        self._ftms_timestamps.clear()
         if self._live_panel.is_ftms_enabled():
             self._live_panel.set_ftms_button(False)
             self._live_panel.clear_ble()
@@ -467,6 +470,7 @@ class MainWindow(tk.Tk):
                     self._connected_device_name = None
                     self._connected_device_address = None
                     self._status_bar.set_device_info()
+                    self._ftms_timestamps.clear()
                     if self._live_panel.is_ftms_enabled():
                         self._live_panel.set_ftms_button(False)
                         self._live_panel.clear_ble()
@@ -679,23 +683,23 @@ class MainWindow(tk.Tk):
             logging.getLogger().error(f"Errore disabilitazione FTMS: {e}")
 
     def _on_ble_data(self, bike_data: dict):
-        """Callback invocata dal loop BLE ad ogni pacchetto FTMS."""
+        arrival_time = time.monotonic()  # timestamp reale di arrivo
         self._latest_data.update(bike_data)
-        self.after(0, self._update_ble_ui, bike_data)
+        self.after(0, self._update_ble_ui, bike_data, arrival_time)
 
-    def _update_ble_ui(self, bike_data: dict):
-        # Heartbeat
-        now = time.monotonic()
-        if self._last_packet_time is not None:
-            dt = now - self._last_packet_time
-            if dt > 0:
-                self._status_bar.set_ftms(1.0 / dt)
-        self._last_packet_time = now
+    def _update_ble_ui(self, bike_data: dict, arrival_time: float = None):
+        now = arrival_time if arrival_time is not None else time.monotonic()
+        self._ftms_timestamps.append(now)
+
+        if len(self._ftms_timestamps) >= 2:
+            span = self._ftms_timestamps[-1] - self._ftms_timestamps[0]
+            if span > 0:
+                hz = (len(self._ftms_timestamps) - 1) / span
+                self._status_bar.set_ftms(hz)
+
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id)
         self._heartbeat_reset_id = self.after(2000, lambda: self._status_bar.set_ftms(0))
-
-        # Aggiorna live panel e ottieni speed/power per ComparePanel
         self._live_panel.update_ble(bike_data)
 
 
