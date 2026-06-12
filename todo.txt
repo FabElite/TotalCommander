@@ -1,11 +1,13 @@
-skip comandi automatici
-precedente (al primo rifare l'attuale) comandi automatici
-pausa comandi automatici
-
 spostare media ble e lorenz su visualizzazione dati
 spostare hz ble e lorenz su visualizzazione dati
 spostare pulsante offset lorenz su visualizzazione dati
 
 leggere seriale dati e parlante da rullo connesso e visualizzarlo su barra stato
 
-verificare alta frequenza ble
+
+26/6/11 FATTO:  verificare alta frequenza ble
+
+
+26/6/12 FATTO:  skip comandi automatici
+                precedente (al primo rifare l'attuale) comandi automatici
+                pausa comandi automatici

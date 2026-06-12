@@ -2,19 +2,14 @@
 Pannello comandi: tabella CSV + controlli automatici unificati in una sola box,
 affiancati dai comandi manuali BLE e dal controllo banco.
 
-Layout:
-  ┌─ Sequenza automatica ─────────────────────┐  ┌─ Comandi manuali BLE ─┐
-  │ [Carica] [▶ Start] [■ Stop]  N=[1]  stato │  │ Livello  [spin] Invia │
-  │ ─────────────────────────────────────────  │  │ Potenza  [spin] Invia │
-  │  Tabella CSV (scrollable, cresce)          │  │ Simul.   [spin] Invia │
-  │ ─────────────────────────────────────────  │  ├─ Controllo Banco ─────┤
-  │ Tot 00:36  Rim --:--  Ini 16:34  Fine ~   │  │ Vel [spin]  [Set]     │
-  └────────────────────────────────────────────┘  │ [■■ STOP BANCO ■■■]  │
-                                                   └───────────────────────┘
+Layout toolbar (stile media-player):
+  [Carica file]  [⏮]  [▶ Start / ⏸ Pausa]  [⏭]  [■ Stop]  N=[1]
+  [Auto-Stop REC □]
 """
 import tkinter as tk
 from tkinter import ttk, filedialog
 import datetime
+import time as _time
 import logging
 from logic.data_processing import DataProcessor
 
@@ -66,12 +61,44 @@ class CsvPanel(ttk.Frame):
         self._stop_rec_var         = tk.BooleanVar(value=stop_rec_on_auto_end)
 
         self._log = logging.getLogger(__name__)
-        self.auto_commands_running       = False
-        self._csv_single_cycle_seconds   = 0
-        self.total_test_duration_seconds = 0
+
+        # ── Stato sequenza ─────────────────────────────────────────────────────
+        self.auto_commands_running           = False
+        self._csv_single_cycle_seconds       = 0
+        self.total_test_duration_seconds     = 0
         self.remaining_test_duration_seconds = 0
-        self._auto_command_id = None
-        self._countdown_id    = None
+        self._auto_command_id                = None
+        self._countdown_id                   = None
+
+        # ── Stato navigazione / pausa ──────────────────────────────────────────
+        # _paused          : True quando la sequenza è esplicitamente in pausa
+        # _pending_pause   : True se pausa richiesta durante save/spindown (async);
+        #                    verrà applicata al termine dell'operazione corrente.
+        #                    Un secondo click sul pulsante annulla la pendenza.
+        # _current_abs_idx : absolute_index del comando attualmente in esecuzione
+        # _pause_remaining_ms: ms residui del timer del comando corrente al momento
+        #                    della pausa (0 se pausa dopo save/spindown)
+        # _after_deadline  : timestamp monotonic della scadenza del timer corrente;
+        #                    usato per calcolare _pause_remaining_ms
+        # _back_origin     : _current_abs_idx al momento del primo press di ⏮
+        #                    (-1 = nessuna navigazione back in corso)
+        # _back_count      : quante volte ⏮ è stato premuto nella sessione corrente
+        #                    (0 = restart corrente, 1 = uno indietro, …)
+        # _commands / _command_items / _total_commands / _num_cycles / _send_next:
+        #                    riferimenti alla sessione start() corrente, necessari
+        #                    per chiamare send_next dall'esterno della closure
+        self._paused             = False
+        self._pending_pause      = False
+        self._current_abs_idx    = 0
+        self._pause_remaining_ms = 0
+        self._after_deadline     = 0.0
+        self._back_origin        = -1
+        self._back_count         = 0
+        self._commands           = []
+        self._command_items      = []
+        self._total_commands     = 0
+        self._num_cycles         = 1
+        self._send_next          = None   # closure send_next dell'ultima start()
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
@@ -83,50 +110,68 @@ class CsvPanel(ttk.Frame):
     # ── Costruzione ───────────────────────────────────────────────────────────
 
     def _build_sequence_panel(self):
-        """Box unica: tabella → pulsanti/cicli → tempi."""
+        """Box unica: tabella → toolbar → timebar."""
         f = ttk.LabelFrame(self, text="Sequenza automatica")
         f.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
         f.grid_columnconfigure(0, weight=1)
-        f.grid_rowconfigure(0, weight=1)   # tabella in row=0 occupa lo spazio libero
+        f.grid_rowconfigure(0, weight=1)
 
         self._build_table(f)       # row 0
-        self._build_toolbar(f)     # rows 1,2  (separatore + pulsanti)
-        self._build_timebar(f)     # rows 3,4  (separatore + tempi)
+        self._build_toolbar(f)     # rows 1,2
+        self._build_timebar(f)     # rows 3,4
 
     def _build_toolbar(self, parent):
-        """Riga 2 (sotto tabella): separatore + pulsanti + N. Cicli."""
         ttk.Separator(parent, orient='horizontal').grid(
             row=1, column=0, sticky='ew', padx=8, pady=(2, 0))
 
         tb = ttk.Frame(parent)
         tb.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 4))
+        tb.grid_columnconfigure(2, weight=1)  # ▶/⏸ si espande con la finestra
 
+        # ── Riga 0: controlli trasporto ───────────────────────────────────────
         ttk.Button(tb, text="Carica file",
                    command=self.load_csv, width=11
-                   ).grid(row=0, column=0, padx=(0, 4))
+                   ).grid(row=0, column=0, padx=(0, 8))
 
-        ttk.Button(tb, text="▶  Start",
-                   command=self.start, width=9
-                   ).grid(row=0, column=1, padx=(0, 4))
+        self._btn_prev = ttk.Button(
+            tb, text="⏮", width=3,
+            command=self.go_back, state='disabled')
+        self._btn_prev.grid(row=0, column=1, padx=(0, 2))
+
+        self._btn_play_pause = ttk.Button(
+            tb, text="▶  Start",
+            command=self._on_play_pause)
+        self._btn_play_pause.grid(row=0, column=2, padx=(0, 2), sticky='ew')
+
+        self._btn_skip = ttk.Button(
+            tb, text="⏭", width=3,
+            command=self.skip_next, state='disabled')
+        self._btn_skip.grid(row=0, column=3, padx=(0, 8))
 
         ttk.Button(tb, text="■  Stop",
                    command=self.stop, width=9
-                   ).grid(row=0, column=2, padx=(0, 16))
+                   ).grid(row=0, column=4)
 
-        ttk.Label(tb, text="N. Cicli:").grid(row=0, column=3, padx=(0, 4))
-        self._cycles_spin = ttk.Spinbox(tb, from_=1, to=9999, increment=1, width=6,
-                                        command=self._on_cycles_changed)
-        self._cycles_spin.set(1)
-        self._cycles_spin.grid(row=0, column=4)
-        self._cycles_spin.bind("<FocusOut>", lambda e: self._on_cycles_changed())
-        self._cycles_spin.bind("<Return>",   lambda e: self._on_cycles_changed())
+        # ── Riga 1: checkbox a sx, N. Cicli a dx ─────────────────────────────
+        row1 = ttk.Frame(tb)
+        row1.grid(row=1, column=0, columnspan=5, sticky='ew', pady=(4, 0))
+        row1.grid_columnconfigure(0, weight=1)  # checkbox prende spazio residuo
 
         ttk.Checkbutton(
-            tb,
-            text="Auto-Stop REC",
+            row1, text="Auto-Stop REC",
             variable=self._stop_rec_var,
             command=self._on_stop_rec_toggle,
-        ).grid(row=1, column=0, sticky='w')
+        ).grid(row=0, column=0, sticky='w')
+
+        ttk.Label(row1, text="N. Cicli:").grid(row=0, column=1, padx=(0, 4))
+        self._cycles_spin = ttk.Spinbox(
+            row1, from_=1, to=9999, increment=1, width=6,
+            command=self._on_cycles_changed)
+        self._cycles_spin.set(1)
+        self._cycles_spin.grid(row=0, column=2)
+        self._cycles_spin.bind("<FocusOut>", lambda e: self._on_cycles_changed())
+        self._cycles_spin.bind("<Return>", lambda e: self._on_cycles_changed())
+
 
     def _build_table(self, parent):
         """Riga 0: Treeview con scrollbar."""
@@ -151,7 +196,7 @@ class CsvPanel(ttk.Frame):
             ("t[s]",        45, 'center', False),
             ("Valore",      55, 'center', False),
             ("Banco[km/h]", 82, 'center', False),
-            ("info",   10, 'w',      True),   # si espande quando CsvPanel cresce
+            ("info",        10, 'w',      True),
         ]
         for col, w, anchor, stretch in col_defs:
             self._table.heading(col, text=col)
@@ -175,12 +220,10 @@ class CsvPanel(ttk.Frame):
         tb = ttk.Frame(parent)
         tb.grid(row=4, column=0, sticky="ew", padx=10, pady=(4, 8))
 
-        # Larghezza fissa per i valori: "00:00:00" = 8 car, "99g 00:00:00" = 12 car
-        # Usiamo font monospace per garantire stabilità
         _F_LBL = ('Helvetica', 9)
-        _F_VAL = ('Courier', 9, 'bold')   # monospace → larghezza costante
-        _W_SHORT = 9   # HH:MM:SS
-        _W_LONG  = 13  # Xg HH:MM:SS (per Totale e Fine che possono superare 24h)
+        _F_VAL = ('Courier', 9, 'bold')
+        _W_SHORT = 9
+        _W_LONG  = 13
 
         def _pair(row, col, label_text, attr, fg, width):
             ttk.Label(tb, text=label_text, font=_F_LBL
@@ -190,13 +233,10 @@ class CsvPanel(ttk.Frame):
             lbl.grid(row=row, column=col + 1, sticky='w', padx=(0, 16))
             setattr(self, attr, lbl)
 
-        # Riga 0: Totale  |  Rimanente
-        _pair(0, 0, "Totale:",     "_lbl_total",     "black",   _W_LONG)
-        _pair(0, 2, "Rimanente:",  "_lbl_remaining",  "black",   _W_SHORT)
-
-        # Riga 1: Inizio  |  Fine
-        _pair(1, 0, "Inizio:",     "_lbl_inizio",    "#005500", _W_SHORT)
-        _pair(1, 2, "Fine:",       "_lbl_fine",      "#885500", _W_LONG)
+        _pair(0, 0, "Totale:",    "_lbl_total",     "black",   _W_LONG)
+        _pair(0, 2, "Rimanente:", "_lbl_remaining",  "black",   _W_SHORT)
+        _pair(1, 0, "Inizio:",    "_lbl_inizio",    "#005500", _W_SHORT)
+        _pair(1, 2, "Fine:",      "_lbl_fine",      "#885500", _W_LONG)
 
     # ── Colonna B: comandi manuali + banco ────────────────────────────────────
 
@@ -205,28 +245,24 @@ class CsvPanel(ttk.Frame):
         col_b.grid(row=0, column=1, sticky="new")
         col_b.grid_columnconfigure(0, weight=1)
 
-        # Un unico LabelFrame con griglia condivisa → tutto allineato
         f = ttk.LabelFrame(col_b, text="Comandi")
         f.grid(row=0, column=0, sticky="ew")
 
-        _W_SPIN = 8    # larghezza spinbox
+        _W_SPIN = 8
         _PX = 5
         _PY = 3
 
-        # Prima: 3 colonne (label | spinbox | "Invia")
-        # Ora:   2 colonne (spinbox | pulsante autodescrittivo che si espande)
-        f.grid_columnconfigure(0, weight=0)   # spinbox — larghezza fissa
-        f.grid_columnconfigure(1, weight=1)   # pulsante — si espande con il frame
+        f.grid_columnconfigure(0, weight=0)
+        f.grid_columnconfigure(1, weight=1)
 
-        # ── Sezione BLE ───────────────────────────────────────────────────────
         ttk.Label(f, text="BLE", font=('Helvetica', 8, 'bold'),
                   foreground='#1565C0').grid(
             row=0, column=0, columnspan=2, sticky='w', padx=_PX, pady=(6, 2))
 
         specs = [
-            ("Livello [/200]",  self._on_send_level,       0,       200,    1,    None,   'livello'),
-            ("Potenza [W]",     self._on_send_power,        0,      5000,    1,    None,   'potenza'),
-            ("Simulazione [%]",      self._on_send_simulation, -999999, 999999, 0.1, "%.1f",   'simulazione'),
+            ("Livello [/200]",   self._on_send_level,       0,       200,    1,    None,   'livello'),
+            ("Potenza [W]",      self._on_send_power,        0,      5000,    1,    None,   'potenza'),
+            ("Simulazione [%]",  self._on_send_simulation, -999999, 999999, 0.1, "%.1f",   'simulazione'),
         ]
         self._manual_entries = {}
         for i, (btn_label, cmd, lo, hi, inc, fmt, key) in enumerate(specs, start=1):
@@ -241,7 +277,6 @@ class CsvPanel(ttk.Frame):
                        command=lambda c=cmd, k=key: c(self._manual_entries[k].get())
                        ).grid(row=i, column=1, padx=(2, _PX), pady=_PY, sticky='ew')
 
-        # ── Zero Freno ────────────────────────────────────────────────────────
         btn_zero = tk.Button(
             f, text="⬛  ZERO FRENO",
             command=lambda: self._on_send_level(0),
@@ -253,11 +288,9 @@ class CsvPanel(ttk.Frame):
         btn_zero.grid(row=4, column=0, columnspan=2,
                       sticky="ew", padx=_PX, pady=(6, 4))
 
-        # ── Separatore ────────────────────────────────────────────────────────
         ttk.Separator(f, orient='horizontal').grid(
             row=5, column=0, columnspan=2, sticky='ew', padx=_PX, pady=(4, 4))
 
-        # ── Sezione Banco ─────────────────────────────────────────────────────
         ttk.Label(f, text="Banco", font=('Helvetica', 8, 'bold'),
                   foreground='#444444').grid(
             row=6, column=0, columnspan=2, sticky='w', padx=_PX, pady=(0, 2))
@@ -270,7 +303,6 @@ class CsvPanel(ttk.Frame):
                    command=self._clicked_set_speed).grid(
             row=7, column=1, padx=(2, _PX), pady=_PY, sticky='ew')
 
-        # ── STOP BANCO ────────────────────────────────────────────────────────
         btn_stop = tk.Button(
             f, text="⏹  STOP BANCO",
             command=self._on_emergency_stop,
@@ -319,10 +351,8 @@ class CsvPanel(ttk.Frame):
     def _start_countdown(self):
         """
         Avvia il conto alla rovescia basato su wall-clock (time.monotonic).
-        Non accumula deriva perché legge il tempo reale ad ogni tick
-        invece di decrementare un contatore.
+        Cattura total_test_duration_seconds al momento della chiamata come _total.
         """
-        import time as _time
         self._stop_countdown()
         _t0    = _time.monotonic()
         _total = float(self.total_test_duration_seconds)
@@ -335,14 +365,12 @@ class CsvPanel(ttk.Frame):
             remaining = max(0.0, _total - elapsed)
             self.remaining_test_duration_seconds = int(remaining)
             self._lbl_remaining.config(text=_fmt(remaining))
-            # Aggiorna ogni 500 ms per display fluido; si ferma quando arriva a zero
             if remaining > 0.5:
                 self._countdown_id = self.after(500, _tick)
             else:
                 self._lbl_remaining.config(text="00:00:00")
                 self._countdown_id = None
 
-        # Prima chiamata dopo 1 s: il display iniziale è già impostato in start()
         self._countdown_id = self.after(1000, _tick)
 
     def _stop_countdown(self):
@@ -354,11 +382,182 @@ class CsvPanel(ttk.Frame):
         for index, item in enumerate(self._table.get_children()):
             self._table.item(item, tags=('evenrow' if index % 2 == 0 else 'oddrow',))
 
+    def _update_nav_buttons(self):
+        """Abilita ⏮ e ⏭ solo quando la sequenza è attiva o in pausa."""
+        active = self.auto_commands_running or self._paused
+        s = 'normal' if active else 'disabled'
+        self._btn_prev.config(state=s)
+        self._btn_skip.config(state=s)
+
+    def _remaining_seconds_from(self, abs_idx: int) -> int:
+        """
+        Somma i tempi di attesa (tempo_s) dei comandi da abs_idx fino a fine sequenza.
+        Usato per ricalcolare il countdown dopo pause, salti e back.
+        """
+        if not self._commands or self._total_commands == 0:
+            return 0
+        n   = len(self._commands)
+        tot = 0
+        for i in range(abs_idx, self._total_commands):
+            try:
+                tot += int(float(self._commands[i % n][2]))   # col 2 = tempo_s
+            except (ValueError, TypeError, IndexError):
+                pass
+        return tot
+
+    # ── Navigazione / pausa ───────────────────────────────────────────────────
+
+    def _on_play_pause(self):
+        """
+        Gestisce il pulsante play/pause unificato:
+          - Idle          → start()
+          - In esecuzione → pause()
+          - In pausa      → resume()
+          - Pending pause → annulla la pausa pendente
+        """
+        if self._paused:
+            self.resume()
+        elif self._pending_pause:
+            self._pending_pause = False
+            self._btn_play_pause.config(text="⏸  Pausa")
+            self._log.info("Pausa annullata.")
+        elif self.auto_commands_running:
+            self.pause()
+        else:
+            self.start()
+
+    def pause(self):
+        """
+        Mette in pausa la sequenza.
+
+        Caso A — timer ordinario attivo (_auto_command_id set):
+            Cancella il timer, salva il residuo in _pause_remaining_ms, entra in pausa.
+        Caso B — operazione asincrona in corso (save / spindown):
+            Imposta _pending_pause; la pausa verrà applicata al termine del callback.
+            Un secondo click sul pulsante annulla la pendenza (→ _on_play_pause).
+        """
+        if not self.auto_commands_running or self._paused:
+            return
+
+        if self._auto_command_id is not None:
+            # Pausa immediata
+            self.after_cancel(self._auto_command_id)
+            self._auto_command_id    = None
+            self._pause_remaining_ms = max(
+                0, int((self._after_deadline - _time.monotonic()) * 1000))
+            self.auto_commands_running = False
+            self._paused               = True
+            self._stop_countdown()
+            self._btn_play_pause.config(text="▶  Riprendi")
+            self._on_auto_status('warn', 'Auto: PAUSA')
+            self._update_nav_buttons()
+            self._log.info(
+                f"Sequenza in pausa (residuo timer: {self._pause_remaining_ms} ms).")
+        else:
+            # Pausa pendente durante save / spindown
+            self._pending_pause = True
+            self._btn_play_pause.config(text="⏸  Annulla ⏸")
+            self._log.info(
+                "Pausa richiesta — attendo fine operazione corrente (clicca ancora per annullare).")
+
+    def resume(self):
+        """
+        Riprende la sequenza dopo una pausa immediata.
+        Ricalcola il countdown come: residuo_timer_corrente + somma_tempi_successivi.
+        """
+        if not self._paused:
+            return
+        self._paused               = False
+        self.auto_commands_running = True
+
+        remaining_s = (self._pause_remaining_ms / 1000
+                       + self._remaining_seconds_from(self._current_abs_idx + 1))
+        self.total_test_duration_seconds = int(remaining_s)
+        self._lbl_total.config(text=_fmt(self.total_test_duration_seconds))
+        self._start_countdown()
+
+        self._btn_play_pause.config(text="⏸  Pausa")
+        self._on_auto_status('ok', 'Auto: ON')
+        self._update_nav_buttons()
+
+        # Pianifica l'avanzamento al comando successivo dopo il residuo del timer
+        self._after_deadline  = _time.monotonic() + self._pause_remaining_ms / 1000
+        self._auto_command_id = self.after(
+            self._pause_remaining_ms, self._on_resume_advance)
+        self._log.info("Sequenza ripresa.")
+
+    def _on_resume_advance(self):
+        """Fired quando il timer residuo di una pausa termina naturalmente."""
+        self._auto_command_id = None
+        self._back_origin     = -1
+        self._back_count      = 0
+        if self._send_next is not None:
+            self._send_next(self._current_abs_idx + 1)
+
+    def skip_next(self):
+        """Salta immediatamente al comando successivo, resettando la navigazione back."""
+        if not (self.auto_commands_running or self._paused):
+            return
+        self._back_origin = -1
+        self._back_count  = 0
+        self._jump_to(self._current_abs_idx + 1)
+
+    def go_back(self):
+        """
+        Navigazione indietro con memoria della posizione originale:
+          1° press → riavvia il comando corrente  (back_count=0, target=origin)
+          2° press → va al comando precedente      (back_count=1, target=origin-1)
+          3° press → va ancora indietro            (back_count=2, target=origin-2)
+          …
+        _back_origin è fissato al primo press; i press successivi ne sottraggono
+        _back_count incrementalmente. Reset su skip, avanzamento naturale e stop.
+        """
+        if not (self.auto_commands_running or self._paused):
+            return
+        if self._back_origin == -1:
+            # Primo press: memorizza la posizione corrente
+            self._back_origin = self._current_abs_idx
+        target = max(0, self._back_origin - self._back_count)
+        self._back_count += 1
+        self._log.debug(
+            f"go_back: origin={self._back_origin} press={self._back_count-1} → target={target}")
+        self._jump_to(target)
+
+    def _jump_to(self, index: int):
+        """
+        Interrompe il timer corrente e salta a index.
+        Azzera le evidenziature, ricalcola e riavvia il countdown.
+        """
+        if self._send_next is None:
+            return
+        index = max(0, min(index, self._total_commands))
+
+        if self._auto_command_id is not None:
+            self.after_cancel(self._auto_command_id)
+            self._auto_command_id = None
+
+        self._paused            = False
+        self._pending_pause     = False
+        self.auto_commands_running = True
+
+        self._reset_table_highlights()
+        remaining = self._remaining_seconds_from(index)
+        self.total_test_duration_seconds = remaining
+        self._lbl_total.config(text=_fmt(remaining))
+        self._stop_countdown()
+        self._start_countdown()
+
+        self._btn_play_pause.config(text="⏸  Pausa")
+        self._on_auto_status('ok', 'Auto: ON')
+        self._update_nav_buttons()
+        self._send_next(index)
+
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def load_csv(self):
-        if self.auto_commands_running:
-            self._log.warning("Comandi automatici in corso. Impossibile caricare il file CSV.")
+        if self.auto_commands_running or self._paused:
+            self._log.warning(
+                "Sequenza in esecuzione o in pausa. Impossibile caricare il file.")
             return
         file_path = filedialog.askopenfilename(
             filetypes=[
@@ -377,7 +576,7 @@ class CsvPanel(ttk.Frame):
         self._lbl_inizio.config(text="--:--:--", fg='#005500')
         self._lbl_fine.config(text="--:--:--", fg='#885500')
         self.total_test_duration_seconds = 0
-        self._csv_single_cycle_seconds = 0
+        self._csv_single_cycle_seconds   = 0
 
         for item in self._table.get_children():
             self._table.delete(item)
@@ -402,6 +601,9 @@ class CsvPanel(ttk.Frame):
             f"Caricati {len(commands)} comandi. Durata 1 ciclo: {_fmt(single_cycle_s)}")
 
     def start(self):
+        if self._paused:
+            self.resume()
+            return
         if self.auto_commands_running:
             self._log.warning("Comandi automatici già in esecuzione.")
             return
@@ -409,7 +611,6 @@ class CsvPanel(ttk.Frame):
             self._log.info("La tabella dei comandi è vuota.")
             return
 
-        # Controllo pre-avvio (es. registrazione non attiva)
         if self._on_before_auto_start is not None:
             if not self._on_before_auto_start():
                 return
@@ -431,83 +632,170 @@ class CsvPanel(ttk.Frame):
         self.total_test_duration_seconds = self._csv_single_cycle_seconds * num_cycles
         self._lbl_total.config(text=_fmt(self.total_test_duration_seconds))
 
-        commands      = [self._table.item(i, 'values') for i in self._table.get_children()]
-        command_items = self._table.get_children()
-        self._reset_table_highlights()
+        # ── Reset stato navigazione ────────────────────────────────────────────
+        self._paused             = False
+        self._pending_pause      = False
+        self._current_abs_idx    = 0
+        self._back_origin        = -1
+        self._back_count         = 0
+        self._pause_remaining_ms = 0
+        self._after_deadline     = 0.0
+
+        commands       = [self._table.item(i, 'values') for i in self._table.get_children()]
+        command_items  = list(self._table.get_children())
         total_commands = len(commands) * num_cycles
 
-        def send_next(absolute_index):
+        # Salva riferimenti per navigazione esterna (go_back / skip_next / resume)
+        self._commands       = commands
+        self._command_items  = command_items
+        self._total_commands = total_commands
+        self._num_cycles     = num_cycles
+
+        self._reset_table_highlights()
+
+        # ── Closure send_next ──────────────────────────────────────────────────
+        def send_next(absolute_index: int):
+            self._current_abs_idx = absolute_index
+
             if absolute_index < total_commands and self.auto_commands_running:
                 index = absolute_index % len(commands)
-                cycle = absolute_index // len(commands) + 1
-                # Treeview restituisce: (#, command_type, tempo_s, valore_rullo, banco_kmh, etichetta)
                 _num, command_type, tempo_s, valore_rullo, banco_kmh, etichetta = commands[index]
                 try:
                     wait_time = int(float(tempo_s))
                 except (ValueError, TypeError):
                     wait_time = 0
 
+                # Aggiorna evidenziatura riga
                 if absolute_index > 0:
                     prev = (absolute_index - 1) % len(commands)
-                    self._table.item(command_items[prev],
-                                     tags=('evenrow' if prev % 2 == 0 else 'oddrow',))
+                    self._table.item(
+                        command_items[prev],
+                        tags=('evenrow' if prev % 2 == 0 else 'oddrow',))
                 self._table.item(command_items[index], tags=('currentrow',))
                 if self._autoscroll_table.get():
                     self._table.see(command_items[index])
                 self._on_auto_status('ok', 'Auto: ON')
 
+                # ── Comando SAVE ───────────────────────────────────────────────
                 if command_type == "save" and self._on_save is not None:
                     label_str = f"'{etichetta}'" if etichetta else "(nessuna)"
                     self._log.info(
                         f"[Auto] Raccolta media {label_str} — finestra {wait_time}s...")
                     self._on_auto_status('ok', 'Auto: SAVE…')
+
                     def _resume_save(success: bool, _ai=absolute_index):
                         if not self.auto_commands_running:
+                            return
+                        # Applica pausa pendente dopo operazione asincrona
+                        if self._pending_pause:
+                            self._pending_pause      = False
+                            self._paused             = True
+                            self.auto_commands_running = False
+                            self._current_abs_idx    = _ai
+                            self._pause_remaining_ms = 0
+                            self._stop_countdown()
+                            self._btn_play_pause.config(text="▶  Riprendi")
+                            self._on_auto_status('warn', 'Auto: PAUSA')
+                            self._update_nav_buttons()
+                            self._log.info(
+                                f"[Auto] save {'OK' if success else 'non salvato'}"
+                                " — sequenza in pausa.")
                             return
                         if success:
                             self._log.info("[Auto] Media salvata nel file sintesi.")
                         else:
-                            self._log.warning("[Auto] Raccolta interrotta — riga non salvata.")
+                            self._log.warning(
+                                "[Auto] Raccolta interrotta — riga non salvata.")
+                        # Avanzamento naturale: reset navigazione back
+                        self._back_origin = -1
+                        self._back_count  = 0
                         self._auto_command_id = self.after(
                             0, lambda: send_next(_ai + 1))
+
                     self._on_save(wait_time, str(etichetta), _resume_save)
 
+                # ── Comando SPINDOWN ───────────────────────────────────────────
                 elif command_type == "spindown" and self._on_spindown is not None:
                     self._log.info("[Auto] Avvio calibrazione spin-down automatica...")
-                    def _resume(success: bool, _ai=absolute_index):
+
+                    def _resume_spindown(success: bool, _ai=absolute_index):
                         if not self.auto_commands_running:
                             return
+                        if self._pending_pause:
+                            self._pending_pause      = False
+                            self._paused             = True
+                            self.auto_commands_running = False
+                            self._current_abs_idx    = _ai
+                            self._pause_remaining_ms = 0
+                            self._stop_countdown()
+                            self._btn_play_pause.config(text="▶  Riprendi")
+                            self._on_auto_status('warn', 'Auto: PAUSA')
+                            self._update_nav_buttons()
+                            self._log.info(
+                                "[Auto] Calibrazione terminata — sequenza in pausa.")
+                            return
                         if success:
-                            self._log.info("[Auto] Calibrazione completata — sequenza ripresa.")
+                            self._log.info(
+                                "[Auto] Calibrazione completata — sequenza ripresa.")
                         else:
-                            self._log.warning("[Auto] Calibrazione fallita — sequenza ripresa comunque.")
-                        self._auto_command_id = self.after(0, lambda: send_next(_ai + 1))
-                    self._on_spindown(_resume)
+                            self._log.warning(
+                                "[Auto] Calibrazione fallita — sequenza ripresa comunque.")
+                        self._back_origin = -1
+                        self._back_count  = 0
+                        self._auto_command_id = self.after(
+                            0, lambda: send_next(_ai + 1))
 
+                    self._on_spindown(_resume_spindown)
+
+                # ── Comando ordinario con timer ────────────────────────────────
                 else:
                     self._on_dispatch(command_type, valore_rullo, banco_kmh)
+                    self._after_deadline = _time.monotonic() + wait_time
+
+                    def _natural_advance(_ai=absolute_index):
+                        """Avanzamento naturale: reset navigazione back, poi next."""
+                        self._auto_command_id = None
+                        self._back_origin     = -1
+                        self._back_count      = 0
+                        send_next(_ai + 1)
+
                     self._auto_command_id = self.after(
-                        wait_time * 1000, lambda: send_next(absolute_index + 1))
+                        wait_time * 1000, _natural_advance)
+
             else:
+                # ── Fine sequenza ──────────────────────────────────────────────
                 self.auto_commands_running = False
+                self._paused               = False
+                self._pending_pause        = False
+                self._back_origin          = -1
+                self._back_count           = 0
                 self._stop_countdown()
                 self._lbl_remaining.config(text="00:00:00")
                 self._on_auto_status('warn', 'Auto: OK')
                 self._lbl_fine.config(
                     text=datetime.datetime.now().strftime("%H:%M:%S"),
                     fg='#005500')
-                self._log.info(f"Comandi automatici completati ({num_cycles} ciclo/i)")
-                # Sicurezza: freno a 0 e banco a 0 al termine di tutti i cicli
-                self._log.info("Fine sequenza — invio freno=0 e velocità banco=0 (sicurezza)")
+                self._log.info(
+                    f"Comandi automatici completati ({num_cycles} ciclo/i)")
+                self._log.info(
+                    "Fine sequenza — invio freno=0 e velocità banco=0 (sicurezza)")
                 self._on_send_level(0)
                 self._on_set_banco(0)
                 self._reset_table_highlights()
+                self._update_nav_buttons()
+                self._btn_play_pause.config(text="▶  Start")
                 self._on_auto_completed()
 
+        # Salva riferimento alla closure per navigazione esterna
+        self._send_next = send_next
+
+        # ── Avvio ─────────────────────────────────────────────────────────────
         self.auto_commands_running = True
         self._on_auto_status('ok', 'Auto: ON')
+        self._btn_play_pause.config(text="⏸  Pausa")
+        self._update_nav_buttons()
 
-        now = datetime.datetime.now()
+        now  = datetime.datetime.now()
         self._lbl_inizio.config(text=now.strftime("%H:%M:%S"), fg='#005500')
         fine = now + datetime.timedelta(seconds=self.total_test_duration_seconds)
         self._lbl_fine.config(text=fine.strftime("%H:%M:%S") + " ~", fg='#885500')
@@ -518,8 +806,13 @@ class CsvPanel(ttk.Frame):
         send_next(0)
 
     def stop(self):
-        if self.auto_commands_running:
+        was_active = self.auto_commands_running or self._paused
+        if was_active:
             self.auto_commands_running = False
+            self._paused               = False
+            self._pending_pause        = False
+            self._back_origin          = -1
+            self._back_count           = 0
             self._stop_countdown()
             self._lbl_remaining.config(text="Interrotto")
             self._lbl_fine.config(
@@ -533,8 +826,12 @@ class CsvPanel(ttk.Frame):
             for item in self._table.get_children():
                 if 'currentrow' in self._table.item(item, 'tags'):
                     idx = self._table.index(item)
-                    self._table.item(item, tags=('evenrow' if idx % 2 == 0 else 'oddrow',))
+                    self._table.item(
+                        item,
+                        tags=('evenrow' if idx % 2 == 0 else 'oddrow',))
                     break
+            self._update_nav_buttons()
+            self._btn_play_pause.config(text="▶  Start")
         else:
             self._log.info("Non ci sono comandi automatici attivi")
             self._lbl_remaining.config(text="--:--:--")
