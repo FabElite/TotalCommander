@@ -74,10 +74,6 @@ class StatusBar(tk.Frame):
         self._lbl_ftms = tk.Label(g_ble, text='FTMS', bg=_BG, fg='#aaaacc',
                                   font=('Helvetica', 8))
         self._lbl_ftms.grid(row=0, column=5)
-        self._lbl_ftms_hz = tk.Label(g_ble, text='', bg=_BG, fg='#aaaacc',
-                                     font=('Helvetica', 8))
-        self._lbl_ftms_hz.grid(row=1, column=4, columnspan=2,
-                               padx=(3, 0), pady=(0, 1))
 
         self._sep(3)
 
@@ -153,22 +149,17 @@ class StatusBar(tk.Frame):
 
     def set_ftms(self, hz=None):
         """
-        None     → FTMS disabilitato (LED spento)
-        0        → FTMS abilitato, nessun pacchetto ancora (LED verde fisso)
-        float>0  → pacchetti in arrivo (LED verde + Hz)
+        None  → FTMS disabilitato (LED spento).
+        0     → FTMS abilitato, nessun pacchetto ancora (LED verde).
+        float → pacchetti in arrivo (LED verde).
+        La frequenza Hz è ora mostrata nel LiveDataPanel.
         """
         if hz is None:
             self._led_ftms.config(fg='#555555')
             self._lbl_ftms.config(fg='#aaaacc')
-            self._lbl_ftms_hz.config(text='')
-        elif hz == 0:
-            self._led_ftms.config(fg='#00cc44')
-            self._lbl_ftms.config(fg='#88ffaa')
-            self._lbl_ftms_hz.config(text='-- Hz')
         else:
             self._led_ftms.config(fg='#00cc44')
             self._lbl_ftms.config(fg='#88ffaa')
-            self._lbl_ftms_hz.config(text=f'{hz:.1f} Hz')
 
     def set_rec(self, recording: bool):
         """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""

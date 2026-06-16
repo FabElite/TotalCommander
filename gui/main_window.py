@@ -104,6 +104,7 @@ class MainWindow(tk.Tk):
         self._shutdown_anim_id = None
         self._shutdown_pb      = None
         self._ftms_timestamps: deque = deque(maxlen=10)
+        self._lorenz_timestamps: deque = deque(maxlen=10)
 
         # ── Layout root: col 0 = contenuto, col 1 = sidebar ──────────────────
         self.grid_rowconfigure(0, weight=1)
@@ -133,8 +134,6 @@ class MainWindow(tk.Tk):
             on_ble_disconnect    = self._ble_disconnect,
             on_lorenz_connect    = self._lorenz_connect,
             on_lorenz_disconnect = self._lorenz_disconnect,
-            on_lorenz_read_offset= self._lorenz_read_offset,
-            on_lorenz_avg_change = self._lorenz_avg_changed,
             on_lorenz_invert     = self._lorenz_invert_speed,
             on_banco_connect     = self._banco_connect,
             on_banco_disconnect  = self._banco_disconnect,
@@ -169,10 +168,14 @@ class MainWindow(tk.Tk):
 
         self._live_panel = LiveDataPanel(
             content,
-            on_toggle_ftms   = self._toggle_ftms,
-            smoothing_window = self.delta_smoothing_window,
-            speed_thresholds = self.delta_speed_thresholds_kmh,
-            power_thresholds = self.delta_power_thresholds_pct,
+            on_toggle_ftms       = self._toggle_ftms,
+            on_lorenz_read_offset= self._lorenz_read_offset,
+            on_lorenz_avg_change = self._lorenz_avg_changed,
+            on_smoothing_change  = self._on_smoothing_window_changed,
+            smoothing_window     = self.delta_smoothing_window,
+            lorenz_avg_dim       = self.lorenz_reader.avg_dim,
+            speed_thresholds     = self.delta_speed_thresholds_kmh,
+            power_thresholds     = self.delta_power_thresholds_pct,
         )
         self._live_panel.grid(row=0, column=1, sticky="nsew")
 
@@ -195,7 +198,7 @@ class MainWindow(tk.Tk):
         self._sidebar.grid(row=0, column=1, sticky="ns")
 
         # Aggiorna offset al primo avvio
-        self._conn_bar.set_offset(self.lorenz_reader.offset)
+        self._live_panel.set_offset(self.lorenz_reader.offset)
 
         self._create_menu()
         self.periodic_connection_check()
@@ -640,6 +643,7 @@ class MainWindow(tk.Tk):
             self._heartbeat_reset_id = None
         self._last_packet_time = None
         self._status_bar.set_ftms(None)
+        self._live_panel.set_ble_hz(None)
 
     def _toggle_ftms(self):
         if not self._live_panel.is_ftms_enabled():
@@ -696,11 +700,18 @@ class MainWindow(tk.Tk):
             if span > 0:
                 hz = (len(self._ftms_timestamps) - 1) / span
                 self._status_bar.set_ftms(hz)
+                self._live_panel.set_ble_hz(hz)
 
         if self._heartbeat_reset_id:
             self.after_cancel(self._heartbeat_reset_id)
-        self._heartbeat_reset_id = self.after(2000, lambda: self._status_bar.set_ftms(0))
+        self._heartbeat_reset_id = self.after(2000, self._on_ftms_heartbeat_timeout)
         self._live_panel.update_ble(bike_data)
+
+    def _on_ftms_heartbeat_timeout(self):
+        """Chiamato 2 s dopo l'ultimo pacchetto FTMS: indica assenza dati."""
+        self._heartbeat_reset_id = None
+        self._status_bar.set_ftms(0)
+        self._live_panel.set_ble_hz(None)
 
 
     # ── Lorenz ────────────────────────────────────────────────────────────────
@@ -735,7 +746,7 @@ class MainWindow(tk.Tk):
         """Aggiorna live panel e _latest_data con i dati Lorenz. Chiamata da _sensor_poll."""
         self._latest_data.update(data)
         self._live_panel.update_lorenz(data)
-        self._conn_bar.set_offset(self.lorenz_reader.offset)
+        self._live_panel.set_offset(self.lorenz_reader.offset)
 
     def _lorenz_disconnect(self):
         logging.getLogger().info("Disconnessione Lorenz in corso...")
@@ -750,7 +761,7 @@ class MainWindow(tk.Tk):
     def _lorenz_read_offset(self):
         self.lorenz_reader.read_offset()
         logging.getLogger().debug(f"Offset Lorenz: {self.lorenz_reader.offset:.4f}")
-        self._conn_bar.set_offset(self.lorenz_reader.offset)
+        self._live_panel.set_offset(self.lorenz_reader.offset)
         self._save_settings()
 
     def _lorenz_avg_changed(self, value_str):
@@ -759,19 +770,24 @@ class MainWindow(tk.Tk):
             if new_avg > 0 and self.lorenz_reader.avg_dim != new_avg:
                 self.lorenz_reader.avg_dim = new_avg
                 logging.getLogger().debug(f"Media Lorenz impostata a {new_avg} campioni.")
-                self._conn_bar.set_avg(new_avg)
                 self._save_settings()
             elif new_avg <= 0:
                 logging.getLogger().warning("La dimensione della media deve essere > 0.")
-                self._conn_bar.set_avg(self.lorenz_reader.avg_dim)
+                self._live_panel.set_lorenz_avg(self.lorenz_reader.avg_dim)
         except ValueError:
-            logging.getLogger().error("Valore media non valido.")
-            self._conn_bar.set_avg(self.lorenz_reader.avg_dim)
+            logging.getLogger().error("Valore media Lorenz non valido.")
+            self._live_panel.set_lorenz_avg(self.lorenz_reader.avg_dim)
 
     def _lorenz_invert_speed(self, inverted: bool):
         self.lorenz_reader.invert_speed = inverted
         logging.getLogger().debug(f"Inversione velocità Lorenz: {'Attiva' if inverted else 'Disattiva'}")
         self._save_settings()
+
+    def _on_smoothing_window_changed(self, n: int):
+        """Callback dallo spinbox BLE N campioni nel LiveDataPanel."""
+        self.delta_smoothing_window = n
+        self._save_settings()
+        logging.getLogger().debug(f"Smoothing window BLE: {n} campioni")
 
     # ── Modbus / Banco ────────────────────────────────────────────────────────
 
@@ -1118,6 +1134,18 @@ class MainWindow(tk.Tk):
         if self.lorenz_reader.is_connected():
             data = self.lorenz_reader.get_data()
             self._on_lorenz_data(data)
+            # Misura frequenza effettiva (analogo a FTMS Hz)
+            now = time.monotonic()
+            self._lorenz_timestamps.append(now)
+            if len(self._lorenz_timestamps) >= 2:
+                span = self._lorenz_timestamps[-1] - self._lorenz_timestamps[0]
+                if span > 0:
+                    self._live_panel.set_lorenz_hz(
+                        (len(self._lorenz_timestamps) - 1) / span)
+        else:
+            if self._lorenz_timestamps:
+                self._lorenz_timestamps.clear()
+                self._live_panel.set_lorenz_hz(None)
 
         # ── Sensore seriale COM ───────────────────────────────────────────────
         if self.serial_reader.connected:
@@ -1438,30 +1466,19 @@ class MainWindow(tk.Tk):
 
         ttk.Separator(win, orient='horizontal').grid(
             row=7, column=0, columnspan=3, sticky='ew', padx=12, pady=6)
-
-        ttk.Label(win, text="Smoothing window",
-                  font=('Helvetica', 9, 'bold')).grid(
-            row=8, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
-        ttk.Label(win, text="Campioni (N)").grid(row=9, column=0, sticky='e', **pad)
-        smw = ttk.Entry(win, width=8, justify='right')
-        smw.insert(0, str(self.delta_smoothing_window))
-        smw.grid(row=9, column=1, **pad)
-
-        ttk.Separator(win, orient='horizontal').grid(
-            row=10, column=0, columnspan=3, sticky='ew', padx=12, pady=6)
         ttk.Label(win, text="Frequenza registrazione",
                   font=('Helvetica', 9, 'bold')).grid(
-            row=11, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
-        ttk.Label(win, text="Frequenza [Hz]:").grid(row=12, column=0, sticky='e', **pad)
+            row=8, column=0, columnspan=3, sticky='w', padx=12, pady=(2, 2))
+        ttk.Label(win, text="Frequenza [Hz]:").grid(row=9, column=0, sticky='e', **pad)
         rec_hz_cb = ttk.Combobox(win, values=['1', '2', '4', '10'], width=6,
                                  justify='right', state='readonly')
         rec_hz_cb.set(str(self._rec_hz))
-        rec_hz_cb.grid(row=12, column=1, **pad)
+        rec_hz_cb.grid(row=9, column=1, **pad)
 
         err_var = tk.StringVar()
         ttk.Label(win, textvariable=err_var, foreground='#CC0000',
                   font=('Helvetica', 8)).grid(
-            row=14, column=0, columnspan=3, padx=12, pady=(2, 0))
+            row=10, column=0, columnspan=3, padx=12, pady=(2, 0))
 
         def _apply():
             try:
@@ -1469,13 +1486,10 @@ class MainWindow(tk.Tk):
                 s2 = float(spd_t2.get())
                 p1 = float(pwr_t1.get())
                 p2 = float(pwr_t2.get())
-                n  = int(smw.get())
                 if s1 <= 0 or s2 <= s1:
                     raise ValueError("Soglie velocità: richiede 0 < verde < arancione")
                 if p1 <= 0 or p2 <= p1:
                     raise ValueError("Soglie potenza: richiede 0 < verde < arancione")
-                if n < 1:
-                    raise ValueError("Smoothing window deve essere ≥ 1")
                 hz = int(rec_hz_cb.get())
             except ValueError as e:
                 err_var.set(str(e))
@@ -1483,20 +1497,17 @@ class MainWindow(tk.Tk):
 
             self.delta_speed_thresholds_kmh = (s1, s2)
             self.delta_power_thresholds_pct = (p1, p2)
-            self.delta_smoothing_window     = n
             self._rec_hz                    = hz
             self._live_panel.set_thresholds(
                 self.delta_speed_thresholds_kmh,
                 self.delta_power_thresholds_pct)
-            self._live_panel.set_smoothing_window(n)
             self._save_settings()
-            # Aggiorna immediatamente la label Hz nella status bar
             self._status_bar.set_rec_hz(hz, active=self.data_processor.is_recording)
             logging.getLogger().info(
-                f"Settings updated - spd ({s1},{s2}) km/h | pwr ({p1},{p2})% | N={n} | REC {hz}Hz")
+                f"Settings updated - spd ({s1},{s2}) km/h | pwr ({p1},{p2})% | REC {hz}Hz")
 
         bf = ttk.Frame(win)
-        bf.grid(row=15, column=0, columnspan=3, pady=(8, 14))
+        bf.grid(row=11, column=0, columnspan=3, pady=(8, 14))
         ttk.Button(bf, text="Applica", command=_apply).grid(
             row=0, column=0, padx=6)
         ttk.Button(bf, text="Annulla", command=win.destroy).grid(

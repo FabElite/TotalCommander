@@ -27,7 +27,7 @@ class ConnectionsBar(ttk.Frame):
                  on_rec_start, on_rec_stop, on_open_output,
                  on_ble_search, on_ble_connect, on_ble_disconnect,
                  on_lorenz_connect, on_lorenz_disconnect,
-                 on_lorenz_read_offset, on_lorenz_avg_change, on_lorenz_invert,
+                 on_lorenz_invert,
                  on_banco_connect, on_banco_disconnect,
                  banco_ip: str = _BANCO_DEFAULT_IP, **kwargs):
         super().__init__(parent, **kwargs)
@@ -41,8 +41,6 @@ class ConnectionsBar(ttk.Frame):
         self._cb_ble_disconnect    = on_ble_disconnect
         self._cb_lorenz_connect    = on_lorenz_connect
         self._cb_lorenz_disconnect = on_lorenz_disconnect
-        self._cb_lorenz_offset     = on_lorenz_read_offset
-        self._cb_lorenz_avg        = on_lorenz_avg_change
         self._cb_lorenz_invert     = on_lorenz_invert
         self._cb_banco_connect     = on_banco_connect
         self._cb_banco_disconnect  = on_banco_disconnect
@@ -256,51 +254,23 @@ class ConnectionsBar(ttk.Frame):
         f.grid(row=0, column=2, sticky="nsew",
                padx=self.PAD_OUT, pady=self.PAD_OUT)
         f.grid_columnconfigure(0, weight=1)
-        f.grid_columnconfigure(1, weight=1)
 
         ttk.Button(f, text="Connetti",
                    command=self._cb_lorenz_connect
-                   ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(self.PAD_IN, 2), padx=2)
+                   ).grid(row=0, column=0, sticky="ew",
+                          pady=(self.PAD_IN, 2), padx=2)
         ttk.Button(f, text="Disconnetti",
                    command=self._cb_lorenz_disconnect
-                   ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2), padx=2)
-
-        # Offset: label + entry readonly + pulsante "Leggi" compatti
-        off_f = ttk.Frame(f)
-        off_f.grid(row=2, column=0, columnspan=2, sticky="ew",
-                   padx=2, pady=2)
-        off_f.grid_columnconfigure(1, weight=1)
-        ttk.Label(off_f, text="Offset:").grid(row=0, column=0,
-                                               sticky="e", padx=(0, 2))
-        self._offset_entry = ttk.Entry(off_f, state='readonly',
-                                       justify='right', width=5)
-        self._offset_entry.grid(row=0, column=1, sticky="ew", padx=(0, 2))
-        ttk.Button(off_f, text="Leggi", width=5,
-                   command=self._cb_lorenz_offset
-                   ).grid(row=0, column=2)
-
-        # Media
-        avg_f = ttk.Frame(f)
-        avg_f.grid(row=3, column=0, columnspan=2, sticky="ew",
-                   padx=2, pady=2)
-        avg_f.grid_columnconfigure(1, weight=1)
-        ttk.Label(avg_f, text="Media:").grid(row=0, column=0,
-                                              sticky="e", padx=(0, 2))
-        self.avg_entry = ttk.Entry(avg_f, justify='right', width=5)
-        self.avg_entry.grid(row=0, column=1, sticky="ew")
-        self.avg_entry.insert(0, str(self._lorenz_reader.avg_dim))
-        self.avg_entry.bind("<Return>",
-                            lambda e: self._cb_lorenz_avg(self.avg_entry.get()))
-        self.avg_entry.bind("<FocusOut>",
-                            lambda e: self._cb_lorenz_avg(self.avg_entry.get()))
+                   ).grid(row=1, column=0, sticky="ew",
+                          pady=(0, 2), padx=2)
 
         # Inverti velocità
         self._invert_var = tk.BooleanVar(value=self._lorenz_reader.invert_speed)
         ttk.Checkbutton(f, text="Inverti Velocità",
                         variable=self._invert_var,
                         command=lambda: self._cb_lorenz_invert(self._invert_var.get())
-                        ).grid(row=4, column=0, columnspan=2, sticky="w",
-                               padx=2, pady=(2, self.PAD_IN))
+                        ).grid(row=2, column=0, sticky="w",
+                               padx=2, pady=(4, self.PAD_IN))
 
     # ------------------------------------------------------------------ #
     # Banco  (IP da settings, modificabile in linea)
@@ -405,13 +375,3 @@ class ConnectionsBar(ttk.Frame):
     def get_banco_ip(self) -> str:
         """Restituisce l'IP banco attualmente inserito nel campo."""
         return self._banco_ip_entry.get().strip()
-
-    def set_offset(self, value: float):
-        self._offset_entry.config(state='normal')
-        self._offset_entry.delete(0, tk.END)
-        self._offset_entry.insert(0, f"{value:.2f}")
-        self._offset_entry.config(state='readonly')
-
-    def set_avg(self, value: int):
-        self.avg_entry.delete(0, tk.END)
-        self.avg_entry.insert(0, str(value))

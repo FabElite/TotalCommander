@@ -1,18 +1,21 @@
 """
 Pannello dati live — layout affiancato BLE|Lorenz con scarto a destra.
 
-  ┌──────────────────────────────────────────────────────┐
-  │  Misura        ║  BLE  ║ Lorenz ║  Scarto %         │
-  │  Power [W]     ║  350  ║  339   ║  +3.2%            │
-  │  Speed [km/h]  ║  28.5 ║  28.8  ║  −1.1%            │
-  │  ─────────────────────────────────────────────────   │
-  │  Resistance    ║   15  ║   —    ║                   │
-  │  Cadence       ║    0  ║   —    ║                   │
-  │  Tot.Dist      ║    0  ║   —    ║                   │
-  │  Elapsed       ║    0  ║   —    ║                   │
-  │  Torque [Nm]   ║   —   ║  2.45  ║                   │
-  │  [Abilita Dati BLE]                                  │
-  └──────────────────────────────────────────────────────┘
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  Misura        ║  BLE      ║ Lorenz    ║  Scarto                │
+  │  Power [W]     ║  350      ║  339      ║  +3.2%                 │
+  │  Speed [km/h]  ║  28.5     ║  28.8     ║  −1.1%                 │
+  │  ──────────────────────────────────────────────────────────────  │
+  │  Resistance    ║   15      ║   —       ║                        │
+  │  Cadence       ║    0      ║   —       ║                        │
+  │  Tot.Dist      ║    0      ║   —       ║                        │
+  │  Elapsed       ║    0      ║   —       ║                        │
+  │  Torque [Nm]   ║   —       ║  2.45     ║                        │
+  │  Offset [Nm]   ║   —       ║  0.0012   ║  [Leggi]               │
+  │  Hz            ║  2.1 Hz   ║  10.0 Hz  ║                        │
+  │  N campioni    ║  [5    ]  ║  [20   ]  ║                        │
+  │  [Abilita Dati BLE                  ]                            │
+  └──────────────────────────────────────────────────────────────────┘
 """
 import tkinter as tk
 from tkinter import ttk
@@ -43,14 +46,22 @@ _W_LABEL = 11
 class LiveDataPanel(ttk.Frame):
 
     def __init__(self, parent, on_toggle_ftms,
+                 on_lorenz_read_offset,
+                 on_lorenz_avg_change,
+                 on_smoothing_change,
                  smoothing_window: int = 5,
+                 lorenz_avg_dim: int = 20,
                  speed_thresholds=(1.0, 3.0),
                  power_thresholds=(2.0, 5.0),
                  **kwargs):
         super().__init__(parent, **kwargs)
-        self._on_toggle_ftms = on_toggle_ftms
-        self._speed_thr = speed_thresholds
-        self._power_thr = power_thresholds
+        self._on_toggle_ftms  = on_toggle_ftms
+        self._on_lorenz_offset = on_lorenz_read_offset
+        self._on_lorenz_avg    = on_lorenz_avg_change
+        self._on_smoothing     = on_smoothing_change
+        self._speed_thr        = speed_thresholds
+        self._power_thr        = power_thresholds
+        self._lorenz_avg_dim   = max(1, int(lorenz_avg_dim))
 
         self._n = max(1, int(smoothing_window))
         self._speed_hist = deque(maxlen=self._n)
@@ -164,12 +175,69 @@ class LiveDataPanel(ttk.Frame):
                   row=8, col=1, padx=2, pady=1)
         self._lrz_torque = self._val_lbl(outer, 8, 2, _F_VAL_S, _LRZ_BG)
 
-        # ── Pulsante sotto colonna BLE ────────────────────────────────────────
+        # ── Riga Offset [Nm] (row 9, solo Lorenz) ────────────────────────────
+        self._lbl(outer, "Offset [Nm]", _F_VAL_S, bg, fg='#333333',
+                  anchor='w', width=_W_LABEL, row=9, col=0, padx=(8, 4))
+        self._lbl(outer, "—", _F_VAL_S, _BLE_BG, fg=_NA_FG,
+                  row=9, col=1, padx=2, pady=1)
+        self._lrz_offset = self._val_lbl(outer, 9, 2, _F_VAL_S, _LRZ_BG, _LRZ_ACCENT)
+        # "Leggi" occupa col 3 (normalmente delta, non usato per queste righe)
+        ttk.Button(outer, text="Leggi", width=6,
+                   command=self._on_lorenz_offset
+                   ).grid(row=9, column=3, padx=(4, 8), pady=1, sticky='w')
+
+        # ── Riga Hz (row 10) ─────────────────────────────────────────────────
+        self._lbl(outer, "Hz", _F_VAL_S, bg, fg='#333333',
+                  anchor='w', width=_W_LABEL, row=10, col=0, padx=(8, 4))
+        self._ble_hz_lbl    = self._val_lbl(outer, 10, 1, _F_VAL_S, _BLE_BG, _BLE_ACCENT)
+        self._lorenz_hz_lbl = self._val_lbl(outer, 10, 2, _F_VAL_S, _LRZ_BG, _LRZ_ACCENT)
+
+        # ── Riga N campioni (row 11) ──────────────────────────────────────────
+        self._lbl(outer, "N campioni", _F_VAL_S, bg, fg='#333333',
+                  anchor='w', width=_W_LABEL, row=11, col=0, padx=(8, 4))
+
+        self._ble_n_spin = ttk.Spinbox(outer, from_=1, to=500, increment=1, width=6)
+        self._ble_n_spin.set(self._n)
+        self._ble_n_spin.grid(row=11, column=1, padx=2, pady=(2, 4))
+        self._ble_n_spin.config(command=self._on_ble_n_changed)
+        self._ble_n_spin.bind('<Return>',   lambda e: self._on_ble_n_changed())
+        self._ble_n_spin.bind('<FocusOut>', lambda e: self._on_ble_n_changed())
+
+        self._lorenz_n_spin = ttk.Spinbox(outer, from_=1, to=5000, increment=1, width=6)
+        self._lorenz_n_spin.set(self._lorenz_avg_dim)
+        self._lorenz_n_spin.grid(row=11, column=2, padx=2, pady=(2, 4))
+        self._lorenz_n_spin.config(command=self._on_lorenz_n_changed)
+        self._lorenz_n_spin.bind('<Return>',   lambda e: self._on_lorenz_n_changed())
+        self._lorenz_n_spin.bind('<FocusOut>', lambda e: self._on_lorenz_n_changed())
+
+        # ── Pulsante toggle FTMS (row 12) ─────────────────────────────────────
         self._btn_toggle = ttk.Button(
             outer, text="Abilita Dati BLE",
             command=self._on_toggle_ftms, style='Data.Disabled.TButton')
-        self._btn_toggle.grid(row=9, column=0, columnspan=2,
-                              padx=(8, 2), pady=(6, 6), sticky='ew')
+        self._btn_toggle.grid(row=12, column=0, columnspan=2,
+                              padx=(8, 2), pady=(2, 6), sticky='ew')
+
+    # ── Handler spinbox N campioni ────────────────────────────────────────────
+
+    def _on_ble_n_changed(self):
+        try:
+            n = max(1, int(float(self._ble_n_spin.get())))
+        except (ValueError, TypeError):
+            n = 1
+        self._ble_n_spin.set(n)
+        self.set_smoothing_window(n)
+        if self._on_smoothing:
+            self._on_smoothing(n)
+
+    def _on_lorenz_n_changed(self):
+        try:
+            n = max(1, int(float(self._lorenz_n_spin.get())))
+        except (ValueError, TypeError):
+            n = 1
+        self._lorenz_n_spin.set(n)
+        self._lorenz_avg_dim = n
+        if self._on_lorenz_avg:
+            self._on_lorenz_avg(str(n))
 
     # ── Smoothing & delta ─────────────────────────────────────────────────────
 
@@ -245,6 +313,7 @@ class LiveDataPanel(ttk.Frame):
         self._last_ble_speed = self._last_ble_power = None
         self._speed_hist.clear()
         self._power_hist.clear()
+        self.set_ble_hz(None)
         self._refresh_delta()
 
     def update_lorenz(self, data: dict):
@@ -286,3 +355,21 @@ class LiveDataPanel(ttk.Frame):
         self._speed_hist = deque(list(self._speed_hist)[-n:], maxlen=n)
         self._power_hist = deque(list(self._power_hist)[-n:], maxlen=n)
         self._refresh_delta()
+
+    def set_offset(self, value: float):
+        """Aggiorna la label offset Lorenz."""
+        self._lrz_offset.config(text=f'{value:.4f}')
+
+    def set_ble_hz(self, hz):
+        """Aggiorna la frequenza BLE (None → '—')."""
+        self._ble_hz_lbl.config(text=f'{hz:.1f} Hz' if hz else '—')
+
+    def set_lorenz_hz(self, hz):
+        """Aggiorna la frequenza Lorenz misurata (None → '—')."""
+        self._lorenz_hz_lbl.config(text=f'{hz:.1f} Hz' if hz else '—')
+
+    def set_lorenz_avg(self, n: int):
+        """Aggiorna lo spinbox Lorenz N campioni (chiamato al caricamento settings)."""
+        n = max(1, int(n))
+        self._lorenz_avg_dim = n
+        self._lorenz_n_spin.set(n)
