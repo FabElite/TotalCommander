@@ -13,7 +13,7 @@ import sys
 import os
 from logging.handlers import RotatingFileHandler
 
-from gui.main_window import MainWindow
+from gui.app import TotalCommanderApp
 
 
 def resource_path(relative_path):
@@ -75,7 +75,7 @@ _lib_filter: _LibraryFilter | None = None
 
 
 def set_debug_mode(enabled: bool):
-    """Chiamato da MainWindow.set_debug_mode → aggiorna filtro e livello root."""
+    """Chiamato dal pannello log (callback) → aggiorna filtro e livello root."""
     if _lib_filter is not None:
         _lib_filter.set_debug(enabled)
 
@@ -85,7 +85,7 @@ def set_debug_mode(enabled: bool):
 def _setup_logging():
     """
     Configura file handler (DEBUG) e console handler (INFO).
-    Il GUI handler viene aggiunto dopo la creazione di MainWindow.
+    Il GUI handler viene aggiunto dopo la creazione di TotalCommanderApp.
     """
     fmt_full  = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     fmt_short = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     _setup_logging()
     logging.info("Avvio del programma...")
 
-    app = MainWindow()
+    app = TotalCommanderApp()
 
     try:
         app.iconbitmap(resource_path("justo.ico"))

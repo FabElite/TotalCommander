@@ -29,13 +29,11 @@ import tkinter as tk
 from tkinter import ttk
 import serial.tools.list_ports
 
+from gui.theme import LED_COLORS as _LED_COLORS, F_SMALL as _F_SMALL, F_NORMAL as _F_NORMAL
+
 _STRIP_W   = 22      # larghezza strip sempre visibile
 _STRIP_BG  = '#d0d0d0'
 _STRIP_HOV = '#b8b8b8'
-_F_SMALL   = ('Helvetica', 7)
-_F_NORMAL  = ('Helvetica', 9)
-
-_LED_COLORS = {'ok': '#00cc44', 'err': '#cc2222', 'warn': '#cc8800', 'off': '#555555'}
 
 
 class CollapsibleSidebar(ttk.Frame):

@@ -57,7 +57,7 @@ pyinstaller --noconfirm --onefile --windowed ^
   --add-data="%PROJECT%\gui;gui" ^
   --add-data="%PROJECT%\logic;logic" ^
   --add-data="%PROJECT%\version.py;." ^
-  --add-data="%VENV%\Lib\site-packages\shared_lib\LorenzProtokollDll_x64.dll;shared_lib" ^
+  --add-data="%PROJECT%\core;core" ^
   --add-data="%PROJECT%\justo.ico;." ^
   --hidden-import=winrt.windows.foundation.collections ^
   --hidden-import=winrt ^

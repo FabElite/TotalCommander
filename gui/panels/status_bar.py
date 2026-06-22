@@ -5,9 +5,7 @@ Layout:
 """
 import tkinter as tk
 
-_BG = '#1e1e2e'
-_SEP = '#444466'
-_LED_COLORS = {'ok': '#00cc44', 'err': '#cc2222', 'warn': '#cc8800', 'off': '#555555'}
+from gui.theme import DARK_BG as _BG, SEP as _SEP, LED_COLORS as _LED_COLORS
 
 
 class StatusBar(tk.Frame):

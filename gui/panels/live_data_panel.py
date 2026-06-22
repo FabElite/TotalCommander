@@ -25,13 +25,8 @@ from logic.delta_logic import (
     color_for_speed_delta, color_for_power_delta,
     fmt_speed_delta, fmt_power_delta,
 )
-
-# ── Palette ──────────────────────────────────────────────────────────────────
-_BLE_ACCENT = '#1565C0'
-_LRZ_ACCENT = '#B85C00'
-_BLE_BG     = '#DCE8FA'   # più saturo → colonna intera colorata
-_LRZ_BG     = '#FAE8D8'
-_NA_FG      = '#AAAAAA'
+from gui.theme import (BLE_ACCENT as _BLE_ACCENT, LRZ_ACCENT as _LRZ_ACCENT,
+                       BLE_BG as _BLE_BG, LRZ_BG as _LRZ_BG, NA_FG as _NA_FG)
 
 # ── Font ─────────────────────────────────────────────────────────────────────
 _F_TITLE = ('Helvetica', 9,  'bold')
@@ -68,6 +63,7 @@ class LiveDataPanel(ttk.Frame):
         self._power_hist = deque(maxlen=self._n)
         self._last_ble_speed = self._last_ble_power = None
         self._last_lrz_speed = self._last_lrz_power = None
+        self._ftms_enabled = False   # stato esplicito (non dedotto dal testo del bottone)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
@@ -332,9 +328,10 @@ class LiveDataPanel(ttk.Frame):
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def is_ftms_enabled(self) -> bool:
-        return 'Disabilita' in self._btn_toggle.cget('text')
+        return self._ftms_enabled
 
     def set_ftms_button(self, enabled: bool):
+        self._ftms_enabled = enabled
         self._btn_toggle.config(
             text='Disabilita Dati BLE' if enabled else 'Abilita Dati BLE',
             style='Data.Enabled.TButton' if enabled else 'Data.Disabled.TButton')
