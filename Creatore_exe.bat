@@ -63,7 +63,7 @@ REM ── Suffisso _DEBUG se NON è un tag pulito vX.Y.Z ───────�
 set DEBUG_SUFFIX=
 echo !GIT_VERSION!| findstr /R "^v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$" >nul
 if errorlevel 1 set DEBUG_SUFFIX=_DEBUG
-if not "!DEBUG_SUFFIX!"=="" echo [INFO] Build NON di release: nome exe con suffisso !DEBUG_SUFFIX!
+if not "!DEBUG_SUFFIX!"=="" echo [INFO] Build NON di release: suffisso !DEBUG_SUFFIX!
 
 REM ── Salva copia di backup di version.py prima di sovrascriverlo ──────────────
 copy /Y "%PROJECT%\version.py" "%PROJECT%\version.py.bak" >nul 2>&1
@@ -75,9 +75,29 @@ echo LIB_VERSION = "!LIBVER!"
 ) > "%PROJECT%\version.py"
 echo [INFO] version.py scritto: VERSION=!GIT_VERSION!  LIB_VERSION=!LIBVER!
 
+REM ── Genera i metadati Windows (version_info.txt) ────────────────────────────
+set "VERSION_INFO_OUT=%PROJECT%\version_info.txt"
+python "%PROJECT%\tools\make_version_info.py"
+if errorlevel 1 (
+    echo [ERRORE] Generazione version_info.txt fallita.
+    pause & exit /b 1
+)
+
+REM ── Icona: variante debug se disponibile ────────────────────────────────────
+set "ICON=%PROJECT%\justo.ico"
+if not "!DEBUG_SUFFIX!"=="" (
+    if exist "%PROJECT%\justo_debug.ico" (
+        set "ICON=%PROJECT%\justo_debug.ico"
+        echo [INFO] Uso icona debug: justo_debug.ico
+    ) else (
+        echo [WARN] justo_debug.ico non trovato: uso justo.ico anche per la build debug.
+    )
+)
+
 REM ── Esegui PyInstaller ───────────────────────────────────────────────────────
 pyinstaller --noconfirm --onefile --windowed ^
   --name=TotalCommander_!GIT_VERSION!!DEBUG_SUFFIX! ^
+  --version-file="%PROJECT%\version_info.txt" ^
   --add-data="%PROJECT%\gui;gui" ^
   --add-data="%PROJECT%\logic;logic" ^
   --add-data="%PROJECT%\version.py;." ^
@@ -86,10 +106,13 @@ pyinstaller --noconfirm --onefile --windowed ^
   --add-data="%PROJECT%\docs\guida_total_commander.html;docs" ^
   --hidden-import=winrt.windows.foundation.collections ^
   --hidden-import=winrt ^
-  --icon="%PROJECT%\justo.ico" ^
+  --icon="!ICON!" ^
   "%PROJECT%\main.py"
 
 set BUILD_OK=%ERRORLEVEL%
+
+REM ── Rimuovi version_info.txt generato ────────────────────────────────────────
+del "%PROJECT%\version_info.txt" >nul 2>&1
 
 REM ── Ripristina version.py dal backup ─────────────────────────────────────────
 if exist "%PROJECT%\version.py.bak" (

@@ -12,12 +12,11 @@ delta_*_thresholds_*, rec_hz, stop_rec_on_auto_end, banco_ip, lorenz_reader,
 make_dialog, set_banco_speed, save_settings / load_settings, start_recording.
 """
 import logging
-import re
 import os
+import re
 import subprocess
 import sys
 import time
-
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
@@ -64,6 +63,7 @@ except Exception:
         LIB_VERSION = _pkg_version("shared_lib")
     except Exception:
         LIB_VERSION = "unknown"
+
 
 def is_release(version: str) -> bool:
     """True solo se la versione è un tag pulito tipo v1.0.0 (nessun commit/dirty dopo)."""
@@ -170,8 +170,8 @@ class TotalCommanderApp(tk.Tk):
         self._shutdown_future = None
 
         # ── Layout + pannelli ────────────────────────────────────────────────
-        self.grid_rowconfigure(0, weight=0)  # banner dev (riga vuota in release)
-        self.grid_rowconfigure(1, weight=1)  # contenuto principale
+        self.grid_rowconfigure(0, weight=0)   # banner dev (riga vuota in release)
+        self.grid_rowconfigure(1, weight=1)   # contenuto principale
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
 
