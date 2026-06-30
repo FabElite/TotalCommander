@@ -23,6 +23,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from logic import settings_manager
+from logic.data_processing import DataProcessor
 from shared_lib.bluetooth_manager import CalibrationPhase
 from shared_lib.LorenzLib import LorenzReader
 from shared_lib.SerialDataLib import SerialDataReader
@@ -52,6 +53,15 @@ try:
     from version import VERSION
 except Exception:
     VERSION = "unknown"
+
+try:
+    from version import LIB_VERSION
+except Exception:
+    try:
+        from importlib.metadata import version as _pkg_version
+        LIB_VERSION = _pkg_version("shared_lib")
+    except Exception:
+        LIB_VERSION = "unknown"
 
 
 class TotalCommanderApp(tk.Tk):
@@ -203,6 +213,7 @@ class TotalCommanderApp(tk.Tk):
             on_stop_rec_changed=self._on_stop_rec_changed,
             on_spindown=self._run_spindown_auto,
             on_save=self._on_save,
+            on_eeprom=self._on_eeprom,
         )
         self.csv_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
@@ -417,6 +428,56 @@ class TotalCommanderApp(tk.Tk):
     def _on_save(self, tempo_s, etichetta, resume_fn):
         self.recording.collect_save(tempo_s, etichetta, resume_fn)
 
+    def _on_eeprom(self, etichetta, resume_fn):
+        """
+        Scrittura+verifica EEPROM da sequenza automatica.
+
+        `etichetta` è il payload grezzo "ADDR: B0 B1 ..." (hex). Il parsing è
+        già stato validato al caricamento del file; qui riparsiamo in modo
+        difensivo. Su payload invalido o BLE non pronto → resume_fn(False),
+        che fa fermare la sequenza (fail → stop).
+
+        resume_fn(success: bool) viene chiamato sul main thread al termine.
+        """
+        parsed = DataProcessor.parse_eeprom_payload(etichetta)
+        if parsed is None:
+            logging.getLogger().error(
+                f"[Auto-EEPROM] Payload non valido: {etichetta!r} — sequenza interrotta.")
+            resume_fn(False)
+            return
+        address, data = parsed
+
+        if not self.ble.is_ready():
+            logging.getLogger().warning(
+                "[Auto-EEPROM] BLE non connesso: scrittura saltata — sequenza interrotta.")
+            resume_fn(False)
+            return
+
+        self.executor.submit(self._on_eeprom_worker, address, data, resume_fn)
+
+    def _on_eeprom_worker(self, address, data, resume_fn):
+        """Eseguito nel thread pool: write_and_verify gestisce retry e verifica
+        read-back lato manager; qui attendiamo l'esito e riportiamo al main
+        thread. Il timeout esterno (40s) copre il caso peggiore dei retry
+        (3 × (write+read) + backoff ≈ 30s)."""
+        try:
+            ok = self.ble.run(
+                self.ble.manager.write_and_verify(address, data)
+            ).result(timeout=40)
+        except Exception as e:
+            logging.getLogger().error(
+                f"[Auto-EEPROM] Errore scrittura/verifica 0x{address:04X}: {e}")
+            ok = False
+
+        if ok:
+            logging.getLogger().info(
+                f"[Auto-EEPROM] 0x{address:04X} = {data.hex()} scritto e verificato.")
+        else:
+            logging.getLogger().error(
+                f"[Auto-EEPROM] 0x{address:04X} = {data.hex()} FALLITO.")
+
+        self.after(0, lambda: resume_fn(ok))
+
     # ═════════════════════════════════════════════════════════════════════════
     # Menu
     # ═════════════════════════════════════════════════════════════════════════
@@ -461,6 +522,7 @@ class TotalCommanderApp(tk.Tk):
         _is_dev = VERSION.endswith("-dev") or "unknown" in VERSION
         _ver_label = f"Versione: {VERSION}" + ("  ⚠ build di sviluppo" if _is_dev else "")
         info_menu.add_command(label=_ver_label, state="disabled")
+        info_menu.add_command(label=f"Libreria: {LIB_VERSION}", state="disabled")
 
     # ═════════════════════════════════════════════════════════════════════════
     # Chiusura

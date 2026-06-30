@@ -8,6 +8,21 @@ set VENV=%PROJECT%\.venv
 REM ── Attiva la virtual environment ───────────────────────────────────────────
 call %VENV%\Scripts\activate.bat
 
+REM ── Allinea shared_lib alla versione pinnata in requirements.txt ─────────────
+echo [INFO] Allineo shared_lib a requirements.txt...
+pip install -U --force-reinstall --no-deps -r "%PROJECT%\requirements.txt"
+pip install -r "%PROJECT%\requirements.txt"
+if errorlevel 1 (
+    echo [ERRORE] Installazione dipendenze fallita.
+    pause & exit /b 1
+)
+
+REM ── Cattura la versione effettivamente installata della libreria ─────────────
+set LIBVER=
+for /f "delims=" %%v in ('python -c "import importlib.metadata as m; print(m.version('shared_lib'))" 2^>nul') do set LIBVER=%%v
+if "%LIBVER%"=="" set LIBVER=unknown
+echo [INFO] shared_lib version: !LIBVER!
+
 REM ── Trova git.exe ────────────────────────────────────────────────────────────
 set GIT_EXE=
 where git >nul 2>&1
@@ -48,8 +63,11 @@ REM ── Salva copia di backup di version.py prima di sovrascriverlo ───
 copy /Y "%PROJECT%\version.py" "%PROJECT%\version.py.bak" >nul 2>&1
 
 REM ── Scrivi version.py congelato (una sola riga, nessuna logica) ──────────────
-(echo VERSION = "!GIT_VERSION!") > "%PROJECT%\version.py"
-echo [INFO] version.py scritto: VERSION = !GIT_VERSION!
+(
+echo VERSION = "!GIT_VERSION!"
+echo LIB_VERSION = "!LIBVER!"
+) > "%PROJECT%\version.py"
+echo [INFO] version.py scritto: VERSION=!GIT_VERSION!  LIB_VERSION=!LIBVER!
 
 REM ── Esegui PyInstaller ───────────────────────────────────────────────────────
 pyinstaller --noconfirm --onefile --windowed ^

@@ -24,6 +24,12 @@ MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 #
 # Per aggiungere un nuovo comando: aggiungere una voce qui e il relativo handler
 # in main_window._dispatch_command. Nessun'altra parte del codice va toccata.
+#
+# Eccezione 'eeprom': scrittura+verifica in memoria. Non usa valore_rullo né
+# banco_kmh; trasporta indirizzo iniziale e byte da scrivere nella colonna
+# 'etichetta', nel formato "ADDR: B0 B1 ..." (tutto hex, vedi
+# parse_eeprom_payload). Ha un handler dedicato nel runner (csv_panel) con
+# resume-callback: in caso di fallimento la sequenza si ferma.
 COMMAND_SCHEMA = {
     #  comando         richiede_valore  richiede_tempo
     "livelli":     {"requires_valore": True,  "requires_tempo": True},
@@ -31,6 +37,7 @@ COMMAND_SCHEMA = {
     "simulazione": {"requires_valore": True,  "requires_tempo": True},
     "spindown":    {"requires_valore": False, "requires_tempo": False},
     "save":        {"requires_valore": False, "requires_tempo": True},
+    "eeprom":      {"requires_valore": False, "requires_tempo": False},
 }
 
 
@@ -296,12 +303,66 @@ class DataProcessor:
 
         # ── etichetta (col 4, opzionale) ────────────────────────────────────
         # Usata dal comando 'save' come label descrittiva della riga di sintesi.
+        # Per il comando 'eeprom' trasporta il payload "ADDR: B0 B1 ..." (hex).
         # Per tutti gli altri comandi è inclusa nel tuple ma ignorata.
         etichetta = ""
         if len(row) > 4 and row[4]:
             etichetta = str(row[4]).strip()
 
+        # ── Validazione comando eeprom ──────────────────────────────────────
+        # eeprom richiede un payload valido nella colonna etichetta. Riga
+        # malformata → saltata con warning (coerente con gli altri scarti).
+        if command_type == "eeprom":
+            if DataProcessor.parse_eeprom_payload(etichetta) is None:
+                log.warning(
+                    f"Riga {line_num}: comando eeprom con payload non valido "
+                    f"'{etichetta}' (atteso 'ADDR: B0 B1 ...' in hex), saltata.")
+                return None
+
         return (command_type, tempo_s, valore_rullo, banco_kmh, etichetta)
+
+    @staticmethod
+    def parse_eeprom_payload(text) -> tuple | None:
+        """
+        Interpreta il payload di un comando 'eeprom' nel formato:
+            "ADDR: B0 B1 B2 ..."
+        dove ADDR è l'indirizzo iniziale (hex, 0000–FFFF) e B0.. sono i byte
+        consecutivi da scrivere a partire da ADDR (hex, 00–FF, separati da
+        spazi e/o virgole). Il caso singolo byte è semplicemente "ADDR: B0".
+
+        Esempi validi: "0549: 46" · "0549: 46 47 48" · "549:46,47,48"
+
+        Ritorna (address:int, data:bytearray) oppure None se malformato.
+        """
+        if text is None:
+            return None
+        s = str(text).strip()
+        if not s or ':' not in s:
+            return None
+
+        addr_part, data_part = s.split(':', 1)
+        try:
+            address = int(addr_part.strip(), 16)
+        except ValueError:
+            return None
+        if not (0x0000 <= address <= 0xFFFF):
+            return None
+
+        tokens = data_part.replace(',', ' ').split()
+        if not tokens:
+            return None
+
+        data = bytearray()
+        for tok in tokens:
+            try:
+                b = int(tok, 16)
+            except ValueError:
+                return None
+            if not (0x00 <= b <= 0xFF):
+                return None
+            data.append(b)
+
+        return address, data
 
     @staticmethod
     def _detect_csv_delimiter(file_path: str) -> str:

@@ -44,6 +44,7 @@ class CsvPanel(ttk.Frame):
                  on_stop_rec_changed=None,
                  on_spindown=None,
                  on_save=None,
+                 on_eeprom=None,
                  **kwargs):
         super().__init__(parent, **kwargs)
         self._on_dispatch        = on_dispatch
@@ -58,6 +59,7 @@ class CsvPanel(ttk.Frame):
         self._on_stop_rec_changed  = on_stop_rec_changed
         self._on_spindown          = on_spindown
         self._on_save              = on_save
+        self._on_eeprom            = on_eeprom
         self._stop_rec_var         = tk.BooleanVar(value=stop_rec_on_auto_end)
 
         self._log = logging.getLogger(__name__)
@@ -746,6 +748,52 @@ class CsvPanel(ttk.Frame):
                             0, lambda: send_next(_ai + 1))
 
                     self._on_spindown(_resume_spindown)
+
+                # ── Comando EEPROM (scrittura+verifica in memoria) ─────────────
+                elif command_type == "eeprom" and self._on_eeprom is not None:
+                    self._log.info(
+                        f"[Auto] Scrittura EEPROM in memoria: {etichetta}")
+                    self._on_auto_status('ok', 'Auto: EEPROM…')
+
+                    def _resume_eeprom(success: bool, _ai=absolute_index):
+                        if not self.auto_commands_running:
+                            return
+
+                        # Fallimento definitivo (dopo i retry lato manager):
+                        # ferma la sequenza, non avanzare. Lo stop ha priorità
+                        # su un'eventuale pausa pendente.
+                        if not success:
+                            self._log.error(
+                                "[Auto] Scrittura EEPROM FALLITA dopo i retry — "
+                                "sequenza interrotta.")
+                            self._current_abs_idx = _ai
+                            self.stop()
+                            return
+
+                        # Successo: applica eventuale pausa pendente…
+                        if self._pending_pause:
+                            self._pending_pause      = False
+                            self._paused             = True
+                            self.auto_commands_running = False
+                            self._current_abs_idx    = _ai
+                            self._pause_remaining_ms = 0
+                            self._stop_countdown()
+                            self._btn_play_pause.config(text="▶  Riprendi")
+                            self._on_auto_status('warn', 'Auto: PAUSA')
+                            self._update_nav_buttons()
+                            self._log.info(
+                                "[Auto] Scrittura EEPROM completata — sequenza in pausa.")
+                            return
+
+                        # …oppure prosegui.
+                        self._log.info(
+                            "[Auto] Scrittura EEPROM verificata — sequenza ripresa.")
+                        self._back_origin = -1
+                        self._back_count  = 0
+                        self._auto_command_id = self.after(
+                            0, lambda: send_next(_ai + 1))
+
+                    self._on_eeprom(str(etichetta), _resume_eeprom)
 
                 # ── Comando ordinario con timer ────────────────────────────────
                 else:
