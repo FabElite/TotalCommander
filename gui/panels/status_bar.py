@@ -60,10 +60,29 @@ class StatusBar(tk.Frame):
         self._lbl_device = tk.Label(g_ble, text='—', bg=_BG, fg='#666688',
                                     font=('Helvetica', 8), anchor='w')
         self._lbl_device.grid(row=0, column=2, padx=(6, 12))
-        self._lbl_address = tk.Label(g_ble, text='', bg=_BG, fg='#555577',
-                                     font=('Helvetica', 8), anchor='w')
-        self._lbl_address.grid(row=1, column=1, columnspan=3,
-                               padx=(3, 12), pady=(0, 1))
+        # ── Riga 1: dettagli identità (MAC + device number) in un frame dedicato,
+        #    così i due valori restano allineati tra loro con spaziatura fissa,
+        #    indipendentemente dalle larghezze delle colonne della riga 0 ──────
+        g_ble_id = tk.Frame(g_ble, bg=_BG)
+        g_ble_id.grid(row=1, column=1, columnspan=5, sticky='w',
+                      padx=(3, 0), pady=(0, 1))
+
+        # Etichetta dell'indirizzo: NON "BLE" (già presente in riga 0 accanto al
+        # LED); "MAC" distingue l'indirizzo dal device number sulla stessa riga.
+        self._cap_address = tk.Label(g_ble_id, text='', bg=_BG, fg='#666688',
+                                     font=('Helvetica', 8))
+        self._cap_address.pack(side='left')
+        self._lbl_address = tk.Label(g_ble_id, text='', bg=_BG, fg='#555577',
+                                     font=('Helvetica', 8))
+        self._lbl_address.pack(side='left', padx=(4, 16))
+
+        # Device number (uint16 LE letto da EEPROM @ addr 2)
+        self._cap_devnum = tk.Label(g_ble_id, text='', bg=_BG, fg='#666688',
+                                    font=('Helvetica', 8))
+        self._cap_devnum.pack(side='left')
+        self._lbl_devnum = tk.Label(g_ble_id, text='', bg=_BG, fg='#555577',
+                                    font=('Helvetica', 8))
+        self._lbl_devnum.pack(side='left', padx=(4, 0))
 
         # LED FTMS
         self._led_ftms = tk.Label(g_ble, text='●', bg=_BG, fg='#555555',
@@ -140,10 +159,25 @@ class StatusBar(tk.Frame):
     def set_device_info(self, name=None, address=None):
         if name or address:
             self._lbl_device.config(text=name or 'Sconosciuto', fg='#88ffaa')
+            self._cap_address.config(text='MAC')
             self._lbl_address.config(text=address or '', fg='#88ffaa')
+            self._cap_devnum.config(text='Dev#')
+            self._lbl_devnum.config(text='…', fg='#666688')
         else:
             self._lbl_device.config(text='—', fg='#666688')
+            self._cap_address.config(text='')
             self._lbl_address.config(text='')
+            self._cap_devnum.config(text='')
+            self._lbl_devnum.config(text='')
+
+    def set_device_number(self, num=None):
+        """Device number ANT+ (uint16) letto da EEPROM dopo il connect.
+        num=int  → mostra il valore (verde, coerente con nome/indirizzo).
+        num=None → lettura fallita ('?', ambra)."""
+        if num is None:
+            self._lbl_devnum.config(text='?', fg='#cc8800')
+        else:
+            self._lbl_devnum.config(text=str(num), fg='#88ffaa')
 
     def set_ftms(self, hz=None):
         """

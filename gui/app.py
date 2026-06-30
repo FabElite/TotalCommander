@@ -694,6 +694,19 @@ class TotalCommanderApp(tk.Tk):
                 # Abilita FTMS subito — connect_to_device garantisce già
                 # che i servizi GATT siano pronti a questo punto
                 self.after(0, self._auto_enable_ftms)
+                # Device number ANT+: lettura una-tantum da EEPROM (uint16 LE @ addr 2)
+                try:
+                    raw = self.ble.run(self.ble.manager.read_eeprom(2, 2)).result()
+                    if raw and len(raw) >= 2:
+                        devnum = int.from_bytes(bytes(raw[:2]), "little")
+                        self.after(0, self.status_bar.set_device_number, devnum)
+                        logging.getLogger().info(f"Device number: {devnum}")
+                    else:
+                        self.after(0, self.status_bar.set_device_number, None)
+                        logging.getLogger().warning("Device number: risposta EEPROM vuota o troppo corta.")
+                except Exception as e:
+                    self.after(0, self.status_bar.set_device_number, None)
+                    logging.getLogger().error(f"Errore lettura device number: {e}")
             else:
                 logging.getLogger().warning(f"Connessione BLE fallita: {name or address} non ha risposto.")
         except Exception as e:
