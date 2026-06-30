@@ -12,10 +12,12 @@ delta_*_thresholds_*, rec_hz, stop_rec_on_auto_end, banco_ip, lorenz_reader,
 make_dialog, set_banco_speed, save_settings / load_settings, start_recording.
 """
 import logging
+import re
 import os
 import subprocess
 import sys
 import time
+
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
@@ -63,11 +65,16 @@ except Exception:
     except Exception:
         LIB_VERSION = "unknown"
 
+def is_release(version: str) -> bool:
+    """True solo se la versione è un tag pulito tipo v1.0.0 (nessun commit/dirty dopo)."""
+    return bool(re.fullmatch(r"v?\d+\.\d+\.\d+", version.strip()))
+
 
 class TotalCommanderApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Total Commander IV")
+        self._is_dev = not is_release(VERSION)
+        self.title("Total Commander IV" + (f" — ⚠ DEBUG {VERSION}" if self._is_dev else ""))
         self.geometry("1000x800")
 
         # ── Stili ttk ────────────────────────────────────────────────────────
@@ -163,12 +170,20 @@ class TotalCommanderApp(tk.Tk):
         self._shutdown_future = None
 
         # ── Layout + pannelli ────────────────────────────────────────────────
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)  # banner dev (riga vuota in release)
+        self.grid_rowconfigure(1, weight=1)  # contenuto principale
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
 
+        if self._is_dev:
+            self._dev_banner = tk.Label(
+                self,
+                text=f"⚠ BUILD DI SVILUPPO — NON RILASCIATA — {VERSION}",
+                bg="#cc2222", fg="white", font=("Helvetica", 9, "bold"))
+            self._dev_banner.grid(row=0, column=0, columnspan=2, sticky="ew")
+
         main_frame = ttk.Frame(self)
-        main_frame.grid(row=0, column=0, sticky="nsew")
+        main_frame.grid(row=1, column=0, sticky="nsew")
         main_frame.grid_rowconfigure(2, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
@@ -244,7 +259,7 @@ class TotalCommanderApp(tk.Tk):
             on_gamma_connect=self.gamma.connect,
             on_gamma_disconnect=self.gamma.disconnect,
         )
-        self.sidebar.grid(row=0, column=1, sticky="ns")
+        self.sidebar.grid(row=1, column=1, sticky="ns")
 
         # ── Avvio cicli e chiusura ───────────────────────────────────────────
         self.live_panel.set_offset(self.lorenz_reader.offset)
@@ -519,7 +534,7 @@ class TotalCommanderApp(tk.Tk):
         menubar.add_cascade(label="Info", menu=info_menu)
         info_menu.add_command(label="Guida all'uso…", command=lambda: open_help(self))
         info_menu.add_separator()
-        _is_dev = VERSION.endswith("-dev") or "unknown" in VERSION
+        _is_dev = self._is_dev
         _ver_label = f"Versione: {VERSION}" + ("  ⚠ build di sviluppo" if _is_dev else "")
         info_menu.add_command(label=_ver_label, state="disabled")
         info_menu.add_command(label=f"Libreria: {LIB_VERSION}", state="disabled")

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Total Commander IV — Guida all'uso</title>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#1e1e2e; --muted:#5b5b72; --faint:#8a8aa0;
+    --rule:#e7e7ef; --code-bg:#f3f3f8; --code-ink:#2c2c44;
+    --side-bg:#1e1e2e; --side-ink:#b9b9d0; --side-dim:#7c7c98; --side-rule:#33334d;
+    --accent:#5757c8;
+    --ok:#00cc44; --warn:#cc8800; --err:#cc2222; --off:#9a9aab;
+    --ble:#1565C0; --ble-bg:#e3edfb; --lrz:#B85C00; --lrz-bg:#fbeadb;
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--bg);
+       font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .wrap{display:grid;grid-template-columns:264px 1fr;min-height:100vh}
+
+  /* ── Sidebar nav ────────────────────────────────────── */
+  aside{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+        background:var(--side-bg);color:var(--side-ink);padding:22px 0 40px}
+  .brand{padding:4px 22px 16px;border-bottom:1px solid var(--side-rule);margin-bottom:10px}
+  .brand b{display:block;color:#fff;font-size:15px;letter-spacing:.2px}
+  .brand span{font-size:11.5px;color:var(--side-dim);font-family:var(--mono)}
+  nav .grp{padding:14px 22px 4px;font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--side-dim);font-weight:600}
+  nav a{display:flex;align-items:center;gap:9px;padding:5px 22px;color:var(--side-ink);
+        text-decoration:none;font-size:13.5px;border-left:2px solid transparent}
+  nav a.sub{padding-left:34px;font-size:12.5px;color:var(--side-dim)}
+  nav a:hover{color:#fff;background:rgba(255,255,255,.04)}
+  nav a.active{color:#fff;border-left-color:var(--accent);background:rgba(87,87,200,.16)}
+  nav a .led{width:8px;height:8px;border-radius:50%;flex:none}
+
+  /* ── Content ────────────────────────────────────────── */
+  main{padding:46px 56px 120px;max-width:860px}
+  header.intro h1{font-size:30px;margin:0 0 6px;letter-spacing:-.4px}
+  header.intro p.lede{color:var(--muted);font-size:16px;margin:0 0 4px;max-width:62ch}
+  header.intro .ver{font-family:var(--mono);font-size:12px;color:var(--faint);margin-top:12px}
+
+  section{padding-top:38px;margin-top:8px;border-top:1px solid var(--rule)}
+  section:first-of-type{border-top:none}
+  h2{font-size:21px;margin:0 0 4px;letter-spacing:-.2px;display:flex;align-items:center;gap:10px}
+  h2 .dot{width:11px;height:11px;border-radius:50%;flex:none}
+  h2 .num{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600}
+  h3{font-size:15px;margin:26px 0 6px;letter-spacing:.1px}
+  h3 code, h2 code{font-size:.92em}
+  p{margin:6px 0}
+  .muted{color:var(--muted)}
+  .lead{color:var(--muted);margin:2px 0 6px}
+
+  code,kbd{font-family:var(--mono);font-size:.86em;background:var(--code-bg);
+           color:var(--code-ink);padding:1.5px 6px;border-radius:5px;
+           border:1px solid #e2e2ee;white-space:nowrap}
+  kbd.path{background:#eef0fb;border-color:#dcdef6;color:#3b3b78}
+  .ble code{background:var(--ble-bg);color:var(--ble);border-color:#cfe0f7}
+  .lrz code{background:var(--lrz-bg);color:var(--lrz);border-color:#f3d8c0}
+
+  ul{margin:6px 0;padding-left:20px}
+  li{margin:3px 0}
+  dl{margin:8px 0;display:grid;grid-template-columns:max-content 1fr;
+     gap:4px 16px;align-items:baseline}
+  dt{font-family:var(--mono);font-size:12.5px;color:var(--ink);
+     background:var(--code-bg);border:1px solid #e2e2ee;border-radius:5px;
+     padding:2px 8px;white-space:nowrap}
+  dd{margin:0;color:var(--muted)}
+
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  td code{white-space:normal}
+
+  .led-row{display:flex;align-items:center;gap:9px;margin:4px 0;color:var(--muted)}
+  .led{width:10px;height:10px;border-radius:50%;flex:none;
+       box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+  .l-ok{background:var(--ok)} .l-warn{background:var(--warn)}
+  .l-err{background:var(--err)} .l-off{background:var(--off)}
+
+  .note{border-left:3px solid var(--accent);background:#f6f6fd;
+        padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;color:#3c3c63;font-size:13.5px}
+  .warn-box{border-left:3px solid var(--err);background:#fdf3f3;color:#7a2222}
+
+  /* ── Mobile ─────────────────────────────────────────── */
+  .topbar{display:none}
+  @media(max-width:860px){
+    .wrap{grid-template-columns:1fr}
+    aside{position:fixed;z-index:20;left:0;top:0;width:264px;transform:translateX(-100%);
+          transition:transform .22s ease;box-shadow:6px 0 24px rgba(0,0,0,.25)}
+    aside.open{transform:translateX(0)}
+    .topbar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;
+            background:var(--side-bg);color:#fff;padding:12px 16px}
+    .topbar b{font-size:14px}
+    .burger{font-size:20px;background:none;border:none;color:#fff;cursor:pointer;line-height:1}
+    main{padding:26px 20px 90px}
+    .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:15}
+    .scrim.show{display:block}
+    dl{grid-template-columns:1fr;gap:2px 0}
+    dt{justify-self:start}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="burger" id="burger" aria-label="Menu">☰</button>
+  <b>Total Commander IV — Guida</b>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<div class="wrap">
+<aside id="side">
+  <div class="brand">
+    <b>Total Commander IV</b>
+    <span>Guida all'uso</span>
+  </div>
+  <nav id="nav">
+    <div class="grp">Per iniziare</div>
+    <a href="#panoramica"><span class="led" style="background:var(--accent)"></span>Panoramica</a>
+
+    <div class="grp">Interfaccia</div>
+    <a href="#stato"><span class="led l-ok"></span>Barra di stato (LED)</a>
+    <a href="#connessioni"><span class="led l-ok"></span>Barra connessioni</a>
+    <a class="sub" href="#sessione">Sessione</a>
+    <a class="sub" href="#ble">BLE (trainer)</a>
+    <a class="sub" href="#lorenz">Lorenz</a>
+    <a class="sub" href="#banco">Banco</a>
+    <a href="#misure"><span class="led l-warn"></span>Pannello Misure (Δ)</a>
+    <a href="#extra"><span class="led l-off"></span>Pannello EXTRA</a>
+    <a class="sub" href="#com">Sensore COM</a>
+    <a class="sub" href="#psu">Alimentatore PSU</a>
+    <a class="sub" href="#gamma">Gamma Sensor</a>
+
+    <div class="grp">Operatività</div>
+    <a href="#comandi"><span class="led" style="background:var(--ble)"></span>Comandi manuali</a>
+    <a href="#sequenza"><span class="led" style="background:var(--accent)"></span>Sequenza automatica</a>
+    <a class="sub" href="#write_eeprom">Comando write_eeprom</a>
+    <a href="#registrazione"><span class="led l-err"></span>Registrazione dati</a>
+
+    <div class="grp">Riferimento</div>
+    <a href="#menu"><span class="led l-off"></span>Menu</a>
+    <a href="#sicurezza"><span class="led l-err"></span>Arresto rapido</a>
+  </nav>
+</aside>
+
+<main>
+<header class="intro">
+  <h1>Total Commander IV</h1>
+  <p class="lede">Banco di collaudo per trainer indoor: pilota il trainer via Bluetooth, confronta i dati con il sensore di coppia Lorenz, controlla il motore del banco e registra tutto su Excel.</p>
+  <p class="ver">Guida allineata alla versione corrente del software.</p>
+</header>
+
+<!-- 1 ─────────────────────────────────────────────── -->
+<section id="panoramica">
+  <h2><span class="num">01</span>Panoramica</h2>
+  <p class="lead">La finestra è divisa in zone fisse. Ogni zona ha un capitolo dedicato qui a fianco.</p>
+  <dl>
+    <dt>Barra di stato</dt><dd>In alto, scura: i LED che dicono a colpo d'occhio cosa è connesso e cosa sta succedendo.</dd>
+    <dt>Barra connessioni</dt><dd>Sessione di registrazione e connessione dei dispositivi principali (BLE, Lorenz, Banco).</dd>
+    <dt>Comandi</dt><dd>Invio manuale di resistenza/potenza/pendenza al trainer e controllo velocità del banco.</dd>
+    <dt>Sequenza automatica</dt><dd>Esecuzione di un test scritto su file CSV/Excel, con cicli e tempi.</dd>
+    <dt>Misure</dt><dd>Confronto in tempo reale BLE vs Lorenz con lo scarto (Δ).</dd>
+    <dt>EXTRA</dt><dd>Pannello laterale a comparsa: sensore COM, alimentatore PSU, sensore Gamma.</dd>
+  </dl>
+  <div class="note">Tutti i risultati finiscono nella cartella <kbd>output</kbd>, apribile da <kbd class="path">File → Apri cartella output</kbd> o dal pulsante <code>📁 Esplora</code>.</div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── -->
+<section id="stato">
+  <h2><span class="dot l-ok"></span><span class="num">02</span>Barra di stato (LED)</h2>
+  <p class="lead">Da sinistra a destra. Verde = ok, rosso = problema/persa, spento = non attivo.</p>
+  <dl>
+    <dt>APP</dt><dd>Pulsa e incrementa finché il programma è vivo. Se si ferma, l'app è bloccata.</dd>
+    <dt>BLE</dt><dd>Trainer connesso. Accanto compaiono nome e indirizzo del dispositivo.</dd>
+    <dt>FTMS</dt><dd>Frequenza (Hz) dei pacchetti dati dal trainer. Si spegne se i dati mancano per oltre 2 s.</dd>
+    <dt>Lorenz</dt><dd>Sensore di coppia connesso.</dd>
+    <dt>Banco</dt><dd>Motore del banco connesso (Modbus).</dd>
+    <dt>Auto</dt><dd>Verde mentre è in corso una sequenza automatica.</dd>
+    <dt>REC</dt><dd>Rosso lampeggiante durante la registrazione; accanto il tempo trascorso e la frequenza in Hz.</dd>
+  </dl>
+  <p class="muted" style="margin-top:14px">Legenda colori:</p>
+  <div class="led-row"><span class="led l-ok"></span> Connesso / attivo</div>
+  <div class="led-row"><span class="led l-warn"></span> Avviso / valore moderato</div>
+  <div class="led-row"><span class="led l-err"></span> Non connesso / connessione persa</div>
+  <div class="led-row"><span class="led l-off"></span> Spento / non attivo</div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── -->
+<section id="connessioni">
+  <h2><span class="dot l-ok"></span><span class="num">03</span>Barra connessioni</h2>
+
+  <h3 id="sessione">Sessione</h3>
+  <dl>
+    <dt>⏺ REC</dt><dd>Apre la finestra di avvio registrazione (vedi <a href="#registrazione">Registrazione dati</a>).</dd>
+    <dt>⏹ STOP</dt><dd>Chiude la sessione con salvataggio finale garantito.</dd>
+    <dt>📁 Esplora</dt><dd>Apre la cartella <kbd>output</kbd> con i file registrati.</dd>
+  </dl>
+
+  <h3 id="ble" class="ble">BLE — trainer</h3>
+  <p class="muted">Sequenza tipica:</p>
+  <ul class="ble">
+    <li><code>🔍 Cerca</code> — elenca i dispositivi vicini con nome, indirizzo MAC e potenza del segnale.</li>
+    <li>Seleziona il trainer dalla lista, poi <code>Connetti</code>.</li>
+    <li>Alla connessione i dati FTMS vengono abilitati automaticamente; il pannello Misure si popola.</li>
+    <li><code>Disconnetti</code> chiude il collegamento.</li>
+  </ul>
+
+  <h3 id="lorenz" class="lrz">Lorenz — sensore di coppia</h3>
+  <dl>
+    <dt>Connetti / Disconnetti</dt><dd>Collega il sensore sulla porta USB dedicata.</dd>
+    <dt>Inverti Velocità</dt><dd>Inverte il segno del canale di velocità se risulta opposto.</dd>
+  </dl>
+  <p class="muted">Offset e numero di campioni della media si regolano dal <a href="#misure">pannello Misure</a>.</p>
+
+  <h3 id="banco">Banco — motore</h3>
+  <dl>
+    <dt>IP</dt><dd>Indirizzo del banco (default <code>192.168.0.10</code>).</dd>
+    <dt>Connetti / Disconnetti</dt><dd>Apre/chiude il collegamento Modbus TCP. La velocità può poi essere impostata a mano o dalla sequenza.</dd>
+  </dl>
+</section>
+
+<!-- 6 (Misure) ─────────────────────────────────────── -->
+<section id="misure">
+  <h2><span class="dot l-warn"></span><span class="num">04</span>Pannello Misure (Δ)</h2>
+  <p class="lead">Mostra affiancati i valori del <span class="ble"><code>trainer BLE</code></span> e del <span class="lrz"><code>sensore Lorenz</code></span>. La colonna centrale è lo <b>Scarto (Δ)</b> tra le due sorgenti.</p>
+  <div class="led-row"><span class="led l-ok"></span> Δ entro soglia</div>
+  <div class="led-row"><span class="led l-warn"></span> Δ moderato</div>
+  <div class="led-row"><span class="led l-err"></span> Δ elevato</div>
+  <p class="muted" style="margin-top:12px">Soglie e finestra di smoothing si impostano da <kbd class="path">Impostazioni → Parametri delta e smoothing…</kbd></p>
+  <dl>
+    <dt>Abilita Dati BLE</dt><dd>Attiva/disattiva manualmente le notifiche FTMS del trainer. Verde = attive.</dd>
+    <dt>Leggi</dt><dd>Acquisisce l'offset del Lorenz: eseguire a riposo, senza carico.</dd>
+    <dt>Media (N)</dt><dd>Numero di campioni della media mobile, impostabile separatamente per BLE e Lorenz.</dd>
+  </dl>
+</section>
+
+<!-- 7 (EXTRA) ──────────────────────────────────────── -->
+<section id="extra">
+  <h2><span class="dot l-off"></span><span class="num">05</span>Pannello EXTRA</h2>
+  <p class="lead">Pannello laterale a comparsa sul bordo destro. Si apre/chiude dalla linguetta verticale <code>EXTRA</code> o da <kbd class="path">Visualizza → Mostra/Nascondi pannello COM</kbd>. In cima ha i LED di stato di COM, PSU e Gamma.</p>
+
+  <h3 id="com">Sensore COM</h3>
+  <p class="muted">Sensore seriale generico. Seleziona la <code>Porta</code> (🔄 per aggiornare l'elenco), <code>Connetti</code>. Legge fino a 4 valori numerici separati da <code>;</code>, mostrati come <code>Valore 1…4</code>.</p>
+
+  <h3 id="psu">Alimentatore PSU</h3>
+  <p class="muted">Alimentatore da banco su porta seriale. Dopo <code>Connetti</code>, il pannello mostra le misure di tensione, corrente e potenza, registrate anche su file. Imposta uscita e limiti da <code>⚙ Impostazioni PSU…</code></p>
+
+  <h3 id="gamma">Gamma Sensor</h3>
+  <p class="muted">Sensore Gamma su porta seriale: legge in continuo <code>DGS</code>, <code>TPR</code> e <code>Trigger</code>. I valori finiscono nelle colonne <code>dgs_gamma</code>, <code>tpr_gamma</code>, <code>trigger_gamma</code> del file Excel se la registrazione è attiva.</p>
+</section>
+
+<!-- 4 (Comandi) ────────────────────────────────────── -->
+<section id="comandi">
+  <h2><span class="dot" style="background:var(--ble)"></span><span class="num">06</span>Comandi manuali</h2>
+  <p class="lead">Riquadro <code>Comandi</code>. Imposta il valore nello spinbox e premi il pulsante. Utile per prove rapide e verifica della risposta.</p>
+
+  <h3 class="ble">Trainer (BLE)</h3>
+  <dl>
+    <dt>Livello [/200]</dt><dd>Resistenza diretta, da 0 a 200.</dd>
+    <dt>Potenza [W]</dt><dd>Potenza target in watt (modalità ERG).</dd>
+    <dt>Simulazione [%]</dt><dd>Profilo di pendenza simulata, in percentuale.</dd>
+    <dt>⬛ ZERO FRENO</dt><dd>Azzera il freno (livello 0) con un click.</dd>
+  </dl>
+
+  <h3>Banco</h3>
+  <dl>
+    <dt>Vel. Banco [km/h]</dt><dd>Imposta la velocità del motore al valore inserito.</dd>
+    <dt>⏹ STOP BANCO</dt><dd>Arresto immediato: velocità a 0 e stop della sequenza in corso.</dd>
+  </dl>
+</section>
+
+<!-- 5 (Sequenza) ───────────────────────────────────── -->
+<section id="sequenza">
+  <h2><span class="dot" style="background:var(--accent)"></span><span class="num">07</span>Sequenza automatica</h2>
+  <p class="lead">Esegue un test scritto su file. <code>Carica file</code> apre un CSV o Excel; le righe compaiono nella tabella.</p>
+
+  <h3>Controlli</h3>
+  <dl>
+    <dt>▶ Start</dt><dd>Avvia. Durante l'esecuzione diventa <code>⏸ Pausa</code> / <code>▶ Riprendi</code>.</dd>
+    <dt>⏮ &nbsp;⏭</dt><dd>Riga precedente / successiva.</dd>
+    <dt>■ Stop</dt><dd>Interrompe la sequenza.</dd>
+    <dt>N. Cicli</dt><dd>Numero di ripetizioni dell'intera sequenza.</dd>
+    <dt>Auto-Stop REC</dt><dd>Se attivo, ferma la registrazione al termine della sequenza.</dd>
+  </dl>
+  <p class="muted">La barra dei tempi mostra durata totale e tempo rimanente.</p>
+
+  <h3>Formato del file</h3>
+  <p class="muted">CSV o Excel (<code>.xlsx</code>/<code>.xls</code>). La prima riga è l'intestazione e viene ignorata. Nei CSV il separatore (<code>;</code> <code>,</code> tab <code>|</code>) viene riconosciuto in automatico. Le colonne, in ordine:</p>
+  <table>
+    <thead><tr><th>#</th><th>Colonna</th><th>Significato</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>comando</code></td><td>Tipo di comando (vedi tabella sotto). Unica colonna obbligatoria.</td></tr>
+      <tr><td>2</td><td><code>tempo_s</code></td><td>Secondi di attesa dopo il comando, prima della riga successiva. Numero intero.</td></tr>
+      <tr><td>3</td><td><code>valore_rullo</code></td><td>Livello / potenza / pendenza, secondo il comando. Numero intero.</td></tr>
+      <tr><td>4</td><td><code>banco_kmh</code></td><td>Velocità del banco in km/h (opzionale). Vedi nota sotto.</td></tr>
+      <tr><td>5</td><td><code>etichetta</code></td><td>Triplo uso: nota descrittiva / nome del punto per <code>save</code> / payload per <code>write_eeprom</code>.</td></tr>
+    </tbody>
+  </table>
+  <div class="note">La colonna <code>banco_kmh</code> ha effetto solo sui comandi <code>livelli</code>, <code>potenza</code> e <code>simulazione</code>: imposta la velocità del banco nella stessa riga. Per <code>spindown</code>, <code>save</code> e <code>write_eeprom</code> viene ignorata.</div>
+
+  <h3>Comandi riconosciuti</h3>
+  <table>
+    <thead><tr><th>Comando</th><th>Cosa fa</th><th>Colonne usate</th></tr></thead>
+    <tbody>
+      <tr><td><code>livelli</code></td><td>Imposta un livello di resistenza diretta (0–200).</td><td>valore + tempo (+ banco)</td></tr>
+      <tr><td><code>potenza</code></td><td>Imposta una potenza target in watt (modalità ERG).</td><td>valore + tempo (+ banco)</td></tr>
+      <tr><td><code>simulazione</code></td><td>Imposta una pendenza simulata in % (valore intero).</td><td>valore + tempo (+ banco)</td></tr>
+      <tr><td><code>spindown</code></td><td>Avvia la calibrazione spin-down. Il rullo gestisce i propri tempi: valore e tempo sono ignorati.</td><td>nessuna</td></tr>
+      <tr><td><code>save</code></td><td>Raccoglie i dati per <code>tempo_s</code> secondi, ne calcola la media e scrive una riga nel file di sintesi, usando <code>etichetta</code> come nome del punto.</td><td>tempo + etichetta</td></tr>
+      <tr><td><code>write_eeprom</code></td><td>Scrive e verifica byte nella EEPROM del trainer. Indirizzo e dati vanno nella colonna <code>etichetta</code> (vedi dettaglio sotto).</td><td>etichetta</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Un esempio per ogni comando</h3>
+  <p class="muted">Riga d'esempio nell'ordine <code>comando ; tempo_s ; valore_rullo ; banco_kmh ; etichetta</code>. I campi non usati restano vuoti.</p>
+  <table>
+    <thead><tr><th>Comando</th><th>Esempio di riga</th><th>Effetto</th></tr></thead>
+    <tbody>
+      <tr><td><code>livelli</code></td><td><code>livelli;30;120;;Livello 120</code></td><td>Livello 120 per 30 s.</td></tr>
+      <tr><td><code>potenza</code></td><td><code>potenza;60;200;28;200 W</code></td><td>200 W (ERG) per 60 s, banco a 28 km/h.</td></tr>
+      <tr><td><code>simulazione</code></td><td><code>simulazione;45;5;28;Salita 5%</code></td><td>Pendenza 5% per 45 s, banco a 28 km/h.</td></tr>
+      <tr><td><code>spindown</code></td><td><code>spindown;;;;Calibrazione</code></td><td>Avvia lo spin-down e attende il completamento.</td></tr>
+      <tr><td><code>save</code></td><td><code>save;20;;;Punto 200W</code></td><td>Media degli ultimi 20 s salvata come «Punto 200W» nella sintesi.</td></tr>
+      <tr><td><code>write_eeprom</code></td><td><code>write_eeprom;;;;0549: 46</code></td><td>Scrive il byte 0x46 all'indirizzo 0x0549 e verifica.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="write_eeprom">Comando <code>write_eeprom</code> — dettaglio</h3>
+  <p class="muted">Non usa <code>valore_rullo</code> né <code>banco_kmh</code>: indirizzo e byte da scrivere viaggiano tutti nella colonna <code>etichetta</code>, nel formato:</p>
+  <p style="margin:8px 0"><code>ADDR: B0 B1 B2 …</code></p>
+  <dl>
+    <dt>ADDR</dt><dd>Indirizzo iniziale in <b>esadecimale</b> (<code>0000</code>–<code>FFFF</code>).</dd>
+    <dt>B0 B1 …</dt><dd>Byte consecutivi scritti a partire da ADDR, in <b>esadecimale</b> (<code>00</code>–<code>FF</code>), separati da spazi o virgole. Un solo byte → <code>ADDR: B0</code>.</dd>
+  </dl>
+  <p class="muted">Esempi validi: <code>0549: 46</code> · <code>0549: 46 47 48</code> · <code>549:46,47,48</code></p>
+  <div class="note warn-box">Tutti i valori sono in esadecimale, ADDR compreso. Il decimale <b>70</b> va scritto come <code>46</code> (ovvero 0x46), <b>non</b> come <code>70</code>.</div>
+  <p class="muted">La scrittura viene riletta e verificata in automatico, con fino a 3 tentativi. Se la verifica fallisce in via definitiva, <b>la sequenza si ferma</b> su quella riga. Richiede il trainer connesso via BLE; una riga con payload non valido o senza BLE viene scartata già al caricamento del file.</p>
+
+  <h3>Esempio di sequenza completa</h3>
+  <p class="muted">Test a gradini di potenza con calibrazione iniziale e punti di sintesi:</p>
+  <table>
+    <thead><tr><th>comando</th><th>tempo_s</th><th>valore_rullo</th><th>banco_kmh</th><th>etichetta</th></tr></thead>
+    <tbody>
+      <tr><td><code>spindown</code></td><td></td><td></td><td></td><td>Calibrazione</td></tr>
+      <tr><td><code>potenza</code></td><td>60</td><td>150</td><td>28</td><td>Step 150W</td></tr>
+      <tr><td><code>save</code></td><td>20</td><td></td><td></td><td>150W</td></tr>
+      <tr><td><code>potenza</code></td><td>60</td><td>200</td><td>28</td><td>Step 200W</td></tr>
+      <tr><td><code>save</code></td><td>20</td><td></td><td></td><td>200W</td></tr>
+      <tr><td><code>livelli</code></td><td>10</td><td>0</td><td>0</td><td>Defaticamento</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">All'avvio della sequenza vengono inviati <code>freno = 0</code> e <code>velocità banco = 0</code> per sicurezza. Le notifiche FTMS restano attive e vanno disattivate a mano dal pannello Misure se necessario.</div>
+</section>
+
+<!-- 8 (Registrazione) ──────────────────────────────── -->
+<section id="registrazione">
+  <h2><span class="dot l-err"></span><span class="num">08</span>Registrazione dati</h2>
+  <p class="lead">Premi <code>⏺ REC</code>: puoi dare un nome opzionale alla sessione.</p>
+  <dl>
+    <dt>senza nome</dt><dd><code>AAAAMMGG_HHMMSS_bike_data.xlsx</code></dd>
+    <dt>con nome</dt><dd><code>AAAAMMGG_HHMMSS_nome.xlsx</code></dd>
+  </dl>
+  <ul>
+    <li><code>⏹ STOP</code> termina la sessione con salvataggio finale garantito.</li>
+    <li>Salvataggio automatico ogni 60 secondi.</li>
+    <li>Oltre i 50 MB il file viene spezzato (<code>_part02</code>, <code>_part03</code>…) con la stessa intestazione.</li>
+    <li>Più sessioni di seguito senza riavviare il programma.</li>
+  </ul>
+  <p class="muted"><kbd class="path">File → Forza salvataggio dati</kbd> scrive subito su disco. La frequenza di registrazione (Hz) si imposta da <kbd class="path">Impostazioni → Parametri delta e smoothing…</kbd></p>
+</section>
+
+<!-- 9 (Menu) ───────────────────────────────────────── -->
+<section id="menu">
+  <h2><span class="dot l-off"></span><span class="num">09</span>Menu</h2>
+  <h3>File</h3>
+  <dl>
+    <dt>Cartella di lavoro</dt><dd>Apre la cartella dell'applicazione.</dd>
+    <dt>Forza salvataggio dati</dt><dd>Scrive subito i dati in corso di registrazione.</dd>
+    <dt>Apri cartella output</dt><dd>Apre la cartella dei file registrati.</dd>
+  </dl>
+  <h3>Impostazioni</h3>
+  <dl>
+    <dt>Parametri delta e smoothing…</dt><dd>Soglie dello scarto Δ (velocità e potenza), finestra di smoothing e frequenza di registrazione.</dd>
+  </dl>
+  <h3>Dispositivo</h3>
+  <dl>
+    <dt>Abilita cadenza simulata…</dt><dd>Configurazione EEPROM del trainer.</dd>
+    <dt>Informazioni dispositivo…</dt><dd>Dati e identificativi del trainer connesso.</dd>
+    <dt>Calibrazione spin-down…</dt><dd>Procedura di calibrazione guidata.</dd>
+  </dl>
+  <h3>Visualizza</h3>
+  <dl>
+    <dt>Mostra/Nascondi pannello COM</dt><dd>Apre o chiude il pannello EXTRA laterale.</dd>
+  </dl>
+  <h3>Info</h3>
+  <dl>
+    <dt>Guida all'uso…</dt><dd>Questa guida.</dd>
+    <dt>Versione / Libreria</dt><dd>Versione dell'app e della libreria condivisa.</dd>
+  </dl>
+</section>
+
+<!-- 10 (Sicurezza) ─────────────────────────────────── -->
+<section id="sicurezza">
+  <h2><span class="dot l-err"></span><span class="num">10</span>Arresto rapido</h2>
+  <div class="note warn-box">
+    <p style="margin-top:0"><b>⏹ STOP BANCO</b> — arresto immediato: porta la velocità del banco a 0 e interrompe la sequenza automatica in corso. È il pulsante da usare in caso di necessità.</p>
+    <p style="margin-bottom:0"><b>⬛ ZERO FRENO</b> — azzera la resistenza del trainer.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+  // Mobile menu
+  const side=document.getElementById('side'), scrim=document.getElementById('scrim');
+  const open=()=>{side.classList.add('open');scrim.classList.add('show')};
+  const close=()=>{side.classList.remove('open');scrim.classList.remove('show')};
+  document.getElementById('burger')?.addEventListener('click',open);
+  scrim.addEventListener('click',close);
+
+  const links=[...document.querySelectorAll('#nav a')];
+  links.forEach(a=>a.addEventListener('click',()=>{if(window.innerWidth<=860)close()}));
+
+  // Scroll-spy: highlight the nav entry of the section in view
+  const map=new Map();
+  links.forEach(a=>{const id=a.getAttribute('href').slice(1);const el=document.getElementById(id);if(el)map.set(el,a)});
+  const targets=[...map.keys()];
+  const setActive=el=>{links.forEach(l=>l.classList.remove('active'));map.get(el)?.classList.add('active')};
+
+  const io=new IntersectionObserver(entries=>{
+    const vis=entries.filter(e=>e.isIntersecting)
+      .sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top);
+    if(vis.length)setActive(vis[0].target);
+  },{rootMargin:'-12% 0px -72% 0px',threshold:0});
+  targets.forEach(t=>io.observe(t));
+</script>
+</body>
+</html>

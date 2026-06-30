@@ -59,6 +59,12 @@ if "!GIT_VERSION!"=="" (
     echo [INFO] Versione rilevata: !GIT_VERSION!
 )
 
+REM ── Suffisso _DEBUG se NON è un tag pulito vX.Y.Z ────────────────────────────
+set DEBUG_SUFFIX=
+echo !GIT_VERSION!| findstr /R "^v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$" >nul
+if errorlevel 1 set DEBUG_SUFFIX=_DEBUG
+if not "!DEBUG_SUFFIX!"=="" echo [INFO] Build NON di release: nome exe con suffisso !DEBUG_SUFFIX!
+
 REM ── Salva copia di backup di version.py prima di sovrascriverlo ──────────────
 copy /Y "%PROJECT%\version.py" "%PROJECT%\version.py.bak" >nul 2>&1
 
@@ -71,12 +77,13 @@ echo [INFO] version.py scritto: VERSION=!GIT_VERSION!  LIB_VERSION=!LIBVER!
 
 REM ── Esegui PyInstaller ───────────────────────────────────────────────────────
 pyinstaller --noconfirm --onefile --windowed ^
-  --name=TotalCommander_!GIT_VERSION! ^
+  --name=TotalCommander_!GIT_VERSION!!DEBUG_SUFFIX! ^
   --add-data="%PROJECT%\gui;gui" ^
   --add-data="%PROJECT%\logic;logic" ^
   --add-data="%PROJECT%\version.py;." ^
   --add-data="%PROJECT%\core;core" ^
   --add-data="%PROJECT%\justo.ico;." ^
+  --add-data="%PROJECT%\docs\guida_total_commander.html;docs" ^
   --hidden-import=winrt.windows.foundation.collections ^
   --hidden-import=winrt ^
   --icon="%PROJECT%\justo.ico" ^

@@ -25,7 +25,7 @@ MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 # Per aggiungere un nuovo comando: aggiungere una voce qui e il relativo handler
 # in main_window._dispatch_command. Nessun'altra parte del codice va toccata.
 #
-# Eccezione 'eeprom': scrittura+verifica in memoria. Non usa valore_rullo né
+# Eccezione 'write_eeprom': scrittura+verifica in memoria. Non usa valore_rullo né
 # banco_kmh; trasporta indirizzo iniziale e byte da scrivere nella colonna
 # 'etichetta', nel formato "ADDR: B0 B1 ..." (tutto hex, vedi
 # parse_eeprom_payload). Ha un handler dedicato nel runner (csv_panel) con
@@ -37,7 +37,7 @@ COMMAND_SCHEMA = {
     "simulazione": {"requires_valore": True,  "requires_tempo": True},
     "spindown":    {"requires_valore": False, "requires_tempo": False},
     "save":        {"requires_valore": False, "requires_tempo": True},
-    "eeprom":      {"requires_valore": False, "requires_tempo": False},
+    "write_eeprom": {"requires_valore": False, "requires_tempo": False},
 }
 
 
@@ -303,19 +303,19 @@ class DataProcessor:
 
         # ── etichetta (col 4, opzionale) ────────────────────────────────────
         # Usata dal comando 'save' come label descrittiva della riga di sintesi.
-        # Per il comando 'eeprom' trasporta il payload "ADDR: B0 B1 ..." (hex).
+        # Per il comando 'write_eeprom' trasporta il payload "ADDR: B0 B1 ..." (hex).
         # Per tutti gli altri comandi è inclusa nel tuple ma ignorata.
         etichetta = ""
         if len(row) > 4 and row[4]:
             etichetta = str(row[4]).strip()
 
-        # ── Validazione comando eeprom ──────────────────────────────────────
+        # ── Validazione comando write_eeprom ──────────────────────────────────────
         # eeprom richiede un payload valido nella colonna etichetta. Riga
         # malformata → saltata con warning (coerente con gli altri scarti).
-        if command_type == "eeprom":
+        if command_type == "write_eeprom":
             if DataProcessor.parse_eeprom_payload(etichetta) is None:
                 log.warning(
-                    f"Riga {line_num}: comando eeprom con payload non valido "
+                    f"Riga {line_num}: comando write_eeprom con payload non valido "
                     f"'{etichetta}' (atteso 'ADDR: B0 B1 ...' in hex), saltata.")
                 return None
 
@@ -324,7 +324,7 @@ class DataProcessor:
     @staticmethod
     def parse_eeprom_payload(text) -> tuple | None:
         """
-        Interpreta il payload di un comando 'eeprom' nel formato:
+        Interpreta il payload di un comando 'write_eeprom' nel formato:
             "ADDR: B0 B1 B2 ..."
         dove ADDR è l'indirizzo iniziale (hex, 0000–FFFF) e B0.. sono i byte
         consecutivi da scrivere a partire da ADDR (hex, 00–FF, separati da

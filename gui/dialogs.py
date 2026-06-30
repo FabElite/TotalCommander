@@ -14,6 +14,8 @@ import time
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sys
+import webbrowser
 
 from shared_lib.bluetooth_manager import CalibrationPhase
 
@@ -913,158 +915,19 @@ def open_spindown_dialog(app):
     # Polling velocità parte subito, indipendente dalla calibrazione
     _start_speed_poll()
 
+def _resource_path(*parts):
+    """Percorso risorsa, valido sia da sorgente sia da exe PyInstaller."""
+    if getattr(sys, "frozen", False):
+        base = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    else:
+        # dialogs.py è in gui/ → risali alla radice del progetto
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, *parts)
+
+
 def open_help(app):
-    win = app.make_dialog("Guida all'uso", resizable=True, modal=False, size=(580, 540))
-
-    outer = ttk.Frame(win)
-    outer.pack(fill='both', expand=True, padx=2, pady=2)
-
-    sb = ttk.Scrollbar(outer, orient='vertical')
-    sb.pack(side='right', fill='y')
-    canvas = tk.Canvas(outer, yscrollcommand=sb.set,
-                       highlightthickness=0, bg='white')
-    canvas.pack(side='left', fill='both', expand=True)
-    sb.config(command=canvas.yview)
-
-    inner = tk.Frame(canvas, bg='white')
-    canvas_win = canvas.create_window((0, 0), window=inner, anchor='nw')
-
-    def _on_resize(e):
-        canvas.itemconfig(canvas_win, width=e.width)
-    canvas.bind('<Configure>', _on_resize)
-    inner.bind('<Configure>',
-               lambda e: canvas.configure(
-                   scrollregion=canvas.bbox('all')))
-    canvas.bind_all('<MouseWheel>',
-                    lambda e: canvas.yview_scroll(
-                        int(-1 * (e.delta / 120)), 'units'))
-
-    def _on_info_close():
-        canvas.unbind_all('<MouseWheel>')
-        win.destroy()
-
-    win.protocol("WM_DELETE_WINDOW", _on_info_close)
-
-    _BG  = 'white'
-    _H1  = ('Helvetica', 11, 'bold')
-    _H2  = ('Helvetica', 10, 'bold')
-    _TXT = ('Helvetica', 9)
-
-    def h1(text):
-        tk.Label(inner, text=text, font=_H1, bg=_BG,
-                 fg='#1a1a2e', anchor='w'
-                 ).pack(fill='x', padx=16, pady=(14, 2))
-        tk.Frame(inner, bg='#aaaacc', height=1).pack(
-            fill='x', padx=16, pady=(0, 6))
-
-    def h2(text):
-        tk.Label(inner, text=text, font=_H2, bg=_BG,
-                 fg='#333366', anchor='w'
-                 ).pack(fill='x', padx=20, pady=(8, 1))
-
-    def body(text):
-        tk.Label(inner, text=text, font=_TXT, bg=_BG,
-                 fg='#333333', anchor='nw', justify='left',
-                 wraplength=510
-                 ).pack(fill='x', padx=24, pady=(0, 4))
-
-    # ── Contenuto ─────────────────────────────────────────────────────
-    h1("● Barra di Stato — LED")
-
-    h2("APP  (primo LED a sinistra)")
-    body("Indicatore per capire se il programma si è congelato. Fino a quanto lampeggia e il contatore incrementa tutto ok")
-
-    h2("BLE / Lorenz / Banco / COM")
-    body("Verde = dispositivo connesso e raggiungibile.\n"
-         "Rosso = non connesso o connessione persa. ")
-
-    h2("FTMS — frequenza dati")
-    body("Mostra la frequenza (Hz) con cui arrivano i pacchetti dati dal "
-         "trainer BLE. Attivo solo quando le notifiche FTMS sono abilitate. "
-         "Si spegne automaticamente se i dati si interrompono per più di 2 secondi.")
-
-    h2("Auto")
-    body("Verde = sequenza automatica da CSV in esecuzione.\n"
-         "Spento = nessuna sequenza attiva.")
-
-    h2("REC")
-    body("Rosso lampeggiante = la sessione è in registrazione.\n"
-         "Spento = nessuna registazione in corso")
-
-    h1("● Barra Connessioni")
-
-    h2("REC")
-    body("Avvia o ferma la registrazione dei dati. Vengono registrati tutti i dati disponibili in quel momento. "
-         "La cartella di Output serve ad aprire dove sono i risultati. "
-         "In caso di superamento dei 50 Mega di dimensioni del file verrà creato un nuovo file")
-
-    h2("BLE")
-    body("Cerca i dispositivi Bluetooth nelle vicinanze, seleziona il trainer "
-         "dalla lista e premi Connetti. La barra di avanzamento indica che "
-         "un'operazione è in corso. Una volta connesso, le notifiche FTMS "
-         "vengono abilitate automaticamente alla connessione.")
-
-    h2("Lorenz")
-    body("Connette il sensore di coppia/potenza esterno sulla porta USB dedicata. "
-         "'Leggi Offset' acquisisce il valore di offset attuale (eseguire a riposo). "
-         "'Media' imposta quanti campioni usare per la media mobile. "
-         "'Inverti Velocità' inverte il segno del canale B.")
-
-    h2("Banco")
-    body("Connette il motore tramite Modbus TCP. Inserire l'IP del banco e premere "
-         "Connetti. La velocità viene impostata automaticamente durante le sequenze "
-         "automatiche se specificata nel CSV.")
-
-    h2("Sensore COM")
-    body("Connette un sensore seriale aggiuntivo (fino a 4 valori numerici separati "
-         "da ';'). Il pannello è collassabile con il pulsante '+COM'.")
-
-    h2("Gamma Sensor")
-    body("Connette il sensore Gamma via porta seriale. Legge continuamente DGS, TPR e Trigger "
-         "dal sensore con parsing hardware del protocollo frame (header FF FF, CRC, footer 55 AA). "
-         "I valori sono visualizzati nel pannello laterale e vengono registrati automaticamente "
-         "nelle colonne dgs_gamma, tpr_gamma, trigger_gamma del file Excel se la registrazione è attiva.")
-
-    h1("● Comandi e Sequenza Automatica")
-
-    h2("Comandi manuali")
-    body("Inviano direttamente al trainer un livello di resistenza (0–200), "
-         "una potenza target (W) o un profilo di simulazione (pendenza %). "
-         "Usare per test rapidi o verifica risposta.")
-
-    h2("Sequenza da CSV / Excel")
-    body("Carica un file CSV o Excel. Colonne (riga 1 = intestazione, ignorata): "
-         "comando | tempo_s | valore_rullo | banco_kmh | etichetta. "
-         "Comandi disponibili: livelli, potenza, simulazione, spindown, save. "
-         "'tempo_s' è l'attesa dopo il comando; 'valore_rullo' è livello/potenza/pendenza. "
-         "vengono inviati automaticamente freno=0 e velocità banco=0 per sicurezza. "
-         "Le notifiche FTMS restano attive e vanno disabilitate manualmente se necessario.")
-
-    h2("Emergency Stop")
-    body("Ferma immediatamente la sequenza automatica e imposta la velocità "
-         "del banco a 0. Usare in caso di necessità.")
-
-    h1("● Dati Live e Pannello Δ")
-
-    body("Il pannello mostra in tempo reale i valori ricevuti dal trainer BLE "
-         "e dal sensore Lorenz affiancati. Il Δ centrale indica la differenza "
-         "tra le due sorgenti: verde se rientra nella soglia, arancione se "
-         "moderato, rosso se elevato. Le soglie e la finestra di smoothing "
-         "sono configurabili da Impostazioni → Parametri delta.")
-
-    h1("● Salvataggio Dati")
-
-    body("Per avviare la registrazione premere ⏺ REC: verrà chiesto un nome "
-         "opzionale per la sessione. Senza nome il file sarà YYYYMMDD_HHMMSS_bike_data.xlsx; "
-         "con nome personalizzato sarà YYYYMMDD_HHMMSS_nome.xlsx (senza suffisso _bike_data). "
-         "Premere ⏹ STOP per terminare la sessione con flush finale garantito. "
-         "È possibile avviare più sessioni consecutive senza riavviare il programma.")
-    body("Il salvataggio avviene automaticamente ogni 60 secondi. Se il file supera "
-         "50 MB viene creato un nuovo file (_part02, _part03…) con la stessa intestazione. "
-         "Per forzare il salvataggio immediato usare File → Forza salvataggio dati. "
-         "La frequenza di registrazione (default 2 Hz) è configurabile da "
-         "Impostazioni → Parametri delta.")
-
-    # ── Pulsante chiudi ────────────────────────────────────────────────
-    ttk.Button(win, text="Chiudi", command=_on_info_close
-               ).pack(pady=10)
+    path = _resource_path("docs", "guida_total_commander.html")
+    if not os.path.exists(path):
+        messagebox.showerror("Guida", f"File guida non trovato:\n{path}")
+        return
+    webbrowser.open("file:///" + path.replace(os.sep, "/"))

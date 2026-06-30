@@ -750,7 +750,7 @@ class CsvPanel(ttk.Frame):
                     self._on_spindown(_resume_spindown)
 
                 # ── Comando EEPROM (scrittura+verifica in memoria) ─────────────
-                elif command_type == "eeprom" and self._on_eeprom is not None:
+                elif command_type == "write_eeprom" and self._on_eeprom is not None:
                     self._log.info(
                         f"[Auto] Scrittura EEPROM in memoria: {etichetta}")
                     self._on_auto_status('ok', 'Auto: EEPROM…')
