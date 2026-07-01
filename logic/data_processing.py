@@ -22,14 +22,25 @@ MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 #   col 2: valore_rullo → livello 0-200 / potenza [W] / pendenza [%] (int)
 #   col 3: banco_kmh    → velocità banco [km/h] (float, opzionale)
 #
-# Per aggiungere un nuovo comando: aggiungere una voce qui e il relativo handler
-# in main_window._dispatch_command. Nessun'altra parte del codice va toccata.
+# Esistono DUE categorie di comando, con due punti di estensione diversi:
 #
-# Eccezione 'write_eeprom': scrittura+verifica in memoria. Non usa valore_rullo né
+#   1) Comandi ORDINARI con timer (livelli / potenza / simulazione)
+#      Vengono inviati e poi la sequenza attende `tempo_s` prima di proseguire.
+#      Per aggiungerne uno: registrarlo qui e gestirlo in
+#      TotalCommanderApp._dispatch_command (gui/app.py). Nient'altro da toccare.
+#
+#   2) Comandi ASINCRONI con resume-callback (save / spindown / write_eeprom)
+#      Richiedono di attendere l'esito del dispositivo prima di avanzare, quindi
+#      NON passano da _dispatch_command: sono gestiti come casi dedicati dentro
+#      il runner della sequenza (CsvPanel.send_next), che invoca la callback
+#      corrispondente dell'app e prosegue solo quando questa richiama il
+#      resume-callback. Per aggiungerne uno servono: la voce qui, il ramo in
+#      send_next e la callback nell'app.
+#
+# Dettaglio 'write_eeprom': scrittura+verifica in memoria. Non usa valore_rullo né
 # banco_kmh; trasporta indirizzo iniziale e byte da scrivere nella colonna
 # 'etichetta', nel formato "ADDR: B0 B1 ..." (tutto hex, vedi
-# parse_eeprom_payload). Ha un handler dedicato nel runner (csv_panel) con
-# resume-callback: in caso di fallimento la sequenza si ferma.
+# parse_eeprom_payload). In caso di fallimento (dopo i retry) la sequenza si ferma.
 COMMAND_SCHEMA = {
     #  comando         richiede_valore  richiede_tempo
     "livelli":     {"requires_valore": True,  "requires_tempo": True},
@@ -41,20 +52,48 @@ COMMAND_SCHEMA = {
 }
 
 
+# ── Schema colonne dati (SORGENTE UNICA) ──────────────────────────────────────
+# Ordine ufficiale delle colonne dati, come coppie (chiave in bike_data /
+# latest_data, nome colonna nel file). Da qui derivano gli header di
+# DataProcessor e SintesiWriter, la costruzione delle righe e il calcolo delle
+# medie: aggiungere/rimuovere/riordinare una colonna si fa MODIFICANDO SOLO
+# QUESTA LISTA. Prima l'informazione era ripetuta in tre punti che dovevano
+# restare allineati a mano.
+DATA_COLUMNS = [
+    ("Spd",              "speed_trainer"),
+    ("Cad",              "cadence_trainer"),
+    ("Pwr",              "power_trainer"),
+    ("TotDist",          "total_distance_trainer"),
+    ("Res",              "resistance_trainer"),
+    ("ElaTime",          "elapsed_time_trainer"),
+    ("offset_lorenz",    "offset_lorenz"),
+    ("speed_avg_lorenz", "speed_avg_lorenz"),
+    ("torque_lorenz",    "torque_lorenz"),
+    ("power_lorenz",     "power_lorenz"),
+    ("Valore1",          "Valore1"),
+    ("Valore2",          "Valore2"),
+    ("Valore3",          "Valore3"),
+    ("Valore4",          "Valore4"),
+    ("tensione_psu",     "tensione_psu"),
+    ("corrente_psu",     "corrente_psu"),
+    ("potenza_psu",      "potenza_psu"),
+    ("dgs_gamma",        "dgs_gamma"),
+    ("tpr_gamma",        "tpr_gamma"),
+    ("trigger_gamma",    "trigger_gamma"),
+]
+
+# Viste derivate, di sola lettura.
+DATA_KEYS = [k for k, _ in DATA_COLUMNS]          # chiavi bike_data, in ordine
+DATA_COL_NAMES = [c for _, c in DATA_COLUMNS]     # nomi colonna, in ordine
+
+
 class DataProcessor:
     """
     Raccoglie i dati del banco prova e li persiste su file Excel.
     """
 
-    HEADERS = [
-        "timestamp", "s",
-        "speed_trainer", "cadence_trainer", "power_trainer",
-        "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
-        "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz",
-        "Valore1", "Valore2", "Valore3", "Valore4",
-        "tensione_psu", "corrente_psu", "potenza_psu",
-        "dgs_gamma", "tpr_gamma", "trigger_gamma",
-    ]
+    # timestamp + secondi + tutte le colonne dati (vedi DATA_COLUMNS).
+    HEADERS = ["timestamp", "s"] + DATA_COL_NAMES
 
     def __init__(self):
         self.log = logging.getLogger(__name__)
@@ -154,30 +193,7 @@ class DataProcessor:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         elapsed_seconds = round(time.time() - self.start_time, 3)
 
-        row = [
-            timestamp,
-            elapsed_seconds,
-            data.get("Spd"),
-            data.get("Cad"),
-            data.get("Pwr"),
-            data.get("TotDist"),
-            data.get("Res"),
-            data.get("ElaTime"),
-            data.get("offset_lorenz"),
-            data.get("speed_avg_lorenz"),
-            data.get("torque_lorenz"),
-            data.get("power_lorenz"),
-            data.get("Valore1"),
-            data.get("Valore2"),
-            data.get("Valore3"),
-            data.get("Valore4"),
-            data.get("tensione_psu"),
-            data.get("corrente_psu"),
-            data.get("potenza_psu"),
-            data.get("dgs_gamma"),
-            data.get("tpr_gamma"),
-            data.get("trigger_gamma"),
-        ]
+        row = [timestamp, elapsed_seconds] + [data.get(k) for k in DATA_KEYS]
 
         try:
             with self._lock:
@@ -457,44 +473,16 @@ class SintesiWriter:
     (stesso ordine → i due file sono confrontabili direttamente).
     """
 
-    # Colonne metadato seguite da tutte le colonne dati (senza timestamp/s
-    # di DataProcessor che qui sono sostituiti dai metadati propri).
-    HEADERS = [
-        "n_riga", "timestamp", "durata_media_s", "etichetta", "rec_file",
-        "speed_trainer", "cadence_trainer", "power_trainer",
-        "total_distance_trainer", "resistance_trainer", "elapsed_time_trainer",
-        "offset_lorenz", "speed_avg_lorenz", "torque_lorenz", "power_lorenz",
-        "Valore1", "Valore2", "Valore3", "Valore4",
-        "tensione_psu", "corrente_psu", "potenza_psu",
-        "dgs_gamma", "tpr_gamma", "trigger_gamma",
-    ]
+    # Colonne di metadato proprie del file sintesi, seguite da tutte le colonne
+    # dati condivise (DATA_COLUMNS) — così i due file restano confrontabili.
+    _META_COLS = ["n_riga", "timestamp", "durata_media_s", "etichetta", "rec_file"]
+    HEADERS = _META_COLS + DATA_COL_NAMES
 
-    # Mappa chiave _latest_data → nome colonna in HEADERS
-    _KEY_MAP = {
-        "Spd":              "speed_trainer",
-        "Cad":              "cadence_trainer",
-        "Pwr":              "power_trainer",
-        "TotDist":          "total_distance_trainer",
-        "Res":              "resistance_trainer",
-        "ElaTime":          "elapsed_time_trainer",
-        "offset_lorenz":    "offset_lorenz",
-        "speed_avg_lorenz": "speed_avg_lorenz",
-        "torque_lorenz":    "torque_lorenz",
-        "power_lorenz":     "power_lorenz",
-        "Valore1":          "Valore1",
-        "Valore2":          "Valore2",
-        "Valore3":          "Valore3",
-        "Valore4":          "Valore4",
-        "tensione_psu":     "tensione_psu",
-        "corrente_psu":     "corrente_psu",
-        "potenza_psu":      "potenza_psu",
-        "dgs_gamma":        "dgs_gamma",
-        "tpr_gamma":        "tpr_gamma",
-        "trigger_gamma":    "trigger_gamma",
-    }
+    # Mappa chiave bike_data → nome colonna, derivata dalla sorgente unica.
+    _KEY_MAP = dict(DATA_COLUMNS)
 
-    # Colonne dati nell'ordine atteso (sottoinsieme di HEADERS senza metadati)
-    _DATA_COLS = HEADERS[5:]
+    # Colonne dati nell'ordine atteso (le stesse di DATA_COLUMNS).
+    _DATA_COLS = DATA_COL_NAMES
 
     def __init__(self, output_dir: str = "output"):
         self._log        = logging.getLogger(__name__)

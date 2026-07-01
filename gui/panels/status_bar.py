@@ -171,9 +171,10 @@ class StatusBar(tk.Frame):
             self._lbl_devnum.config(text='')
 
     def set_device_number(self, num=None):
-        """Device number ANT+ (uint16) letto da EEPROM dopo il connect.
-        num=int  → mostra il valore (verde, coerente con nome/indirizzo).
-        num=None → lettura fallita ('?', ambra)."""
+        """Device number letto dal Serial Number del servizio Device Information
+        dopo il connect.
+        num valorizzato → mostra il valore (verde, coerente con nome/indirizzo).
+        num=None        → lettura fallita/assente ('?', ambra)."""
         if num is None:
             self._lbl_devnum.config(text='?', fg='#cc8800')
         else:

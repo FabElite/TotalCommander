@@ -27,11 +27,48 @@ PSU_MEASURE_INTERVAL_MS = 1000
 _SEP_LINE = "=" * 55
 
 
+def _log_disconnect_lost(log, name: str) -> None:
+    """Banner uniforme di perdita connessione (prima ripetuto in ogni check())."""
+    log.warning(_SEP_LINE)
+    log.warning(f"*** DISCONNESSIONE {name} - connessione persa ***")
+    log.warning(_SEP_LINE)
+
+
+class _ConnTransitionMixin:
+    """Fornisce check() con logging di transizione, dato is_connected().
+
+    Elimina la ripetizione del blocco 'stato + rilevamento perdita connessione'
+    presente in quasi tutti i controller. La classe che lo usa deve:
+      - definire is_connected() -> bool
+      - avere gli attributi self.on_status, self.log, self._was_connected
+      - impostare l'attributo di classe _status_name (etichetta nel banner)
+    e può opzionalmente sovrascrivere _on_disconnect_lost() per azioni extra
+    (es. spegnere un tick periodico o pulire i widget).
+    """
+    _status_name = "DISPOSITIVO"
+
+    def _on_disconnect_lost(self) -> None:
+        """Hook chiamato una sola volta alla perdita di connessione."""
+        pass
+
+    def check(self):
+        connected = self.is_connected()
+        self.on_status('ok' if connected else 'err')
+        if connected:
+            self._was_connected = True
+        elif self._was_connected:
+            _log_disconnect_lost(self.log, self._status_name)
+            self._was_connected = False
+            self._on_disconnect_lost()
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Lorenz (sensore coppia/potenza su USB dedicata)
 # ═════════════════════════════════════════════════════════════════════════════
 
-class LorenzController:
+class LorenzController(_ConnTransitionMixin):
+    _status_name = "LORENZ"
+
     def __init__(self, reader, executor, ui_after,
                  on_status, on_data, on_hz,
                  port_description: str = LORENZ_PORT_DESCRIPTION):
@@ -84,17 +121,6 @@ class LorenzController:
     def is_connected(self) -> bool:
         return self.reader.is_connected()
 
-    def check(self):
-        connected = self.reader.is_connected()
-        self.on_status('ok' if connected else 'err')
-        if connected:
-            self._was_connected = True
-        elif self._was_connected:
-            self.log.warning(_SEP_LINE)
-            self.log.warning("*** DISCONNESSIONE LORENZ - connessione persa ***")
-            self.log.warning(_SEP_LINE)
-            self._was_connected = False
-
     def poll(self):
         if self.reader.is_connected():
             data = self.reader.get_data()
@@ -115,7 +141,9 @@ class LorenzController:
 # Sensore seriale COM (fino a 4 valori)
 # ═════════════════════════════════════════════════════════════════════════════
 
-class SerialSensorController:
+class SerialSensorController(_ConnTransitionMixin):
+    _status_name = "SENSORE SERIALE"
+
     def __init__(self, reader, executor, ui_after, on_status, on_data):
         self.reader = reader
         self.executor = executor
@@ -151,17 +179,6 @@ class SerialSensorController:
 
     def is_connected(self) -> bool:
         return self.reader.connected
-
-    def check(self):
-        connected = self.reader.connected
-        self.on_status('ok' if connected else 'err')
-        if connected:
-            self._was_connected = True
-        elif self._was_connected:
-            self.log.warning(_SEP_LINE)
-            self.log.warning("*** DISCONNESSIONE SENSORE SERIALE - connessione persa ***")
-            self.log.warning(_SEP_LINE)
-            self._was_connected = False
 
     def poll(self):
         if self.reader.connected:
@@ -242,9 +259,7 @@ class BancoController:
             self._was_connected = True
         else:
             if self._was_connected:
-                self.log.warning(_SEP_LINE)
-                self.log.warning("*** DISCONNESSIONE MODBUS - connessione persa ***")
-                self.log.warning(_SEP_LINE)
+                _log_disconnect_lost(self.log, "MODBUS")
             elif from_user_action:
                 self.log.debug("Modbus: nessuna connessione attiva da chiudere.")
             self._was_connected = False
@@ -254,7 +269,9 @@ class BancoController:
 # PSU (alimentatore SCPI)
 # ═════════════════════════════════════════════════════════════════════════════
 
-class PsuController:
+class PsuController(_ConnTransitionMixin):
+    _status_name = "PSU"
+
     def __init__(self, executor, ui_after, schedule, cancel,
                  on_status, on_measure, on_clear):
         # schedule(ms, fn) -> id ; cancel(id) : per il tick di misura periodico
@@ -307,18 +324,10 @@ class PsuController:
     def is_connected(self) -> bool:
         return self.psu is not None and self.psu.is_connected()
 
-    def check(self):
-        connected = self.is_connected()
-        self.on_status('ok' if connected else 'err')
-        if connected:
-            self._was_connected = True
-        elif self._was_connected:
-            self.log.warning(_SEP_LINE)
-            self.log.warning("*** DISCONNESSIONE PSU - connessione persa ***")
-            self.log.warning(_SEP_LINE)
-            self._stop_update()
-            self._was_connected = False
-            self.ui_after(self.on_clear)
+    def _on_disconnect_lost(self):
+        # Alla perdita di connessione: ferma il tick di misura e pulisci i widget.
+        self._stop_update()
+        self.ui_after(self.on_clear)
 
     def _start_update(self):
         self._stop_update()
@@ -350,7 +359,9 @@ class PsuController:
 # Gamma Sensor (seriale, parsing frame hardware)
 # ═════════════════════════════════════════════════════════════════════════════
 
-class GammaController:
+class GammaController(_ConnTransitionMixin):
+    _status_name = "GAMMA"
+
     def __init__(self, reader, executor, ui_after, on_status, on_data, on_clear):
         self.reader = reader
         self.executor = executor
@@ -395,17 +406,9 @@ class GammaController:
             and self.reader.read_thread.is_alive()
         )
 
-    def check(self):
-        connected = self.is_connected()
-        self.on_status('ok' if connected else 'err')
-        if connected:
-            self._was_connected = True
-        elif self._was_connected:
-            self.log.warning(_SEP_LINE)
-            self.log.warning("*** DISCONNESSIONE GAMMA - connessione persa ***")
-            self.log.warning(_SEP_LINE)
-            self._was_connected = False
-            self.ui_after(self.on_clear)
+    def _on_disconnect_lost(self):
+        # Alla perdita di connessione: pulisci i widget del Gamma Sensor.
+        self.ui_after(self.on_clear)
 
     def poll(self):
         if not self.is_connected():

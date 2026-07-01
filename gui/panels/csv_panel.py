@@ -602,6 +602,51 @@ class CsvPanel(ttk.Frame):
         self._log.info(
             f"Caricati {len(commands)} comandi. Durata 1 ciclo: {_fmt(single_cycle_s)}")
 
+    def _finish_async_command(self, ai, success, send_next, *,
+                              fail_stops=False,
+                              ok_msg="", fail_msg="", pause_msg=""):
+        """Conclusione comune dei comandi asincroni (save / spindown / write_eeprom).
+
+        Invocata sul main thread dai rispettivi resume-callback. Comportamento:
+          - sequenza non più attiva          → no-op
+          - fail_stops=True e success=False  → log errore + stop() (non avanza)
+          - pausa pendente                   → applica la pausa
+          - altrimenti                       → log esito e avanza (ai+1)
+
+        pause_msg può essere una stringa o una funzione success->stringa (serve
+        a 'save', il cui messaggio di pausa dipende dall'esito).
+        """
+        if not self.auto_commands_running:
+            return
+
+        if fail_stops and not success:
+            self._log.error(fail_msg)
+            self._current_abs_idx = ai
+            self.stop()
+            return
+
+        if self._pending_pause:
+            self._pending_pause        = False
+            self._paused               = True
+            self.auto_commands_running = False
+            self._current_abs_idx      = ai
+            self._pause_remaining_ms   = 0
+            self._stop_countdown()
+            self._btn_play_pause.config(text="▶  Riprendi")
+            self._on_auto_status('warn', 'Auto: PAUSA')
+            self._update_nav_buttons()
+            msg = pause_msg(success) if callable(pause_msg) else pause_msg
+            self._log.info(msg)
+            return
+
+        if success:
+            self._log.info(ok_msg)
+        else:
+            self._log.warning(fail_msg)
+        self._back_origin = -1
+        self._back_count  = 0
+        self._auto_command_id = self.after(0, lambda: send_next(ai + 1))
+
     def start(self):
         if self._paused:
             self.resume()
@@ -686,33 +731,14 @@ class CsvPanel(ttk.Frame):
                     self._on_auto_status('ok', 'Auto: SAVE…')
 
                     def _resume_save(success: bool, _ai=absolute_index):
-                        if not self.auto_commands_running:
-                            return
-                        # Applica pausa pendente dopo operazione asincrona
-                        if self._pending_pause:
-                            self._pending_pause      = False
-                            self._paused             = True
-                            self.auto_commands_running = False
-                            self._current_abs_idx    = _ai
-                            self._pause_remaining_ms = 0
-                            self._stop_countdown()
-                            self._btn_play_pause.config(text="▶  Riprendi")
-                            self._on_auto_status('warn', 'Auto: PAUSA')
-                            self._update_nav_buttons()
-                            self._log.info(
-                                f"[Auto] save {'OK' if success else 'non salvato'}"
-                                " — sequenza in pausa.")
-                            return
-                        if success:
-                            self._log.info("[Auto] Media salvata nel file sintesi.")
-                        else:
-                            self._log.warning(
-                                "[Auto] Raccolta interrotta — riga non salvata.")
-                        # Avanzamento naturale: reset navigazione back
-                        self._back_origin = -1
-                        self._back_count  = 0
-                        self._auto_command_id = self.after(
-                            0, lambda: send_next(_ai + 1))
+                        self._finish_async_command(
+                            _ai, success, send_next,
+                            ok_msg="[Auto] Media salvata nel file sintesi.",
+                            fail_msg="[Auto] Raccolta interrotta — riga non salvata.",
+                            pause_msg=lambda ok: (
+                                f"[Auto] save {'OK' if ok else 'non salvato'}"
+                                " — sequenza in pausa."),
+                        )
 
                     self._on_save(wait_time, str(etichetta), _resume_save)
 
@@ -721,31 +747,12 @@ class CsvPanel(ttk.Frame):
                     self._log.info("[Auto] Avvio calibrazione spin-down automatica...")
 
                     def _resume_spindown(success: bool, _ai=absolute_index):
-                        if not self.auto_commands_running:
-                            return
-                        if self._pending_pause:
-                            self._pending_pause      = False
-                            self._paused             = True
-                            self.auto_commands_running = False
-                            self._current_abs_idx    = _ai
-                            self._pause_remaining_ms = 0
-                            self._stop_countdown()
-                            self._btn_play_pause.config(text="▶  Riprendi")
-                            self._on_auto_status('warn', 'Auto: PAUSA')
-                            self._update_nav_buttons()
-                            self._log.info(
-                                "[Auto] Calibrazione terminata — sequenza in pausa.")
-                            return
-                        if success:
-                            self._log.info(
-                                "[Auto] Calibrazione completata — sequenza ripresa.")
-                        else:
-                            self._log.warning(
-                                "[Auto] Calibrazione fallita — sequenza ripresa comunque.")
-                        self._back_origin = -1
-                        self._back_count  = 0
-                        self._auto_command_id = self.after(
-                            0, lambda: send_next(_ai + 1))
+                        self._finish_async_command(
+                            _ai, success, send_next,
+                            ok_msg="[Auto] Calibrazione completata — sequenza ripresa.",
+                            fail_msg="[Auto] Calibrazione fallita — sequenza ripresa comunque.",
+                            pause_msg="[Auto] Calibrazione terminata — sequenza in pausa.",
+                        )
 
                     self._on_spindown(_resume_spindown)
 
@@ -756,42 +763,16 @@ class CsvPanel(ttk.Frame):
                     self._on_auto_status('ok', 'Auto: EEPROM…')
 
                     def _resume_eeprom(success: bool, _ai=absolute_index):
-                        if not self.auto_commands_running:
-                            return
-
-                        # Fallimento definitivo (dopo i retry lato manager):
-                        # ferma la sequenza, non avanzare. Lo stop ha priorità
-                        # su un'eventuale pausa pendente.
-                        if not success:
-                            self._log.error(
-                                "[Auto] Scrittura EEPROM FALLITA dopo i retry — "
-                                "sequenza interrotta.")
-                            self._current_abs_idx = _ai
-                            self.stop()
-                            return
-
-                        # Successo: applica eventuale pausa pendente…
-                        if self._pending_pause:
-                            self._pending_pause      = False
-                            self._paused             = True
-                            self.auto_commands_running = False
-                            self._current_abs_idx    = _ai
-                            self._pause_remaining_ms = 0
-                            self._stop_countdown()
-                            self._btn_play_pause.config(text="▶  Riprendi")
-                            self._on_auto_status('warn', 'Auto: PAUSA')
-                            self._update_nav_buttons()
-                            self._log.info(
-                                "[Auto] Scrittura EEPROM completata — sequenza in pausa.")
-                            return
-
-                        # …oppure prosegui.
-                        self._log.info(
-                            "[Auto] Scrittura EEPROM verificata — sequenza ripresa.")
-                        self._back_origin = -1
-                        self._back_count  = 0
-                        self._auto_command_id = self.after(
-                            0, lambda: send_next(_ai + 1))
+                        # fail_stops=True: dopo i retry lato manager, un fallimento
+                        # ferma la sequenza (lo stop ha priorità sulla pausa).
+                        self._finish_async_command(
+                            _ai, success, send_next,
+                            fail_stops=True,
+                            ok_msg="[Auto] Scrittura EEPROM verificata — sequenza ripresa.",
+                            fail_msg=("[Auto] Scrittura EEPROM FALLITA dopo i retry — "
+                                      "sequenza interrotta."),
+                            pause_msg="[Auto] Scrittura EEPROM completata — sequenza in pausa.",
+                        )
 
                     self._on_eeprom(str(etichetta), _resume_eeprom)
 

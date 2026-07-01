@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from paths import app_base_dir
 from logic import settings_manager
 from logic.data_processing import DataProcessor
 from shared_lib.bluetooth_manager import CalibrationPhase
@@ -74,7 +75,7 @@ class TotalCommanderApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self._is_dev = not is_release(VERSION)
-        self.title("Total Commander IV" + (f" — ⚠ DEBUG {VERSION}" if self._is_dev else ""))
+        self.title("Total Commander" + (f" — ⚠ DEBUG {VERSION}" if self._is_dev else ""))
         self.geometry("1000x800")
 
         # ── Stili ttk ────────────────────────────────────────────────────────
@@ -103,14 +104,12 @@ class TotalCommanderApp(tk.Tk):
         self.gamma_reader = GammaSensorReader()
         self.modbus = ModbusBancoCollaudo()
 
-        # ── Impostazioni (default + override da file) ────────────────────────
+        # ── Impostazioni ─────────────────────────────────────────────────────
+        # I valori (soglie delta, smoothing, rec_hz, stop_rec_on_auto_end,
+        # banco_ip, avg_dim, invert_speed, offset) sono definiti UNA sola volta
+        # in settings_manager.DEFAULTS e applicati qui da load_settings(), che
+        # copre sia il caso "nessun file" sia gli override presenti su disco.
         self.settings_file = "settings.json"
-        self.delta_speed_thresholds_kmh = (1.0, 3.0)
-        self.delta_power_thresholds_pct = (2.0, 5.0)
-        self.delta_smoothing_window = 5
-        self.rec_hz = 1
-        self.stop_rec_on_auto_end = False
-        self.banco_ip = '192.168.0.10'
         self.load_settings()
 
         # ── Registrazione ────────────────────────────────────────────────────
@@ -694,19 +693,27 @@ class TotalCommanderApp(tk.Tk):
                 # Abilita FTMS subito — connect_to_device garantisce già
                 # che i servizi GATT siano pronti a questo punto
                 self.after(0, self._auto_enable_ftms)
-                # Device number ANT+: lettura una-tantum da EEPROM (uint16 LE @ addr 2)
+                # Device number: letto dal campo Serial Number del servizio
+                # standard "Device Information" (DIS). È lo stesso numero di
+                # prima, ma indipendente dalla locazione EEPROM specifica del
+                # firmware (che può variare tra dispositivi diversi).
                 try:
-                    raw = self.ble.run(self.ble.manager.read_eeprom(2, 2)).result()
-                    if raw and len(raw) >= 2:
-                        devnum = int.from_bytes(bytes(raw[:2]), "little")
-                        self.after(0, self.status_bar.set_device_number, devnum)
-                        logging.getLogger().info(f"Device number: {devnum}")
+                    info = self.ble.run(
+                        self.ble.manager.read_device_information(timeout=6.0)
+                    ).result(timeout=10)
+                    serial = (info.get('data') or {}).get('serial_number')
+                    if isinstance(serial, str):
+                        serial = serial.strip()
+                    if serial:
+                        self.after(0, self.status_bar.set_device_number, serial)
+                        logging.getLogger().info(f"Device number (serial): {serial}")
                     else:
                         self.after(0, self.status_bar.set_device_number, None)
-                        logging.getLogger().warning("Device number: risposta EEPROM vuota o troppo corta.")
+                        logging.getLogger().warning(
+                            "Device number: Serial Number assente nel servizio Device Information.")
                 except Exception as e:
                     self.after(0, self.status_bar.set_device_number, None)
-                    logging.getLogger().error(f"Errore lettura device number: {e}")
+                    logging.getLogger().error(f"Errore lettura device number (serial): {e}")
             else:
                 logging.getLogger().warning(f"Connessione BLE fallita: {name or address} non ha risposto.")
         except Exception as e:
@@ -1051,9 +1058,9 @@ class TotalCommanderApp(tk.Tk):
         logging.getLogger().debug("Flush manuale dati eseguito.")
 
     def _get_application_path(self):
-        if getattr(sys, 'frozen', False):
-            return os.path.dirname(sys.executable)
-        return os.path.dirname(os.path.abspath(__file__))
+        # Percorso unico condiviso con main.py (vedi paths.py). In sviluppo
+        # restituisce la cartella del progetto; in build, quella dell'exe.
+        return app_base_dir()
 
     def _open_output_dir(self):
         self._open_working_directory(

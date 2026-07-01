@@ -10,7 +10,7 @@ import re
 
 # ── Personalizza questi due ──────────────────────────────────────────────────
 COMPANY   = "Elite srl"
-COPYRIGHT = "Elire srl (c)"
+COPYRIGHT = "Elite srl (c)"
 # ─────────────────────────────────────────────────────────────────────────────
 
 OUT      = os.environ.get("VERSION_INFO_OUT", "version_info.txt")
@@ -31,10 +31,10 @@ flags    = 0x3 if is_debug else 0x0  # VS_FF_DEBUG | VS_FF_PRERELEASE
 
 if is_debug:
     description  = "Total Commander - BUILD DI SVILUPPO (NON RILASCIATA)"
-    product_name = "Total Commander IV [DEBUG]"
+    product_name = "Total Commander [DEBUG]"
 else:
-    description  = "Total Commander IV"
-    product_name = "Total Commander IV"
+    description  = "Total Commander"
+    product_name = "Total Commander"
 
 comments = f"git: {gitver} | shared_lib: {libver}"
 

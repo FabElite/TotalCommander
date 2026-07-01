@@ -1,5 +1,5 @@
 """
-Entry point dell'applicazione Total Commander IV.
+Entry point dell'applicazione Total Commander.
 
 Architettura logging:
   - Root logger:        DEBUG  → non scarta nulla; ogni handler decide
@@ -14,21 +14,7 @@ import os
 from logging.handlers import RotatingFileHandler
 
 from gui.app import TotalCommanderApp
-
-
-def resource_path(relative_path):
-    """Percorso risorse compatibile con PyInstaller."""
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
-
-
-def _base_dir() -> str:
-    """Cartella base dell'applicazione: accanto all'exe in produzione,
-    cartella del progetto in sviluppo."""
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+from paths import resource_path, app_base_dir as _base_dir
 
 
 # ── Handler GUI ───────────────────────────────────────────────────────────────
