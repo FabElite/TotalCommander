@@ -51,74 +51,114 @@ class StatusBar(tk.Frame):
         g_ble = tk.Frame(self, bg=_BG)
         g_ble.grid(row=0, column=2, padx=10)
 
-        # LED BLE
+        # LED BLE (riga 0) + LED FTMS (riga 1), impilati nella stessa colonna
         self._led_ble = tk.Label(g_ble, text='●', bg=_BG, fg='#555555',
-                                 font=('Helvetica', 25))
+                                 font=('Helvetica', 19))
         self._led_ble.grid(row=0, column=0, padx=(0, 3))
-        self._led_label(g_ble, 'BLE', col=1)
-        # nome e indirizzo device
-        self._lbl_device = tk.Label(g_ble, text='—', bg=_BG, fg='#666688',
-                                    font=('Helvetica', 8), anchor='w')
-        self._lbl_device.grid(row=0, column=2, padx=(6, 12))
-        # ── Riga 1: dettagli identità (MAC + device number) in un frame dedicato,
-        #    così i due valori restano allineati tra loro con spaziatura fissa,
-        #    indipendentemente dalle larghezze delle colonne della riga 0 ──────
-        g_ble_id = tk.Frame(g_ble, bg=_BG)
-        g_ble_id.grid(row=1, column=1, columnspan=5, sticky='w',
-                      padx=(3, 0), pady=(0, 1))
+        self._led_label(g_ble, 'BLE', row=0, col=1)
 
-        # Etichetta dell'indirizzo: NON "BLE" (già presente in riga 0 accanto al
-        # LED); "MAC" distingue l'indirizzo dal device number sulla stessa riga.
-        self._cap_address = tk.Label(g_ble_id, text='', bg=_BG, fg='#666688',
-                                     font=('Helvetica', 8))
-        self._cap_address.pack(side='left')
-        self._lbl_address = tk.Label(g_ble_id, text='', bg=_BG, fg='#555577',
-                                     font=('Helvetica', 8))
-        self._lbl_address.pack(side='left', padx=(4, 16))
-
-        # Device number (uint16 LE letto da EEPROM @ addr 2)
-        self._cap_devnum = tk.Label(g_ble_id, text='', bg=_BG, fg='#666688',
-                                    font=('Helvetica', 8))
-        self._cap_devnum.pack(side='left')
-        self._lbl_devnum = tk.Label(g_ble_id, text='', bg=_BG, fg='#555577',
-                                    font=('Helvetica', 8))
-        self._lbl_devnum.pack(side='left', padx=(4, 0))
-
-        # LED FTMS
         self._led_ftms = tk.Label(g_ble, text='●', bg=_BG, fg='#555555',
-                                  font=('Helvetica', 25))
-        self._led_ftms.grid(row=0, column=4, padx=(0, 3))
+                                  font=('Helvetica', 19))
+        self._led_ftms.grid(row=1, column=0, padx=(0, 3))
         self._lbl_ftms = tk.Label(g_ble, text='FTMS', bg=_BG, fg='#aaaacc',
                                   font=('Helvetica', 8))
-        self._lbl_ftms.grid(row=0, column=5)
+        self._lbl_ftms.grid(row=1, column=1)
+
+        # Riga 0, a dx dei LED: nome device + MAC
+        row0 = tk.Frame(g_ble, bg=_BG)
+        row0.grid(row=0, column=2, sticky='w', padx=(6, 0))
+
+        self._cap_device = tk.Label(row0, text='', bg=_BG, fg='#666688',
+                                    font=('Helvetica', 8), anchor='w')
+        self._cap_device.pack(side='left')
+        self._lbl_device = tk.Label(row0, text='—', bg=_BG, fg='#666688',
+                                    font=('Helvetica', 8), anchor='w')
+        self._lbl_device.pack(side='left')
+        self._cap_address = tk.Label(row0, text='', bg=_BG, fg='#666688',
+                                     font=('Helvetica', 8))
+        self._cap_address.pack(side='left', padx=(12, 0))
+        self._lbl_address = tk.Label(row0, text='', bg=_BG, fg='#555577',
+                                     font=('Helvetica', 8))
+        self._lbl_address.pack(side='left', padx=(4, 0))
+
+        # Riga 1, a dx dei LED: FW/SW/HW/Dev# con titoli e valori colorati separatamente
+        self._versions_row = tk.Frame(g_ble, bg=_BG)
+        self._versions_row.grid(row=1, column=2, sticky='w',
+                                padx=(6, 0), pady=(1, 0))
+
+        self._version_value_labels = {}
+
+        version_items = [
+            ('FW', 'fw'),
+            ('SW', 'sw'),
+            ('HW', 'hw'),
+            ('Dev#', 'devnum'),
+        ]
+
+        for i, (title, key) in enumerate(version_items):
+            tk.Label(
+                self._versions_row,
+                text=f'{title} ',
+                bg=_BG,
+                fg='#666688',
+                font=('Helvetica', 8),
+                anchor='w'
+            ).pack(side='left')
+
+            value_lbl = tk.Label(
+                self._versions_row,
+                text='',
+                bg=_BG,
+                fg='#55ffaa',
+                font=('Helvetica', 8),
+                anchor='w'
+            )
+            value_lbl.pack(side='left')
+
+            self._version_value_labels[key] = value_lbl
+
+            if i < len(version_items) - 1:
+                tk.Label(
+                    self._versions_row,
+                    text='   ',
+                    bg=_BG,
+                    fg='#666688',
+                    font=('Helvetica', 8)
+                ).pack(side='left')
 
         self._sep(3)
 
-        # ── col 4-5: Lorenz, Banco ────────────────────────────────────────────
-        for col, label, attr in [(4, 'Lorenz', '_led_lorenz'),
-                                 (5, 'Banco',  '_led_banco')]:
-            g = tk.Frame(self, bg=_BG)
-            g.grid(row=0, column=col, padx=8)
-            led = tk.Label(g, text='●', bg=_BG, fg='#555555',
-                           font=('Helvetica', 25))
-            led.grid(row=0, column=0, padx=(0, 3))
-            self._led_label(g, label, col=1)
-            setattr(self, attr, led)
+        # ── Lorenz | Banco (ora separati come tutti gli altri gruppi) ─────────
+        g_lor = tk.Frame(self, bg=_BG)
+        g_lor.grid(row=0, column=4, padx=8)
+        self._led_lorenz = tk.Label(g_lor, text='●', bg=_BG, fg='#555555',
+                                    font=('Helvetica', 25))
+        self._led_lorenz.grid(row=0, column=0, padx=(0, 3))
+        self._led_label(g_lor, 'Lorenz', col=1)
 
-        self._sep(6)
+        self._sep(5)
 
-        # ── col 7: Auto ───────────────────────────────────────────────────────
+        g_ban = tk.Frame(self, bg=_BG)
+        g_ban.grid(row=0, column=6, padx=8)
+        self._led_banco = tk.Label(g_ban, text='●', bg=_BG, fg='#555555',
+                                   font=('Helvetica', 25))
+        self._led_banco.grid(row=0, column=0, padx=(0, 3))
+        self._led_label(g_ban, 'Banco', col=1)
+
+        self._sep(7)
+
+        # ── Auto ──────────────────────────────────────────────────────────────
         g_auto = tk.Frame(self, bg=_BG)
-        g_auto.grid(row=0, column=7, padx=10)
+        g_auto.grid(row=0, column=8, padx=10)
         self._led_auto = tk.Label(g_auto, text='●', bg=_BG, fg='#555555',
                                   font=('Helvetica', 25))
         self._led_auto.grid(row=0, column=0, padx=(0, 3))
         self._lbl_auto = self._led_label(g_auto, 'Auto: OFF', col=1)
-        self._sep(8)
+        self._sep(9)
 
-        # ── col 9: REC ───────────────────────────────────────────────────────
+        # ── REC ───────────────────────────────────────────────────────────────
         g_rec = tk.Frame(self, bg=_BG)
-        g_rec.grid(row=0, column=9, padx=10)
+        g_rec.grid(row=0, column=10, padx=10)
         self._led_rec = tk.Label(g_rec, text='●', bg=_BG, fg='#555555',
                                  font=('Helvetica', 35))
         # rowspan=2: il LED grande determina l'altezza del frame su entrambe le righe
@@ -134,7 +174,7 @@ class StatusBar(tk.Frame):
         self._lbl_rec_hz.grid(row=1, column=2, columnspan=2,
                               padx=(10, 0), pady=(0, 1))
 
-        self._sep(10)
+        self._sep(11)
     # ── API pubblica ──────────────────────────────────────────────────────────
 
     def pulse_ui(self):
@@ -158,27 +198,37 @@ class StatusBar(tk.Frame):
 
     def set_device_info(self, name=None, address=None):
         if name or address:
+            self._cap_device.config(text='NAME')
             self._lbl_device.config(text=name or 'Sconosciuto', fg='#88ffaa')
             self._cap_address.config(text='MAC')
             self._lbl_address.config(text=address or '', fg='#88ffaa')
-            self._cap_devnum.config(text='Dev#')
-            self._lbl_devnum.config(text='…', fg='#666688')
         else:
+            self._cap_device.config(text='')
             self._lbl_device.config(text='—', fg='#666688')
             self._cap_address.config(text='')
             self._lbl_address.config(text='')
-            self._cap_devnum.config(text='')
-            self._lbl_devnum.config(text='')
 
-    def set_device_number(self, num=None):
-        """Device number letto dal Serial Number del servizio Device Information
-        dopo il connect.
-        num valorizzato → mostra il valore (verde, coerente con nome/indirizzo).
-        num=None        → lettura fallita/assente ('?', ambra)."""
-        if num is None:
-            self._lbl_devnum.config(text='?', fg='#cc8800')
-        else:
-            self._lbl_devnum.config(text=str(num), fg='#88ffaa')
+    def set_device_versions(self, fw=None, sw=None, hw=None, devnum=None):
+        """
+        Riga compatta FW/SW/HW/Dev#, letti dal servizio Device Information
+        alla connessione BLE. Senza argomenti pulisce (usare alla disconnessione).
+        """
+        values = {
+            'fw': fw,
+            'sw': sw,
+            'hw': hw,
+            'devnum': devnum,
+        }
+
+        if not any(values.values()):
+            for lbl in self._version_value_labels.values():
+                lbl.config(text='')
+            return
+
+        self._version_value_labels['fw'].config(text=str(fw or '—'))
+        self._version_value_labels['sw'].config(text=str(sw or '—'))
+        self._version_value_labels['hw'].config(text=str(hw or '—'))
+        self._version_value_labels['devnum'].config(text=str(devnum or '—'))
 
     def set_ftms(self, hz=None):
         """
@@ -189,10 +239,8 @@ class StatusBar(tk.Frame):
         """
         if hz is None:
             self._led_ftms.config(fg='#555555')
-            self._lbl_ftms.config(fg='#aaaacc')
         else:
             self._led_ftms.config(fg='#00cc44')
-            self._lbl_ftms.config(fg='#88ffaa')
 
     def set_rec(self, recording: bool):
         """Attiva (rosso pulsante) o disattiva (spento) il LED REC."""

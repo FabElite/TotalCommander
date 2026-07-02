@@ -652,6 +652,7 @@ class TotalCommanderApp(tk.Tk):
         self.connected_device_name = None
         self.connected_device_address = None
         self.status_bar.set_device_info()
+        self.status_bar.set_device_versions()
         self._ftms_timestamps.clear()
         if self.live_panel.is_ftms_enabled():
             self.live_panel.set_ftms_button(False)
@@ -701,19 +702,22 @@ class TotalCommanderApp(tk.Tk):
                     info = self.ble.run(
                         self.ble.manager.read_device_information(timeout=6.0)
                     ).result(timeout=10)
-                    serial = (info.get('data') or {}).get('serial_number')
+                    data = info.get('data') or {}
+                    serial = data.get('serial_number')
                     if isinstance(serial, str):
                         serial = serial.strip()
+                    fw = data.get('firmware_revision')
+                    sw = data.get('software_revision')
+                    hw = data.get('hardware_revision')
+                    self.after(0, self.status_bar.set_device_versions, fw, sw, hw, serial)
                     if serial:
-                        self.after(0, self.status_bar.set_device_number, serial)
                         logging.getLogger().info(f"Device number (serial): {serial}")
                     else:
-                        self.after(0, self.status_bar.set_device_number, None)
                         logging.getLogger().warning(
                             "Device number: Serial Number assente nel servizio Device Information.")
                 except Exception as e:
-                    self.after(0, self.status_bar.set_device_number, None)
-                    logging.getLogger().error(f"Errore lettura device number (serial): {e}")
+                    self.after(0, self.status_bar.set_device_versions)
+                    logging.getLogger().error(f"Errore lettura device info: {e}")
             else:
                 logging.getLogger().warning(f"Connessione BLE fallita: {name or address} non ha risposto.")
         except Exception as e:
@@ -746,6 +750,7 @@ class TotalCommanderApp(tk.Tk):
                     self.connected_device_name = None
                     self.connected_device_address = None
                     self.status_bar.set_device_info()
+                    self.status_bar.set_device_versions()
                     self._ftms_timestamps.clear()
                     if self.live_panel.is_ftms_enabled():
                         self.live_panel.set_ftms_button(False)
