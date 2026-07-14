@@ -71,6 +71,9 @@ class CsvPanel(ttk.Frame):
         self.remaining_test_duration_seconds = 0
         self._auto_command_id                = None
         self._countdown_id                   = None
+        self._pending_async_ops  = 0  # True mentre save/spindown/write_eeprom è in corso
+        self._pending_nav_target = None  # indice assoluto richiesto durante un comando async
+        self._pending_nav_item = None  # riga Treeview attualmente taggata 'pendingrow'
 
         # ── Stato navigazione / pausa ──────────────────────────────────────────
         # _paused          : True quando la sequenza è esplicitamente in pausa
@@ -150,6 +153,10 @@ class CsvPanel(ttk.Frame):
             command=self.skip_next, state='disabled')
         self._btn_skip.grid(row=0, column=3, padx=(0, 8))
 
+        self._lbl_pending_nav = tk.Label(
+            tb, text='', font=('Helvetica', 8, 'italic'), fg='#a05a00', anchor='w')
+        self._lbl_pending_nav.grid(row=2, column=0, columnspan=5, sticky='w', pady=(2, 0))
+
         ttk.Button(tb, text="■  Stop",
                    command=self.stop, width=9
                    ).grid(row=0, column=4)
@@ -208,6 +215,7 @@ class CsvPanel(ttk.Frame):
         self._table.tag_configure('oddrow',     background='lightgrey')
         self._table.tag_configure('evenrow',    background='white')
         self._table.tag_configure('currentrow', background='yellow')
+        self._table.tag_configure('pendingrow', background='#ffb84d')
 
         self._autoscroll_table = tk.BooleanVar(value=True)
         ttk.Checkbutton(wrap, text='Auto-scroll',
@@ -391,6 +399,47 @@ class CsvPanel(ttk.Frame):
         self._btn_prev.config(state=s)
         self._btn_skip.config(state=s)
 
+    def _refresh_pending_nav_ui(self):
+        if self._pending_nav_item is not None:
+            idx = self._table.index(self._pending_nav_item)
+            if 'currentrow' not in self._table.item(self._pending_nav_item, 'tags'):
+                self._table.item(
+                    self._pending_nav_item,
+                    tags=('evenrow' if idx % 2 == 0 else 'oddrow',))
+            self._pending_nav_item = None
+
+        if self._pending_nav_target is None or not self._command_items:
+            self._lbl_pending_nav.config(text='')
+            return
+
+        idx = self._pending_nav_target % len(self._commands)
+        item = self._command_items[idx]
+        if 'currentrow' not in self._table.item(item, 'tags'):
+            self._table.item(item, tags=('pendingrow',))
+        self._pending_nav_item = item
+        num, cmd = self._table.item(item, 'values')[:2]
+        self._lbl_pending_nav.config(
+            text=f"⏭/⏮ in coda → riga #{num} ({cmd}), dopo fine operazione corrente")
+
+    def _set_pending_nav(self, target: int):
+        self._pending_nav_target = max(0, min(target, self._total_commands))
+        self._refresh_pending_nav_ui()
+
+    def _clear_pending_nav(self):
+        self._pending_nav_target = None
+        self._refresh_pending_nav_ui()
+
+    def _request_nav(self, target: int):
+        """Applica subito, o accoda se un comando async è in corso."""
+        if self._pending_async_ops > 0:
+            if self._pending_pause:
+                self._log.warning("Navigazione ignorata: pausa già in attesa.")
+                return
+            self._set_pending_nav(target)
+            self._log.info(f"Navigazione in coda (operazione in corso) → target {target}.")
+        else:
+            self._jump_to(target)
+
     def _remaining_seconds_from(self, abs_idx: int) -> int:
         """
         Somma i tempi di attesa (tempo_s) dei comandi da abs_idx fino a fine sequenza.
@@ -456,11 +505,12 @@ class CsvPanel(ttk.Frame):
             self._log.info(
                 f"Sequenza in pausa (residuo timer: {self._pause_remaining_ms} ms).")
         else:
-            # Pausa pendente durante save / spindown
+            if self._pending_nav_target is not None:
+                self._log.warning("Pausa ignorata: una navigazione è già in coda.")
+                return
             self._pending_pause = True
             self._btn_play_pause.config(text="⏸  Annulla ⏸")
-            self._log.info(
-                "Pausa richiesta — attendo fine operazione corrente (clicca ancora per annullare).")
+            self._log.info("Pausa richiesta — attendo fine operazione corrente...")
 
     def resume(self):
         """
@@ -497,42 +547,31 @@ class CsvPanel(ttk.Frame):
             self._send_next(self._current_abs_idx + 1)
 
     def skip_next(self):
-        """Salta immediatamente al comando successivo, resettando la navigazione back."""
         if not (self.auto_commands_running or self._paused):
             return
         self._back_origin = -1
-        self._back_count  = 0
-        self._jump_to(self._current_abs_idx + 1)
+        self._back_count = 0
+        base = self._pending_nav_target if self._pending_nav_target is not None \
+            else self._current_abs_idx
+        self._request_nav(base + 1)
 
     def go_back(self):
-        """
-        Navigazione indietro con memoria della posizione originale:
-          1° press → riavvia il comando corrente  (back_count=0, target=origin)
-          2° press → va al comando precedente      (back_count=1, target=origin-1)
-          3° press → va ancora indietro            (back_count=2, target=origin-2)
-          …
-        _back_origin è fissato al primo press; i press successivi ne sottraggono
-        _back_count incrementalmente. Reset su skip, avanzamento naturale e stop.
-        """
         if not (self.auto_commands_running or self._paused):
             return
         if self._back_origin == -1:
-            # Primo press: memorizza la posizione corrente
-            self._back_origin = self._current_abs_idx
+            self._back_origin = (self._pending_nav_target
+                                 if self._pending_nav_target is not None
+                                 else self._current_abs_idx)
         target = max(0, self._back_origin - self._back_count)
         self._back_count += 1
-        self._log.debug(
-            f"go_back: origin={self._back_origin} press={self._back_count-1} → target={target}")
-        self._jump_to(target)
+        self._request_nav(target)
 
     def _jump_to(self, index: int):
-        """
-        Interrompe il timer corrente e salta a index.
-        Azzera le evidenziature, ricalcola e riavvia il countdown.
-        """
         if self._send_next is None:
             return
         index = max(0, min(index, self._total_commands))
+        self._pending_nav_target = None
+        self._refresh_pending_nav_ui()
 
         if self._auto_command_id is not None:
             self.after_cancel(self._auto_command_id)
@@ -605,47 +644,11 @@ class CsvPanel(ttk.Frame):
     def _finish_async_command(self, ai, success, send_next, *,
                               fail_stops=False,
                               ok_msg="", fail_msg="", pause_msg=""):
-        """Conclusione comune dei comandi asincroni (save / spindown / write_eeprom).
+        self._pending_async_ops = max(0, self._pending_async_ops - 1)
 
-        Invocata sul main thread dai rispettivi resume-callback. Comportamento:
-          - sequenza non più attiva          → no-op
-          - fail_stops=True e success=False  → log errore + stop() (non avanza)
-          - pausa pendente                   → applica la pausa
-          - altrimenti                       → log esito e avanza (ai+1)
-
-        pause_msg può essere una stringa o una funzione success->stringa (serve
-        a 'save', il cui messaggio di pausa dipende dall'esito).
-        """
         if not self.auto_commands_running:
             return
 
-        if fail_stops and not success:
-            self._log.error(fail_msg)
-            self._current_abs_idx = ai
-            self.stop()
-            return
-
-        if self._pending_pause:
-            self._pending_pause        = False
-            self._paused               = True
-            self.auto_commands_running = False
-            self._current_abs_idx      = ai
-            self._pause_remaining_ms   = 0
-            self._stop_countdown()
-            self._btn_play_pause.config(text="▶  Riprendi")
-            self._on_auto_status('warn', 'Auto: PAUSA')
-            self._update_nav_buttons()
-            msg = pause_msg(success) if callable(pause_msg) else pause_msg
-            self._log.info(msg)
-            return
-
-        if success:
-            self._log.info(ok_msg)
-        else:
-            self._log.warning(fail_msg)
-        self._back_origin = -1
-        self._back_count  = 0
-        self._auto_command_id = self.after(0, lambda: send_next(ai + 1))
 
     def start(self):
         if self._paused:
@@ -653,6 +656,11 @@ class CsvPanel(ttk.Frame):
             return
         if self.auto_commands_running:
             self._log.warning("Comandi automatici già in esecuzione.")
+            return
+        if self._pending_async_ops > 0:
+            self._log.warning(
+                "Operazione asincrona precedente (save/spindown/eeprom) ancora in chiusura "
+                "in background — attendere il completamento prima di avviare una nuova sequenza.")
             return
         if not self._table.get_children():
             self._log.info("La tabella dei comandi è vuota.")
@@ -687,6 +695,10 @@ class CsvPanel(ttk.Frame):
         self._back_count         = 0
         self._pause_remaining_ms = 0
         self._after_deadline     = 0.0
+        self._pending_async_ops  = 0
+        self._pending_nav_target = None
+        self._pending_nav_item = None
+        self._lbl_pending_nav.config(text='')
 
         commands       = [self._table.item(i, 'values') for i in self._table.get_children()]
         command_items  = list(self._table.get_children())
@@ -740,6 +752,7 @@ class CsvPanel(ttk.Frame):
                                 " — sequenza in pausa."),
                         )
 
+                    self._async_active += 1
                     self._on_save(wait_time, str(etichetta), _resume_save)
 
                 # ── Comando SPINDOWN ───────────────────────────────────────────
@@ -754,6 +767,7 @@ class CsvPanel(ttk.Frame):
                             pause_msg="[Auto] Calibrazione terminata — sequenza in pausa.",
                         )
 
+                    self._async_active += 1
                     self._on_spindown(_resume_spindown)
 
                 # ── Comando EEPROM (scrittura+verifica in memoria) ─────────────
@@ -774,6 +788,7 @@ class CsvPanel(ttk.Frame):
                             pause_msg="[Auto] Scrittura EEPROM completata — sequenza in pausa.",
                         )
 
+                    self._async_active += 1
                     self._on_eeprom(str(etichetta), _resume_eeprom)
 
                 # ── Comando ordinario con timer ────────────────────────────────
@@ -842,6 +857,8 @@ class CsvPanel(ttk.Frame):
             self._pending_pause        = False
             self._back_origin          = -1
             self._back_count           = 0
+            self._pending_nav_target = None
+            self._refresh_pending_nav_ui()
             self._stop_countdown()
             self._lbl_remaining.config(text="Interrotto")
             self._lbl_fine.config(
